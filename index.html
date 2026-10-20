@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Void · TypeScript client</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+  <header><div class="brand">VOID <span>634 / TYPESCRIPT</span></div><div id="status" role="status">Disconnected</div></header>
+  <main>
+    <section class="world">
+      <div class="toolbar"><div><h1>World view</h1><p>Native TypeScript · cache terrain and objects · live entities</p></div><span id="position">Awaiting character</span></div>
+      <div class="map-controls"><div><button id="map-follow" type="button">Follow character</button><button id="map-zoom-out" type="button" aria-label="Zoom out">−</button><button id="map-zoom-in" type="button" aria-label="Zoom in">+</button><label>Floor <select id="map-floor"><option value="auto">Auto</option><option value="0">0 · Ground</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label><label><input type="checkbox" id="map-grid"> Grid</label></div><span id="map-status" role="status">Map loads after login</span></div>
+      <canvas id="map" aria-label="Nearby entities. Click a tile to walk."></canvas>
+      <div class="legend"><span><i class="self"></i>You</span><span><i class="player"></i>Players</span><span><i class="npc"></i>NPCs</span><span id="map-hover">Drag to pan · scroll to zoom · click a tile to walk</span></div>
+      <section class="messages"><h2>Game messages</h2><div id="messages" aria-live="polite">Connect to a Void server to begin.</div></section>
+    </section>
+    <aside>
+      <section><h2>Character</h2><form id="login"><label>Username<input name="username" autocomplete="username" maxlength="12" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button id="connect">Connect</button></form><button id="disconnect" hidden>Disconnect</button><p id="error" role="alert"></p><p id="target" class="muted"></p></section>
+      <section><h2>Inventory <small id="inventory-count"></small></h2><div id="inventory" class="inventory"></div><p class="muted">Item IDs are shown until cache definitions are loaded.</p></section>
+      <section><h2>Skills</h2><div id="skills" class="skills">No skill updates yet.</div></section>
+      <details><summary>Interfaces & protocol</summary><pre id="debug">No packets received.</pre></details>
+    </aside>
+  </main><script type="module" src="/client.js"></script>
+</body></html>
