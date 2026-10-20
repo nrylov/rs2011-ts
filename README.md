@@ -78,6 +78,20 @@ VOID_USERNAME=mytest VOID_PASSWORD=localpassword bun run example:woodcut-bank
 
 Finish the tutorial first, or use a separate test server configured for mainland starts. The example leaves the character at Lumbridge bank with one log in inventory. It can descend the castle stairs on a later run. It reports missing/depleted trees or blocked routes explicitly.
 
+## NPC dialogue
+
+The lightweight client has a visible conversation panel, nearby **Talk** buttons, labelled choices and Space/number shortcuts. The SDK exposes observed conversation helpers:
+
+```ts
+await bot.talkTo('Guardsman Peale');
+await bot.navigateDialog(); // continue speech, stop at the first unanswered choice
+const dialog = await sdk.getDialog();
+await bot.chooseDialogOption('Tell me about Lumbridge.', {expected: dialog!});
+await bot.navigateDialog(['Bye.']);
+```
+
+See [the dialogue guide](docs/dialogue.md) for snapshots, `continueDialog`, choice matching, stale-snapshot checks, low-level dispatches, limits, and the [runnable example](examples/npc-dialogue.ts).
+
 ## Implemented and remaining work
 
 Implemented: RSA/XTEA/ISAAC login; fragmented framing; static-region/player/NPC movement; player names; containers/skills/messages; live object replacement; read-only JS5 archives, terrain, object/item/NPC definitions; IF3 text/actions; NPC variable-selected forms; window/mount/visibility updates; all five NPC/object options; equipment and common dialogue/bank controls; collision-aware single-tile local routing; shared browser/headless helpers.

@@ -1,17 +1,19 @@
 import { BotSDK, BotActions, inventoryOption, equipmentComponents, plainText } from '../core/sdk.ts';
-import type { Item } from '../core/world.ts';
+import type { Dialog } from '../core/dialogue.ts';
+import type { Item, Entity } from '../core/world.ts';
 import type { MapView } from './map.ts';
 import type { ItemType } from '../cache/definitions.ts';
 const el=(tag:string,text:string)=>{const e=document.createElement(tag);e.textContent=text;return e;};
 const get=(id:string)=>document.getElementById(id)!;
 export class Controls {
- private items=new Map<number,ItemType>();private pending=new Set<number>();private missing=new Set<number>();private renderRevision=0;private collisionKey='';private collisionRequest=0;
+ private items=new Map<number,ItemType>();private pending=new Set<number>();private missing=new Set<number>();private renderRevision=0;private collisionKey='';private collisionRequest=0;private dialogToken='';private dialogPending=false;private currentDialog:Dialog|null=null;private npcSignature='';
  constructor(readonly sdk:BotSDK,readonly bot:BotActions,readonly map:MapView){
   map.onMenu=(x,y,cx,cy)=>{void this.mapMenu(x,y,cx,cy).catch(e=>this.report(String(e)));};
   get('map-collision').onchange=()=>{this.collisionKey='';this.updateCollision();};
   get('close-modal').onclick=()=>this.run('Close interface',()=>bot.closeInterface());
   get('deposit-all').onclick=()=>this.run('Deposit inventory',async()=>{if(!sdk.isOpen(762))throw new Error('Bank is not open');const before=sdk.getInventory().length;sdk.session.clickInterface(762,33);await sdk.session.waitFor(()=>sdk.getInventory().length<before);});
   get('bank-item-mode').onclick=()=>this.run('Select item withdrawal mode',async()=>{this.sdk.session.clickInterface(762,15);await this.sdk.session.waitFor(w=>w.varps.get(115)===0);});
+  window.addEventListener('keydown',e=>this.dialogKey(e));
   get('amount-form').onsubmit=e=>{e.preventDefault();try{sdk.session.enterNumber(Number((get('amount') as HTMLInputElement).value));this.report('Amount sent; waiting for game update.');}catch(e){this.report(String(e));}};
  }
  report(message:string){get('action-status').textContent=message;}
@@ -30,7 +32,7 @@ export class Controls {
    if(/^chop/i.test(option)&&o.name==='Tree')this.run('Chop tree',()=>this.bot.chopTree(o));
    else {this.sdk.session.interactObject(o.id,o.x,o.y,index);this.report(`${option} ${o.name}: sent to game.`);}
   }});});
-  for(const n of this.sdk.getState().npcs.values())if(n.x===x&&n.y===y&&n.level===this.sdk.getState().player?.level){const def=await this.sdk.npcDefinition(n.type!);if(!def)continue;def.options.forEach((option,index)=>{if(option)actions.push({label:`${option} ${def.name}`,run:()=>{this.sdk.session.interactNpc(n.index,index);this.report(`${option} ${def.name}: sent to game.`);}});});}
+  for(const n of this.sdk.getState().npcs.values())if(n.x===x&&n.y===y&&n.level===this.sdk.getState().player?.level){const def=await this.sdk.npcDefinition(n.type!);if(!def)continue;def.options.forEach((option,index)=>{if(option)actions.push({label:`${option} ${def.name}`,run:()=>{if(/^talk[ -]?to$/i.test(option))this.talkTo(n);else{this.sdk.session.interactNpc(n.index,index);this.report(`${option} ${def.name}: sent to game.`);}}});});}
   actions.push({label:'Walk here',run:()=>this.walk(x,y)});this.menu(`${x}, ${y}`,actions,cx,cy);
  }
  private definition(id:number){if(!this.items.has(id)&&!this.pending.has(id)&&!this.missing.has(id)){this.pending.add(id);void Promise.resolve(this.sdk.data.item(id)).then(d=>this.items.set(id,d)).catch(()=>{this.missing.add(id);}).finally(()=>{this.pending.delete(id);this.render();});}return this.items.get(id);}
@@ -61,14 +63,52 @@ export class Controls {
   const bank=this.sdk.isOpen(762),deposit=this.sdk.isOpen(11);(get('deposit-all') as HTMLButtonElement).disabled=!this.sdk.getInventory().length;get('bank-panel').hidden=!bank;get('close-modal').hidden=!(bank||deposit);
   if(bank)this.container('bank',this.sdk.getBank(),Math.max(8,...this.sdk.getBank().map(i=>i.slot+1)),'bank');
   const revision=++this.renderRevision;
-  void this.sdk.getDialog().then(d=>{
-   if(revision!==this.renderRevision)return;const box=get('dialog');box.replaceChildren();box.hidden=!d;if(!d)return;
-   for(const text of d.text)box.append(el('p',text));
-   for(const b of d.buttons){const button=el('button',b.text);button.onclick=()=>{this.sdk.session.continueDialogue(d.id,b.component);};box.append(button);}
-  }).catch(e=>this.report(`Dialogue: ${e}`));
+  void this.sdk.getDialog().then(d=>{if(revision===this.renderRevision)this.renderDialog(d);}).catch(e=>this.report(`Dialogue: ${e}`));
+  this.renderNpcs();
   // Generic IF3 action controls cover character creation and other unmodelled modal windows.
   void this.renderInterfaces(revision).catch(e=>this.report(String(e)));
   for(const n of this.sdk.getState().npcs.values())if(n.type!==undefined){void this.sdk.npcDefinition(n.type).then(d=>{n.name=d?.name;n.hidden=!d;}).catch(()=>{});}
+ }
+ private talkTo(n:Entity){
+  if(this.dialogPending)return;this.hideMenu();this.dialogPending=true;this.dialogToken='';this.render();this.report(`Talking to ${n.name??'NPC'}…`);
+  void this.bot.talkTo(n).then(()=>this.report('Conversation opened.')).catch(e=>this.report(String(e))).finally(()=>{this.dialogPending=false;this.dialogToken='';this.render();});
+ }
+ private renderDialog(d:Dialog|null){
+  const key=`${d?.token??'closed'}:${this.dialogPending}:${this.sdk.session.status}`;this.currentDialog=d;
+  if(this.dialogToken===key)return;this.dialogToken=key;
+  const box=get('dialog');box.setAttribute('aria-busy',String(this.dialogPending));box.replaceChildren();box.hidden=!d;if(!d)return;
+  box.dataset.dialogToken=d.token;
+  const header=el('div','');header.className='dialog-header';header.append(el('h2',d.speaker??d.title??(d.kind==='instruction'?'Tutorial':'Conversation')));
+  const hint=el('span',this.dialogPending?'Waiting for reply…':d.continueButton?'Space to continue':d.options.length?'Choose a response':'');header.append(hint);box.append(header);
+  for(const text of d.lines)box.append(el('p',text));
+  const actions=el('div','');actions.className='dialog-actions';
+  for(const button of d.buttons){
+   const node=el('button',button.text) as HTMLButtonElement;node.type='button';node.setAttribute('aria-label',button.text);node.dataset.dialogIndex=String(button.index);
+   if(d.options.includes(button)){const key=el('kbd',String(button.index));node.prepend(key);}
+   node.disabled=this.dialogPending||this.sdk.session.status!=='playing';node.onclick=()=>this.advanceDialog(d,button.index,button===d.continueButton);actions.append(node);
+  }box.append(actions);
+ }
+ private advanceDialog(d:Dialog,index:number,isContinue:boolean){
+  if(this.dialogPending)return;this.dialogPending=true;this.renderDialog(d);
+  const action=isContinue?this.bot.continueDialog({expected:d}):this.bot.chooseDialogOption(index,{expected:d});
+  this.report('Waiting for the next dialogue…');
+  void action.then(next=>this.report(next?.kind==='choice'?'Choose a dialogue response.':next&&next.kind!=='instruction'?'Dialogue progressed.':'Conversation finished.')).catch(e=>this.report(String(e))).finally(()=>{this.dialogPending=false;this.dialogToken='';this.render();});
+ }
+ private dialogKey(e:KeyboardEvent){
+  if(e.defaultPrevented||e.altKey||e.ctrlKey||e.metaKey||e.repeat||this.dialogPending||this.sdk.session.status!=='playing')return;
+  if((e.target as HTMLElement).closest('input,textarea,select,button,a,[contenteditable]'))return;
+  const d=this.currentDialog;if(!d)return;
+  if((e.code==='Space'||e.key==='Enter')&&d.continueButton){e.preventDefault();this.advanceDialog(d,d.continueButton.index,true);}
+  else if(/^[1-9]$/.test(e.key)){const button=d.options.find(b=>b.index===Number(e.key));if(button){e.preventDefault();this.advanceDialog(d,button.index,false);}}
+ }
+ private renderNpcs(){
+  const w=this.sdk.getState(),p=w.player,npcs=[...w.npcs.values()].filter(n=>!n.hidden&&n.name&&n.level===p?.level).sort((a,b)=>Math.hypot(a.x-p!.x,a.y-p!.y)-Math.hypot(b.x-p!.x,b.y-p!.y)).slice(0,12);
+  const signature=JSON.stringify(npcs.map(n=>[n.index,n.type,n.name]));if(signature===this.npcSignature)return;this.npcSignature=signature;
+  get('nearby-npcs').replaceChildren(...npcs.map(n=>{const row=el('div','');row.className='nearby-npc';row.append(el('span',n.name!));const button=el('button','Talk') as HTMLButtonElement;button.type='button';button.setAttribute('aria-label',`Talk to ${n.name}`);
+   // Only publish Talk when that NPC's current form actually offers it.
+   button.hidden=true;void this.sdk.npcDefinition(n.type!).then(def=>{button.hidden=!def?.options.some(o=>!!o&&/^talk[ -]?to$/i.test(o));}).catch(()=>{});
+   button.onclick=()=>this.talkTo(n);row.append(button);return row;
+  }));
  }
  private async renderInterfaces(revision:number){
   const controls:HTMLElement[]=[];

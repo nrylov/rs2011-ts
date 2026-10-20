@@ -22,6 +22,7 @@ export class World {
   skills = new Map<number, Skill>();
   texts = new Map<number, string>();
   interfaces = new Map<number, number>();
+  uiRevision=0;interfaceMounts=new Map<number,number>();interfaceVersions=new Map<number,number>();
   windowId=0; hidden=new Map<number,boolean>(); interfaceRevision=0;
   scripts:{id:number;args:(number|string)[]}[]=[];
   messages: Message[] = [];
@@ -94,17 +95,17 @@ export class World {
         }
         this.containers.set(key, [...items.values()].sort((a,b) => a.slot - b.slot)); break;
       }
-      case 10: { const id = r.le32() >>> 0; this.texts.set(id, r.text()); break; }
-      case 102: { r.neg8();this.windowId=r.add16();this.interfaces.clear();this.interfaceRevision++;break; }
-      case 108: { const hide=!!r.add8();this.hidden.set(r.le32()>>>0,hide);break; }
+      case 10: { const id = r.le32() >>> 0; this.texts.set(id, r.text());this.interfaceVersions.set(id>>>16,++this.uiRevision); break; }
+      case 102: { r.neg8();this.windowId=r.add16();this.interfaces.clear();this.interfaceMounts.clear();this.uiRevision++;this.interfaceRevision++;break; }
+      case 108: { const hide=!!r.add8();const packed=r.le32()>>>0;this.hidden.set(packed,hide);this.interfaceVersions.set(packed>>>16,++this.uiRevision);break; }
       case 8: {
         const types=r.text(),args:(number|string)[]=Array(types.length);
         for(let i=types.length-1;i>=0;i--)args[i]=types[i]==='s'?r.text():r.i32();
         this.scripts.push({id:r.i32(),args});if(this.scripts.length>100)this.scripts.shift();break;
       }
       case 44: { const value=r.inverse32();const id=r.add16();this.varps.set(id,value);this.variableUpdates.set(`p${id}`,++this.configRevision);break; }
-      case 37: { const id = r.le16(), parent = r.le32() >>> 0; r.add8(); this.interfaces.set(parent, id);this.interfaceRevision++; break; }
-      case 112: this.interfaces.delete(r.i32() >>> 0);this.interfaceRevision++; break;
+      case 37: { const id = r.le16(), parent = r.le32() >>> 0; r.add8(); this.interfaces.set(parent, id);this.interfaceMounts.set(parent,++this.uiRevision);this.interfaceRevision++; break; }
+      case 112: {const parent=r.i32()>>>0;this.interfaces.delete(parent);this.interfaceMounts.delete(parent);this.uiRevision++;this.interfaceRevision++;break;}
       case 7: { const id = r.u16(); this.varps.set(id, signed(r.u8(), 8));this.variableUpdates.set(`p${id}`,++this.configRevision); break; }
       case 73: { const value=signed(r.add8(),8),id=r.le16();this.varbits.set(id,value);this.variableUpdates.set(`b${id}`,++this.configRevision);break; }
       case 68: { const id=r.add16(),value=r.inverse32();this.varbits.set(id,value);this.variableUpdates.set(`b${id}`,++this.configRevision);break; }

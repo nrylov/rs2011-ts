@@ -9,3 +9,5 @@ export { tileIndex, visiblePlane, type Terrain, type MapObject, type MapRegion }
 export {BotSDK,BotActions,type GameData} from './core/sdk.ts';
 export {CollisionMap,type Point} from './core/routing.ts';
 export type {ItemType,NpcType,Component} from './cache/definitions.ts';
+
+export type {Dialog,DialogButton,DialogPattern,DialogWaitOptions} from './core/dialogue.ts';

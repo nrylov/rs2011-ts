@@ -1,3 +1,5 @@
+import { DialogueService, type Dialog, type DialogPattern, type DialogWaitOptions } from './dialogue.ts';
+export {plainText,type Dialog,type DialogButton,type DialogPattern,type DialogWaitOptions} from './dialogue.ts';
 import { Session } from './session.ts';
 import type { Item, Entity, World } from './world.ts';
 import type { MapRegion, MapObject } from '../cache/terrain.ts';
@@ -14,12 +16,11 @@ export interface GameData {
  interface(id:number):Component[]|Promise<Component[]>;
 }
 const match=(s:string,p:string|RegExp)=>typeof p==='string'?s.toLowerCase()===p.toLowerCase():(p.lastIndex=0,p.test(s));
-export const plainText=(s:string)=>s.replace(/<br\s*\/?\s*>/gi,'\n').replace(/<[^>]*>/g,'');
 export const inventoryOption=(slot:number)=>[0,1,2,6,7][slot];
 export const equipmentComponents:Record<number,number>={0:8,1:11,2:14,3:17,4:20,5:23,7:26,9:29,10:32,12:35,13:38};
-export interface Dialog {id:number;text:string[];buttons:{component:number;text:string}[];}
 export class BotSDK {
- constructor(readonly session:Session,readonly data:GameData){}
+ readonly dialogue:DialogueService;
+ constructor(readonly session:Session,readonly data:GameData){this.dialogue=new DialogueService(session,id=>data.interface(id));}
  getState(){return this.session.world;}
  getInventory(){return this.getState().containers.get('93:0')??[];}
  getEquipment(){return this.getState().containers.get('94:0')??[];}
@@ -59,18 +60,10 @@ export class BotSDK {
   if(Math.max(Math.abs(x-p.x),Math.abs(y-p.y))>52)throw new Error('Destination is outside the local routing window');
   return (await this.collisionMap()).route(p,{x,y});
  }
- async getDialog():Promise<Dialog|null>{
-  for(const id of [...new Set(this.getState().interfaces.values())].reverse()){
-   if(!((id>=64&&id<=71)||(id>=210&&id<=219)||(id>=228&&id<=248)||[94,131,372,451,519,740].includes(id)))continue;
-   const w=this.getState(),components=await this.data.interface(id);
-   const visible=(c:Component)=>{let at:Component|undefined=c;const seen=new Set<number>();while(at&&!seen.has(at.id)){seen.add(at.id);if(w.hidden.get((id<<16)|at.id)??at.hidden)return false;at=components.find(p=>p.id===at!.parent);}return true;};
-   const text=(c:Component)=>plainText(w.texts.get((id<<16)|c.id)??c.text);
-   const buttons=components.filter(c=>visible(c)&&(c.setting&1)).map(c=>({component:c.id,text:text(c)})).filter(b=>b.text);
-   const lines=components.filter(c=>visible(c)&&c.type===4&&!(c.setting&1)).map(text).filter(Boolean);
-   return {id,text:lines,buttons};
-  }return null;
- }
- async clickDialogByText(pattern:string|RegExp){const d=await this.getDialog(),b=d?.buttons.find(b=>match(b.text,pattern));if(!d||!b)throw new Error('No matching dialogue option');this.session.continueDialogue(d.id,b.component);}
+ getDialog(){return this.dialogue.read();}
+ waitForDialog(options:DialogWaitOptions={}){return this.dialogue.wait(options);}
+ async clickDialogByText(pattern:DialogPattern,expected?:Dialog){const d=await this.getDialog();if(!d)throw new Error('No dialogue is open');if(expected&&expected.token!==d.token)throw new Error('Dialogue changed; read the current options before choosing');this.dialogue.press(d,this.dialogue.select(d,pattern));}
+ async sendClickDialog(index:number,expected?:Dialog){const d=await this.getDialog();if(!d)throw new Error('No dialogue is open');if(expected&&expected.token!==d.token)throw new Error('Dialogue changed; read the current options before choosing');this.dialogue.press(d,this.dialogue.select(d,index));}
  /** Explicit raw dispatch. Use BotActions for observed effects. */
  sendItemOption(item:Item,option:number){if(!this.isOpen(149))throw new Error('Inventory interface is hidden by a modal');this.session.clickInterface(149,0,option,item.id,item.slot);}
 }
@@ -81,7 +74,7 @@ export class BotActions {
  constructor(readonly sdk:BotSDK){}
  private async exclusive<T>(fn:()=>Promise<T>):Promise<T>{if(this.busy)throw new Error('Another bot action is already running');this.busy=true;try{return await fn();}finally{this.busy=false;}}
  async walkTo(x:number,y:number,timeout=60_000){return this.exclusive(async()=>{
-  await this.dismissDialog();
+  await this.dismissCurrentDialog();
   const deadline=Date.now()+timeout,level=this.sdk.getState().player?.level;
   const path=await this.sdk.routeTo(x,y);if(!path)throw new Error('No local route; a door or unknown tile may block the way');
   // Send short waypoints, observe arrival, and re-evaluate collision before the next leg.
@@ -89,9 +82,43 @@ export class BotActions {
   while(p.x!==x||p.y!==y){if(Date.now()>=deadline)throw new Error('Routed movement timed out');if(p.level!==level)throw new Error('Player changed floor during movement');if(++attempts>100)throw new Error('Route did not converge');const route=await this.sdk.routeTo(x,y);if(!route)throw new Error('Route became blocked');const target=route[Math.min(10,route.length-1)];await this.sdk.session.walkTo(target.x,target.y,Math.max(1,Math.min(15000,deadline-Date.now())));p=this.sdk.getState().player!;}
   return {x:p.x,y:p.y};
  });}
- async dismissDialog(){const d=await this.sdk.getDialog();const b=d?.buttons.find(b=>/continue/i.test(b.text));if(d&&b){const revision=this.sdk.getState().interfaceRevision;this.sdk.session.continueDialogue(d.id,b.component);await this.sdk.session.waitFor(w=>w.interfaceRevision!==revision,5000);return true;}return false;}
- async interactObject(target:MapObject,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissDialog();const index=target.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('Object has no matching action');this.sdk.session.interactObject(target.id,target.x,target.y,index);await this.sdk.session.waitFor(effect,timeout);});}
- async interactNpc(target:Entity,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissDialog();const def=await this.sdk.npcDefinition(target.type!);if(!def)throw new Error('NPC is hidden in its current form');const index=def.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('NPC has no matching action');this.sdk.session.interactNpc(target.index,index);await this.sdk.session.waitFor(effect,timeout);});}
+ private async advanceDialog(selection:DialogPattern|number|null,expected?:Dialog,timeout=15_000):Promise<Dialog|null>{
+  if(!Number.isFinite(timeout)||timeout<=0)throw new Error('Dialogue timeout must be positive');
+  const d=await this.sdk.getDialog();if(!d)throw new Error('No dialogue is open');if(expected&&expected.token!==d.token)throw new Error('Dialogue changed; read the current options before choosing');
+  const button=selection===null?d.continueButton:this.sdk.dialogue.select(d,selection,true);
+  if(!button)throw new Error('This dialogue requires a choice; select a published option');
+  this.sdk.dialogue.press(d,button);return this.sdk.dialogue.changed(d,timeout);
+ }
+ async continueDialog(options:{expected?:Dialog;timeout?:number}={}){return this.exclusive(()=>this.advanceDialog(null,options.expected,options.timeout));}
+ async chooseDialogOption(selection:DialogPattern|number,options:{expected?:Dialog;timeout?:number}={}){return this.exclusive(()=>this.advanceDialog(selection,options.expected,options.timeout));}
+ async talkTo(target:Entity|DialogPattern,timeout=20_000){return this.exclusive(async()=>{
+  if(!Number.isFinite(timeout)||timeout<=0)throw new Error('Dialogue timeout must be positive');
+  const n=typeof target==='string'||target instanceof RegExp?await this.sdk.findNearbyNpc(target):target;if(!n)throw new Error('No matching nearby NPC');
+  const current=this.sdk.getState().npcs.get(n.index);if(!current||current.level!==this.sdk.getState().player?.level)throw new Error('NPC left view; query nearby NPCs again');
+  const def=await this.sdk.npcDefinition(current.type!);const option=def?.options.findIndex(s=>!!s&&/^talk[ -]?to$/i.test(s))??-1;if(option<0)throw new Error('NPC has no Talk-to action');
+  const before=await this.sdk.getDialog();this.sdk.session.interactNpc(current.index,option);
+  return this.sdk.waitForDialog({after:before,timeout});
+ });}
+ async navigateDialog(choices:(DialogPattern|number)[]=[],options:{timeout?:number;maxSteps?:number}={}){return this.exclusive(async()=>{
+  const timeout=options.timeout??30_000,maxSteps=options.maxSteps??30,deadline=Date.now()+timeout;
+  if(!Number.isFinite(timeout)||timeout<=0||!Number.isInteger(maxSteps)||maxSteps<1)throw new Error('Invalid dialogue navigation limit');
+  let dialog=await this.sdk.getDialog(),steps=0,choicesSelected=0;
+  if(!dialog||dialog.kind==='instruction')dialog=await this.sdk.waitForDialog({timeout});
+  while(dialog&&dialog.kind!=='instruction'){
+   const remaining=deadline-Date.now();if(remaining<=0)throw new Error('Dialogue navigation timed out');
+   if(dialog.kind==='choice'&&choicesSelected>=choices.length)return {dialog,steps,choicesSelected,ended:false,awaitingChoice:true};
+   if(steps>=maxSteps)throw new Error('Dialogue navigation reached its step limit');
+   if(dialog.kind==='text'){dialog=await this.sdk.dialogue.changed(dialog,remaining);steps++;continue;}
+   const selection=dialog.continueButton?null:choices[choicesSelected++];
+   dialog=await this.advanceDialog(selection,dialog,remaining);steps++;
+  }
+  if(choicesSelected<choices.length)throw new Error(`Conversation ended before choice ${choicesSelected+1}`);
+  return {dialog,steps,choicesSelected,ended:true,awaitingChoice:false};
+ });}
+ async dismissDialog(){return this.exclusive(()=>this.dismissCurrentDialog());}
+ private async dismissCurrentDialog(){const d=await this.sdk.getDialog();if(!d?.continueButton)return false;await this.advanceDialog(null,d,5000);return true;}
+ async interactObject(target:MapObject,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissCurrentDialog();const index=target.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('Object has no matching action');this.sdk.session.interactObject(target.id,target.x,target.y,index);await this.sdk.session.waitFor(effect,timeout);});}
+ async interactNpc(target:Entity,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissCurrentDialog();const def=await this.sdk.npcDefinition(target.type!);if(!def)throw new Error('NPC is hidden in its current form');const index=def.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('NPC has no matching action');this.sdk.session.interactNpc(target.index,index);await this.sdk.session.waitFor(effect,timeout);});}
  async chopTree(target:MapObject,timeout=30_000){const logIds:Record<string,number>={Tree:1511,'Dead tree':1511,Oak:1521,Willow:1519,'Maple tree':1517,'Yew tree':1515,'Magic tree':1513,Teak:6333,Mahogany:6332};const logId=logIds[target.name];if(logId===undefined)throw new Error('Log type is not mapped for this tree; use interactObject with an explicit effect');const before=this.sdk.count(logId),xp=this.sdk.getState().skills.get(8)?.xp??0;await this.interactObject(target,/^chop/i,w=>this.sdk.count(logId)>before&&(w.skills.get(8)?.xp??0)>xp,timeout);return {logs:this.sdk.count(logId)-before,xp:(this.sdk.getState().skills.get(8)?.xp??0)-xp};}
  async openBank(target?:MapObject|Entity){if(this.sdk.isOpen(762))return;const t=target??await this.sdk.findNearbyNpc(/^banker$/i)??await this.sdk.findNearbyObject(/^bank booth$/i);if(!t)throw new Error('No nearby banker or bank booth');if('index'in t)await this.interactNpc(t,/^bank$/i,()=>this.sdk.isOpen(762));else await this.interactObject(t,/use-quickly|bank/i,()=>this.sdk.isOpen(762));}
  async confirmAppearance(){return this.exclusive(async()=>{if(!this.sdk.isOpen(1028))throw new Error('Character creation is not open');this.sdk.session.clickInterface(1028,117);await this.sdk.session.waitFor(()=>!this.sdk.isOpen(1028),5000);});}
