@@ -1,0 +1,19 @@
+{
+  "name": "rs2011-ts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun src/server.ts",
+    "build": "bun scripts/build.ts",
+    "headless": "bun src/headless/main.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "check": "bun run typecheck && bun test && bun run build",
+    "example:woodcut-bank": "bun examples/woodcut-bank.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.0",
+    "typescript": "^5.9.0"
+  }
+}

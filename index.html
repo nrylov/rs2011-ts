@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Void · TypeScript client</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+  <header><div class="brand">VOID <span>634 / TYPESCRIPT</span></div><div id="status" role="status">Disconnected</div></header>
+  <main>
+    <section class="world">
+      <div class="toolbar"><div><h1>World view</h1><p>Native TypeScript · cache terrain and objects · live entities</p></div><span id="position">Awaiting character</span></div>
+      <div class="map-controls"><div><button id="map-follow" type="button">Follow character</button><button id="map-zoom-out" type="button" aria-label="Zoom out">−</button><button id="map-zoom-in" type="button" aria-label="Zoom in">+</button><label>Floor <select id="map-floor"><option value="auto">Auto</option><option value="0">0 · Ground</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label><label><input type="checkbox" id="map-grid"> Grid</label><label><input type="checkbox" id="map-collision"> Collision</label></div><span id="map-status" role="status">Map loads after login</span></div>
+      <canvas id="map" aria-label="Nearby entities. Click a tile to walk."></canvas>
+      <div class="legend"><span><i class="self"></i>You</span><span><i class="player"></i>Players</span><span><i class="npc"></i>NPCs</span><span id="map-hover">Drag to pan · scroll to zoom · click a tile to walk · right-click for actions</span></div>
+      <p id="action-status" role="status" class="action-status">Select an object, NPC, or item for actions.</p><section id="dialog" class="dialog" hidden></section><div id="interface-controls" class="dialog" hidden></div>
+      <section class="messages"><h2>Game messages</h2><div id="messages" aria-live="polite">Connect to a Void server to begin.</div></section>
+    </section>
+    <aside>
+      <section><h2>Character</h2><form id="login"><label>Username<input name="username" autocomplete="username" maxlength="12" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button id="connect">Connect</button></form><button id="disconnect" hidden>Disconnect</button><p id="error" role="alert"></p><p id="target" class="muted"></p></section>
+      <section><h2>Inventory <small id="inventory-count"></small></h2><div id="inventory" class="inventory"></div></section>
+      <section><h2>Equipment</h2><div id="equipment" class="inventory"></div></section>
+      <section id="bank-panel" hidden><h2>Bank</h2><button id="deposit-all" type="button">Deposit inventory</button><button id="bank-item-mode" type="button">Withdraw as items</button><div id="bank" class="inventory"></div></section>
+      <section><button id="close-modal" type="button" hidden>Close interface</button><details><summary>Enter a requested amount</summary><form id="amount-form"><input id="amount" type="number" min="0" max="2147483647" step="1" required aria-label="Requested amount"><button>Submit amount</button></form></details></section>
+      <section><h2>Skills</h2><div id="skills" class="skills">No skill updates yet.</div></section>
+      <details><summary>Interfaces & protocol</summary><pre id="debug">No packets received.</pre></details>
+    </aside>
+  </main><div id="action-menu" class="action-menu" role="group" aria-label="Game actions" hidden></div><script type="module" src="/client.js"></script>
+</body></html>
