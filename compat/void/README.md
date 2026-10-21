@@ -19,3 +19,12 @@ java -cp /path/to/rs2011-ts/dist/void-login-sync.jar:/path/to/void-server.jar Ma
 ```
 
 The overlay includes the original JAR's script registry plus the new listener. Keep it paired with the exact JAR used to build it, and rebuild it after server upgrades. The original server JAR is untouched. This local development overlay was checked against Void 2.11.0; its compiler requires the full Kotlin standard library, not just the release JAR's minimized runtime.
+
+
+## Optional tutorial starting-room door fix
+
+`TutorialObjects.kt` is a scoped replacement for Void 2.11.0's existing tutorial object handler. The first Guide-room door previously used the ordinary five-minute shared opening, allowing another account to follow without completing the Guide steps. The replacement uses the existing pass-through-door helper: the door opens briefly, keeps shared collision blocked, and only the approved player walks through. Outward passage requires tutorial stage 3 and advances to stage 4. An early-stage account already outside can return to the Guide without advancing. Other tutorial doors and gates retain their existing behavior.
+
+For a source build, replace `game/src/main/kotlin/content/area/misthalin/tutorial_island/TutorialObjects.kt` with this file. Copy `tests/TutorialStartingDoorTest.kt` to the matching test package and run that test alongside the existing tutorial tests.
+
+For the optional binary overlay, add `VOID_TUTORIAL_DOOR_FIX=1` to the build command above. The resulting overlay includes both the read-only login listener and this gameplay fix. The default build remains login synchronization only. This replacement is tied to the inspected Void 2.11.0 API; review it against updated source before enabling it for another release. The original server JAR remains untouched.

@@ -8,7 +8,8 @@ const java=process.env.VOID_JAVA??'java',root=resolve(import.meta.dir,'..'),out=
 const temporary=await mkdtemp(join(tmpdir(),'void-login-sync-'));
 try{
  const classes=join(temporary,'classes');
- const compile=Bun.spawn([java,'-cp',compiler,'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler','-no-stdlib','-no-reflect','-Xskip-metadata-version-check','-Xskip-prerelease-check','-Xallow-unstable-dependencies','-jvm-target','21','-classpath',resolve(server),'-d',classes,join(root,'compat/void/LoginStateSync.kt')],{stdout:'inherit',stderr:'inherit'});
+ const sources=[join(root,'compat/void/LoginStateSync.kt')];if(process.env.VOID_TUTORIAL_DOOR_FIX==='1')sources.push(join(root,'compat/void/TutorialObjects.kt'));
+ const compile=Bun.spawn([java,'-cp',compiler,'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler','-no-stdlib','-no-reflect','-Xskip-metadata-version-check','-Xskip-prerelease-check','-Xallow-unstable-dependencies','-jvm-target','21','-classpath',resolve(server),'-d',classes,...sources],{stdout:'inherit',stderr:'inherit'});
  if(await compile.exited)throw new Error('Login-state listener compilation failed');
  await mkdir(resolve(out,'..'),{recursive:true});
  const pack=Bun.spawn(['python3','-c',`

@@ -5,6 +5,7 @@ import type { Item, Entity, World, GroundItem } from './world.ts';
 import type { MapRegion, MapObject } from '../cache/terrain.ts';
 import type { ObjectType } from '../cache/format.ts';
 import type { ItemType, NpcType, Component, VarbitType } from '../cache/definitions.ts';
+import {objectKey} from './objects.ts';
 import { sceneObjects } from './scene.ts';
 import { CollisionMap } from './routing.ts';
 export interface GameData {
@@ -65,6 +66,15 @@ export class BotSDK {
   const defs=new Map<number,ObjectType>();for(const r of regions)for(const o of r.objects)defs.set(o.id,o);
   for(const o of w.objectChanges.values())if(o.id!==null&&!defs.has(o.id))defs.set(o.id,await this.data.object(o.id));
   return sceneObjects(regions,w,id=>defs.get(id)).filter(o=>o.level===p.level&&Math.max(Math.abs(o.x-p.x),Math.abs(o.y-p.y))<=radius).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));
+ }
+ /** Raw revision-634 object dispatch; use interactObject with a predicate for observed effects. */
+ sendObjectOption(target:MapObject,option:string|RegExp|number=0){
+  const p=this.getState().player;if(!p||target.level!==p.level)throw new Error('Object is not on the current floor');
+  if(!Number.isInteger(target.x)||!Number.isInteger(target.y)||target.x<0||target.y<0||target.x>16383||target.y>16383||Math.max(Math.abs(target.x-p.x),Math.abs(target.y-p.y))>52)throw new Error('Object is outside the local interaction area');
+  const change=this.getState().objectChanges.get(objectKey(target.x,target.y,target.level,target.shape));if(change&&change.id!==target.id)throw new Error('Object changed; query nearby objects again');
+  const index=typeof option==='number'?option:target.options.findIndex(s=>!!s&&match(s,option));
+  if(!Number.isInteger(index)||index<0||index>4||!target.options[index])throw new Error('Object has no matching action');
+  this.session.interactObject(target.id,target.x,target.y,index);
  }
  async findNearbyObject(pattern:string|RegExp,radius=24){return (await this.nearbyObjects(radius)).find(o=>match(o.name,pattern))??null;}
  async npcDefinition(type:number):Promise<NpcType|null>{
@@ -148,7 +158,7 @@ export class BotActions {
  });}
  async dismissDialog(){return this.exclusive(()=>this.dismissCurrentDialog());}
  private async dismissCurrentDialog(){const d=await this.sdk.getDialog();if(!d?.continueButton)return false;await this.advanceDialog(null,d,5000);return true;}
- async interactObject(target:MapObject,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissCurrentDialog();const index=target.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('Object has no matching action');this.sdk.session.interactObject(target.id,target.x,target.y,index);await this.sdk.session.waitFor(effect,timeout);});}
+ async interactObject(target:MapObject,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissCurrentDialog();const index=target.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('Object has no matching action');this.sdk.sendObjectOption(target,index);await this.sdk.session.waitFor(effect,timeout);});}
  async interactNpc(target:Entity,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissCurrentDialog();const def=await this.sdk.npcDefinition(target.type!);if(!def)throw new Error('NPC is hidden in its current form');const index=def.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('NPC has no matching action');this.sdk.session.interactNpc(target.index,index);await this.sdk.session.waitFor(effect,timeout);});}
  async chopTree(target:MapObject,timeout=30_000){const logIds:Record<string,number>={Tree:1511,'Dead tree':1511,Oak:1521,Willow:1519,'Maple tree':1517,'Yew tree':1515,'Magic tree':1513,Teak:6333,Mahogany:6332};const logId=logIds[target.name];if(logId===undefined)throw new Error('Log type is not mapped for this tree; use interactObject with an explicit effect');const before=this.sdk.count(logId),xp=this.sdk.getState().skills.get(8)?.xp??0;await this.interactObject(target,/^chop/i,w=>this.sdk.count(logId)>before&&(w.skills.get(8)?.xp??0)>xp,timeout);return {logs:this.sdk.count(logId)-before,xp:(this.sdk.getState().skills.get(8)?.xp??0)-xp};}
  async openBank(target?:MapObject|Entity){if(this.sdk.isOpen(762))return;const t=target??await this.sdk.findNearbyNpc(/^banker$/i)??await this.sdk.findNearbyObject(/^bank booth$/i);if(!t)throw new Error('No nearby banker or bank booth');if('index'in t)await this.interactNpc(t,/^bank$/i,()=>this.sdk.isOpen(762));else await this.interactObject(t,/use-quickly|bank/i,()=>this.sdk.isOpen(762));}

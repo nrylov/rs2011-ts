@@ -8,6 +8,8 @@ const examples:[string,string][]=[
  ['Inspect inventory','sdk.getInventory()'],
  ['Inspect dialogue','await sdk.getDialog()'],
  ['Continue dialogue','await bot.continueDialog()'],
+ ['List nearby objects','await sdk.nearbyObjects(16)'],
+ ['Open nearest door',"const door = await sdk.findNearbyObject(/^door$/i);\nif (!door) throw new Error('No nearby door');\nsdk.sendObjectOption(door, 'Open');\nreturn 'Open sent; check movement, object state and game messages.';"],
  ['List ground items','sdk.getGroundItems()'],
  ['Use tinderbox on logs',"const box = await sdk.findInventoryItem('Tinderbox');\nconst logs = await sdk.findInventoryItem('Logs');\nif (!box || !logs) throw new Error('Tinderbox and logs required');\nreturn await bot.useItemOnItem(box, logs);"],
  ['Inspect world state','sdk.getState().snapshot()'],

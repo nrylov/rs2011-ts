@@ -20,6 +20,7 @@
     <aside>
       <section><h2>Character</h2><form id="login"><label>Username<input name="username" autocomplete="username" maxlength="12" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button id="connect">Connect</button></form><button id="disconnect" hidden>Disconnect</button><p id="error" role="alert"></p><p id="target" class="muted"></p></section>
       <section><h2>Game tabs</h2><div id="game-tabs" class="game-tabs"></div></section>
+<section><h2>Nearby objects</h2><label for="object-filter">Filter objects</label><input id="object-filter" type="search" placeholder="Door, tree, ladder…"><div id="nearby-objects" class="nearby-npcs">Connect to see nearby objects.</div></section>
       <section><h2>Nearby NPCs</h2><div id="nearby-npcs" class="nearby-npcs">Connect to see nearby characters.</div></section>
       <section><h2>Nearby ground items</h2><div id="ground-items" class="nearby-npcs">No visible ground items.</div></section>
       <section><h2>Inventory <small id="inventory-count"></small></h2><p id="inventory-sync" class="sync-status" role="status">Inventory has not synchronized yet.</p><button id="open-inventory" type="button" disabled>Open Inventory tab</button><p id="inventory-access" class="sync-status" role="status"></p><p id="inventory-action-status" class="sync-status" role="status"></p><div id="item-selection" role="status" hidden></div><div id="inventory" class="inventory"></div></section>

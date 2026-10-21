@@ -150,3 +150,14 @@ Final validation including the console: **63 tests passed**, two opt-in live tes
 ## Empty tab diagnostics — 2026-10-20
 
 A stage-zero tutorial session legitimately has no visible tabs. `getGameTabStatus()` now distinguishes the current window, visible tabs and tutorial instruction; failed tab selections include that context. The lightweight Game tabs panel displays the explanation rather than an empty area, and the command console offers a tab-status example. The SDK still uses revision-634 cache action components and server visibility updates. Regression coverage verifies stage-zero instructions, unsupported windows and no dispatch when a tab is unavailable. Prepared-cache suite: 64 passed, two opt-in live tests skipped; TypeScript and browser build passed.
+
+
+## Tutorial starting door and nearby-object controls — 2026-10-20
+
+The starting-room handler already checked tutorial stage 3, but its generic door helper opened shared collision for five minutes. Changed only this doorway to the existing collision-preserving, short-lived pass-through helper. Outward passage requires the Guide steps; an already-stranded early-stage account can return inward without advancing. The scoped server-source change and a three-case Kotlin world regression test were also applied to the local Void checkout. A reproducible optional classpath overlay is tracked under `compat/void`; its original server JAR stays unchanged.
+
+Real Void test server on isolated port 43598, disposable accounts `tsdoorearly`, `tsdoorready`, `tsdoorreturn`: early-stage Open was refused with the instructor message; ready stage-3 account crossed and advanced; an early account sent ordinary movement during the temporary opening and stayed inside; the original closed door returned; the stranded outside account passed inward and retained stage 0. No user account was controlled. Initial test movement was sent while the passage action was still settling; allowing one tick before the subsequent walking command resolved that validation timing issue.
+
+The Kotlin replacement compiled against the exact published JAR. The Gradle world-test runner could not run offline because its foojay-resolver-convention 1.0.0 plugin was not cached. The Kotlin regression source is included for normal source-build testing; the live multi-account regression above supplied the executed gameplay check.
+
+The lightweight Nearby objects list is filterable and exposes actual cache action slots. `sendObjectOption` provides direct SDK dispatch with same-floor/range/stale-object/action checks, and map controls use that same dispatch. Existing `BotActions.interactObject` retains explicit observed-effect predicates. Client validation: 65 passing tests with the prepared cache, two opt-in live tests skipped, strict TypeScript and browser build passed. Browser UI still needs hands-on confirmation.

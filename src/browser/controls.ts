@@ -6,9 +6,10 @@ import type { ItemType } from '../cache/definitions.ts';
 const el=(tag:string,text:string)=>{const e=document.createElement(tag);e.textContent=text;return e;};
 const get=(id:string)=>document.getElementById(id)!;
 export class Controls {
- private selectedItem:Item|null=null;private items=new Map<number,ItemType>();private pending=new Set<number>();private missing=new Set<number>();private renderRevision=0;private collisionKey='';private collisionRequest=0;private dialogToken='';private dialogPending=false;private currentDialog:Dialog|null=null;private npcSignature='';
+ private objectKey='';private objectRequest=0;private selectedItem:Item|null=null;private items=new Map<number,ItemType>();private pending=new Set<number>();private missing=new Set<number>();private renderRevision=0;private collisionKey='';private collisionRequest=0;private dialogToken='';private dialogPending=false;private currentDialog:Dialog|null=null;private npcSignature='';
  constructor(readonly sdk:BotSDK,readonly bot:BotActions,readonly map:MapView){
   map.onMenu=(x,y,cx,cy)=>{void this.mapMenu(x,y,cx,cy).catch(e=>this.report(String(e)));};
+  get('object-filter').oninput=()=>{this.objectKey='';this.renderObjects();};
   get('map-collision').onchange=()=>{this.collisionKey='';this.updateCollision();};
   get('open-inventory').onclick=()=>{void sdk.selectGameTab('Inventory').then(()=>this.report('Inventory tab click sent.')).catch(e=>this.report(String(e)));};
   get('close-modal').onclick=()=>this.run('Close interface',()=>bot.closeInterface());
@@ -31,7 +32,7 @@ export class Controls {
   const actions:{label:string;run:()=>unknown}[]=[];
   for(const o of this.map.objectsAt(x,y))o.options.forEach((option,index)=>{if(option)actions.push({label:`${option} ${o.name}`,run:()=>{
    if(/^chop/i.test(option)&&o.name==='Tree')this.run('Chop tree',()=>this.bot.chopTree(o));
-   else {this.sdk.session.interactObject(o.id,o.x,o.y,index);this.report(`${option} ${o.name}: sent to game.`);}
+   else {this.sdk.sendObjectOption(o,index);this.report(`${option} ${o.name}: sent to game.`);}
   }});});
   for(const n of this.sdk.getState().npcs.values())if(n.x===x&&n.y===y&&n.level===this.sdk.getState().player?.level){const def=await this.sdk.npcDefinition(n.type!);if(!def)continue;def.options.forEach((option,index)=>{if(option)actions.push({label:`${option} ${def.name}`,run:()=>{if(/^talk[ -]?to$/i.test(option))this.talkTo(n);else{this.sdk.session.interactNpc(n.index,index);this.report(`${option} ${def.name}: sent to game.`);}}});});}
   for(const i of this.sdk.getGroundItems().filter(i=>i.x===x&&i.y===y)){const def=await this.sdk.data.item(i.id);actions.push({label:`Take ${def.name}${i.amount>1?' × '+i.amount:''}`,run:()=>this.run(`Take ${def.name}`,()=>this.bot.pickupItem(i))});}
@@ -78,7 +79,7 @@ export class Controls {
   if(bank)this.container('bank',this.sdk.getBank(),Math.max(8,...this.sdk.getBank().map(i=>i.slot+1)),'bank');
   const revision=++this.renderRevision;
   void this.sdk.getDialog().then(d=>{if(revision===this.renderRevision)this.renderDialog(d);}).catch(e=>this.report(`Dialogue: ${e}`));
-  this.renderNpcs();
+  this.renderNpcs();this.renderObjects();
   // Generic IF3 action controls cover character creation and other unmodelled modal windows.
   void this.renderInterfaces(revision).catch(e=>this.report(String(e)));
   for(const n of this.sdk.getState().npcs.values())if(n.type!==undefined){void this.sdk.npcDefinition(n.type).then(d=>{n.name=d?.name;n.hidden=!d;}).catch(()=>{});}
@@ -114,6 +115,17 @@ export class Controls {
   const d=this.currentDialog;if(!d)return;
   if((e.code==='Space'||e.key==='Enter')&&d.continueButton){e.preventDefault();this.advanceDialog(d,d.continueButton.index,true);}
   else if(/^[1-9]$/.test(e.key)){const button=d.options.find(b=>b.index===Number(e.key));if(button){e.preventDefault();this.advanceDialog(d,button.index,false);}}
+ }
+ private renderObjects(){
+  const w=this.sdk.getState(),p=w.player;if(!p)return;
+  const filter=(get('object-filter') as HTMLInputElement).value.trim().toLowerCase();
+  const key=JSON.stringify([p.x,p.y,p.level,filter,[...w.objectChanges.values()]]);if(key===this.objectKey)return;this.objectKey=key;const request=++this.objectRequest;
+  void this.sdk.nearbyObjects(16).then(objects=>{
+   if(request!==this.objectRequest)return;
+   const matches=objects.filter(o=>o.options.some(Boolean)&&(!filter||o.name.toLowerCase().includes(filter))),rows=matches.slice(0,30).map(o=>{
+    const row=el('div','');row.className='nearby-npc';row.append(el('span',`${o.name} · ${o.x}, ${o.y}`));const actions=el('button','Actions');actions.setAttribute('aria-label',`Actions for ${o.name} at ${o.x}, ${o.y}`);actions.onclick=e=>this.menu(o.name,o.options.flatMap((option,index)=>option?[{label:option,run:()=>{this.sdk.sendObjectOption(o,index);this.report(`${option} ${o.name}: sent to game.`);}}]:[]),e.clientX,e.clientY);row.append(actions);return row;
+   });get('nearby-objects').replaceChildren(...(rows.length?rows:[el('p','No matching interactive objects within 16 tiles.')]));if(matches.length>30)get('nearby-objects').append(el('small',`Showing 30 of ${matches.length}; filter by name for more.`));
+  }).catch(e=>{if(request!==this.objectRequest)return;this.objectKey='';get('nearby-objects').textContent=`Objects unavailable: ${e}`;});
  }
  private renderNpcs(){
   const w=this.sdk.getState(),p=w.player,npcs=[...w.npcs.values()].filter(n=>!n.hidden&&n.name&&n.level===p?.level).sort((a,b)=>Math.hypot(a.x-p!.x,a.y-p!.y)-Math.hypot(b.x-p!.x,b.y-p!.y)).slice(0,12);

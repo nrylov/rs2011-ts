@@ -165,3 +165,18 @@ Commands run locally in the page on the connected character; no command executio
 The **Open Inventory tab** button sits above the inventory. It enables when the server exposes that tab. A locked tutorial inventory shows contextual instructions instead of claiming a modal is open. At the opening tutorial stage, talk to the RuneScape Guide, follow the Options-tab prompt, then the Survival Expert; simply selecting an unavailable Inventory tab cannot unlock it.
 
 If `getGameTabs()` returns `[]`, run `await sdk.getGameTabStatus()` to see the active window, visible tabs, and the current tutorial instruction. At stage 0, every tab is hidden by the server. Start with `await bot.talkTo('RuneScape guide')` and progress the conversation with the dialogue panel or `await bot.navigateDialog()`. Once the Options tab appears, select it when prompted. Inventory unlocks later at the Survival Expert step. A tab click cannot skip these server-side stages.
+
+
+## Nearby objects
+
+The lightweight **Nearby objects** panel lists interactive objects within 16 tiles, nearest first. Filter by name and choose **Actions** for the cache-defined menu. Map menus expose the same actions. The SDK can query a wider local area and dispatch the named action:
+
+```js
+const door = await sdk.findNearbyObject(/^door$/i);
+if (!door) throw new Error('No nearby door');
+sdk.sendObjectOption(door, 'Open');
+```
+
+`sendObjectOption(target, option)` accepts a label, regular expression, or zero-based cache option slot (empty slots are not renumbered). It rejects changed objects, unavailable actions, wrong floors and targets outside the local interaction area. It sends a request; server rules and pathfinding determine the outcome. For observed effects, use `await bot.interactObject(target, option, world => /* expected change */)` with an explicit predicate, or a specialized helper such as `chopTree`.
+
+The optional [Void compatibility overlay](compat/void/README.md) also supports a tutorial starting-door fix. It prevents shared open-door bypasses while letting accounts already stranded outside return to the Guide. It does not mark those accounts' tutorial steps complete.

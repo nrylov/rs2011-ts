@@ -50,3 +50,9 @@ test('empty tutorial tabs explain the current instruction rather than suggesting
   s.world.windowId=1028;expect((await sdk.getGameTabStatus()).reason).toContain('window 1028');
  }finally{s.close();}
 });
+test('object dispatch keeps cache option slots and rejects stale objects or wrong floors',()=>{
+ const {s,sent,sdk}=setup();try{s.world.index=1;s.world.players.set(1,{index:1,x:3097,y:3107,level:0});const door={id:3014,name:'Door',x:3098,y:3107,level:0,shape:0,rotation:0,width:1,height:1,solid:2,options:['Open',null,'Knock',null,null]};
+ sdk.sendObjectOption(door,'Open');expect(sent.at(-1)?.op).toBe(27);sdk.sendObjectOption(door,'Knock');expect(sent.at(-1)?.op).toBe(80);expect(()=>sdk.sendObjectOption(door,1)).toThrow('matching action');expect(()=>sdk.sendObjectOption({...door,level:1},'Open')).toThrow('current floor');
+ s.world.objectChanges.set('0:3098:3107:0',{...door,id:null});expect(()=>sdk.sendObjectOption(door,'Open')).toThrow('changed');expect(sent.length).toBe(2);
+ }finally{s.close();}
+});
