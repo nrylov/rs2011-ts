@@ -32,6 +32,8 @@ console.log(state?.player, sdk.getInventory());
 return await sdk.getDialog();
 ```
 
+Use `await sdk.findInventoryItem(590)` for a numeric item ID, or pass an exact name/RegExp. `await sdk.npcDefinition(type)` works directly on the remote SDK. To await the next conversation, use `await sdk.waitForDialog({after: previousDialog, timeout:15000})`; instruction panels are excluded unless explicitly requested.
+
 Check state and tutorial instructions before acting. New characters must complete Tutorial Island normally; there is no SDK skip-tutorial shortcut. Begin with short snippets (about 10 seconds) and check observed effects before loops.
 
 `list_bots` reads connection status and positions without taking control. `disconnect_bot` cancels this MCP's execution and stops a lightweight client it started; externally started/browser clients remain running.

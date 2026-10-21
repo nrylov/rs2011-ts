@@ -136,7 +136,11 @@ export class BotSDK {
  getGroundItems(radius=24){const p=this.getState().player;return p?[...this.getState().groundItems.values()].filter(i=>i.level===p.level&&Math.max(Math.abs(i.x-p.x),Math.abs(i.y-p.y))<=radius).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y)):[];}
  async findGroundItem(pattern:string|RegExp,radius=24){for(const i of this.getGroundItems(radius))if(match((await this.data.item(i.id)).name,pattern))return i;return null;}
  sendTakeGroundItem(item:GroundItem){const current=this.getState().groundItems.get(item.key);if(!current||current.id!==item.id||current.level!==this.getState().player?.level)throw new Error('Ground item left view; query nearby items again');this.session.interactGroundItem(current.id,current.x,current.y);}
- async findInventoryItem(pattern:string|RegExp){for(const item of this.getInventory())if(match((await this.data.item(item.id)).name,pattern))return item;return null;}
+ async findInventoryItem(pattern:string|RegExp|number){
+  if(typeof pattern==='number'){if(!Number.isInteger(pattern)||pattern<0||pattern>65535)throw new Error('Inventory item ID must be an integer from 0 to 65535');return this.getInventory().find(item=>item.id===pattern)??null;}
+  if(typeof pattern!=='string'&&!(pattern instanceof RegExp))throw new Error('Inventory item selector must be a name, RegExp, or numeric item ID');
+  for(const item of this.getInventory())if(match((await this.data.item(item.id)).name,pattern))return item;return null;
+ }
  async nearbyObjects(radius=24){
   const w=this.getState(),p=w.player;if(!p)return [];
   const regions:MapRegion[]=[];

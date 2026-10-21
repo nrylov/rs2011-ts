@@ -156,3 +156,29 @@ test('aborting an attachment before registration closes the pending publisher an
   await Bun.sleep(20);abort.abort();await expect(pending).rejects.toThrow('cancelled');expect(t.s.status).toBe('playing');
  }finally{await slow.stop(true);await t.close();}
 });
+
+test('remote inventory selectors accept item IDs and names and direct NPC definitions resolve current morphs',async()=>{
+ const t=await setup();let remote;
+ try{
+  t.sdk.data.npc=async id=>({id,name:id===952?'Fishing spot':'Hidden',options:['Net',null,null,null,null]}) as any;
+  remote=await connectGateway(options(t.gateway.url,'observe'));
+  expect(await remote.findInventoryItem(1351)).toMatchObject({id:1351});expect(await remote.findInventoryItem(590)).toBeNull();
+  expect(await remote.findInventoryItem(/coins/i)).toMatchObject({id:995});
+  await expect(remote.findInventoryItem(0.5)).rejects.toThrow('integer');await expect(remote.findInventoryItem(null as any)).rejects.toThrow('selector');
+  expect(await remote.npcDefinition(952)).toMatchObject({name:'Fishing spot',options:['Net',null,null,null,null]});
+ }finally{remote?.close();await t.close();}
+});
+
+test('remote dialogue waiting filters instructions, respects prior tokens and supports local cancellation and disconnect',async()=>{
+ const t=await setup();let remote;let current:any={id:372,parent:1,token:'instruction',kind:'instruction',text:['Tutorial'],lines:['Tutorial'],buttons:[],options:[],continueButton:null};
+ try{
+  t.sdk.getDialog=async()=>current;remote=await connectGateway(options(t.gateway.url,'observe'));
+  const first=remote.waitForDialog({timeout:1000});await Bun.sleep(30);current={...current,token:'first',kind:'continue',text:['Welcome']};
+  expect((await first).token).toBe('first');
+  const next=remote.waitForDialog({after:current,timeout:1000});await Bun.sleep(30);current={...current,token:'second'};expect((await next).token).toBe('second');
+  current={...current,token:'instruction2',kind:'instruction'};expect((await remote.waitForDialog({includeInstructions:true,timeout:1000})).token).toBe('instruction2');
+  await expect(remote.waitForDialog({timeout:30})).rejects.toThrow('timed out');await expect(remote.waitForDialog({timeout:0})).rejects.toThrow('positive');
+  const abort=new AbortController(),cancelled=remote.waitForDialog({signal:abort.signal,timeout:1000});abort.abort();await expect(cancelled).rejects.toThrow('cancelled');
+  const pending=remote.waitForDialog({timeout:1000});remote.close();await expect(pending).rejects.toThrow('No playing');
+ }finally{remote?.close();await t.close();}
+});

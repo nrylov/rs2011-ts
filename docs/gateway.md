@@ -106,6 +106,10 @@ GATEWAY_URL=ws://127.0.0.1:7780/gateway bun run gateway:cli list
 
 The common methods are available directly on the remote SDK: inventory/entity searches, nearby objects/NPCs/ground items, dialogue and game-tab queries, tab selection and item/object dispatch. `sdk.query` exposes the complete supported read-only method set; `sdk.send` exposes the supported low-level mutating methods. Every remote dispatch returns a promise and must be awaited. RegExp patterns and optional arguments are supported; functions cannot be serialized into remote calls.
 
+`findInventoryItem` accepts an exact case-insensitive name, RegExp, or numeric item ID (`await sdk.findInventoryItem(590)`). `sdk.npcDefinition(type)` is available directly as well as through `sdk.query`.
+
+For dialogue transitions, `await sdk.waitForDialog({after: previousDialog, timeout: 15000, signal})` observes the hosted client without issuing gameplay actions. It waits for a stable new dialogue token, excludes tutorial instructions unless `includeInstructions: true`, and supports a local AbortSignal, timeout and disconnect. It does not serialize callbacks or signals to the gateway. Omit `after` to accept an already-open conversation. Read the published options before choosing.
+
 Named emotes and run mode are also available directly:
 
 ```ts

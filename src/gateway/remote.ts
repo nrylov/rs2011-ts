@@ -1,4 +1,4 @@
-import type {BotSDK,BotActions} from '../core/sdk.ts';
+import type {BotSDK,BotActions,Dialog,DialogWaitOptions} from '../core/sdk.ts';
 import {botKey,deadline,encode,botActions,queryMethods,sdkActions,type Mode,type PublishedState,type WorldSnapshot} from './protocol.ts';
 export interface GatewayConnectionOptions {url:string;name:string;token:string;mode?:Mode;takeover?:boolean;timeout?:number;label?:string;}
 export type RemoteBotActions=Pick<BotActions,typeof botActions[number]>;
@@ -39,6 +39,7 @@ export class GatewaySDK {
  findInventoryItem(...args:Parameters<BotSDK['findInventoryItem']>){return this.query.findInventoryItem(...args);}
  nearbyObjects(...args:Parameters<BotSDK['nearbyObjects']>){return this.query.nearbyObjects(...args);}
  findNearbyObject(...args:Parameters<BotSDK['findNearbyObject']>){return this.query.findNearbyObject(...args);}
+ npcDefinition(...args:Parameters<BotSDK['npcDefinition']>){return this.query.npcDefinition(...args);}
  nearbyNpcs(){return this.query.nearbyNpcs();}
  findNearbyNpc(...args:Parameters<BotSDK['findNearbyNpc']>){return this.query.findNearbyNpc(...args);}
  getSpells(){return this.query.getSpells();}
@@ -63,6 +64,29 @@ export class GatewaySDK {
  selectCreationControl(...args:Parameters<BotSDK['selectCreationControl']>){return this.send.selectCreationControl(...args);}
  submitNumber(...args:Parameters<BotSDK['submitNumber']>){return this.send.submitNumber(...args);}
  getDialog(){return this.query.getDialog();}
+ /** Observe hosted dialogue without sending an AbortSignal or callback across the wire. */
+ waitForDialog(options:DialogWaitOptions={}):Promise<Dialog>{
+  const timeout=options.timeout??15000,after=typeof options.after==='string'?options.after:options.after?.token;
+  if(!Number.isFinite(timeout)||timeout<=0)return Promise.reject(new Error('Dialogue timeout must be positive'));
+  return new Promise((resolve,reject)=>{
+   let done=false,reading=false,candidate:string|undefined,since=0;const end=Date.now()+timeout;
+   const finish=(error?:Error,value?:Dialog)=>{if(done)return;done=true;clearTimeout(timer);clearInterval(poll);unsubscribe();options.signal?.removeEventListener('abort',abort);error?reject(error):resolve(value!);};
+   const abort=()=>finish(new Error('Dialogue wait cancelled'));
+   const check=()=>{
+    if(done)return;if(!this.isClientOnline()){finish(new Error('No playing game client is attached'));return;}if(reading)return;
+    reading=true;
+    void this.call('sdk.getDialog',[],Math.max(100,Math.min(600000,end-Date.now()))).then((dialog:Dialog|null)=>{
+     if(done)return;
+     if(dialog&&(options.includeInstructions||dialog.kind!=='instruction')&&(!after||dialog.token!==after)){
+      if(candidate!==dialog.token){candidate=dialog.token;since=Date.now();}
+      else if(Date.now()-since>=120)finish(undefined,dialog);
+     }else{candidate=undefined;since=0;}
+    }).catch(error=>{if(!/Dialogue changed while loading/.test(String(error)))finish(error instanceof Error?error:new Error(String(error)));else candidate=undefined;}).finally(()=>{reading=false;});
+   };
+   const unsubscribe=this.subscribe(check),timer=setTimeout(()=>finish(new Error('Dialogue wait timed out')),timeout),poll=setInterval(check,150);
+   options.signal?.addEventListener('abort',abort,{once:true});if(options.signal?.aborted)abort();else check();
+  });
+ }
  getEmotes(){return this.query.getEmotes();}
  getRunState(){return this.query.getRunState();}
  performEmote(...args:Parameters<BotSDK['performEmote']>){return this.send.performEmote(...args);}
