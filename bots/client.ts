@@ -6,7 +6,7 @@ export async function gatewayHealthy(url:string){const base=new URL(url);base.pr
 export async function ensureGateway(url:string,root=repoRoot){
  if(await gatewayHealthy(url))return;const endpoint=new URL(url);if(!['127.0.0.1','localhost','[::1]'].includes(endpoint.hostname))throw new Error('Remote gateway is unavailable; start it on the client host');
  const config=join(root,'gateway.config.json');if(!await Bun.file(config).exists())throw new Error('No gateway configuration; create a bot first');
- const log=await open(join(root,'gateway.log'),'a',0o600),gatewayProcess=Bun.spawn([process.execPath,resolve(root,'src/gateway/main.ts')],{cwd:root,env:{...Bun.env,GATEWAY_CONFIG:config,GATEWAY_HOST:endpoint.hostname,GATEWAY_PORT:endpoint.port||'7780'},stdout:log.fd,stderr:log.fd});gatewayProcess.unref();await log.close();
+ const log=await open(join(root,'gateway.log'),'a',0o600),gatewayProcess=Bun.spawn([process.execPath,resolve(root,'src/gateway/main.ts')],{cwd:root,env:{...Bun.env,GATEWAY_CONFIG:config,GATEWAY_HOST:endpoint.hostname,GATEWAY_PORT:endpoint.port||'7780',GATEWAY_ALLOWED_ORIGINS:Bun.env.GATEWAY_ALLOWED_ORIGINS??'http://127.0.0.1:8082,http://localhost:8082'},stdout:log.fd,stderr:log.fd});gatewayProcess.unref();await log.close();
  const until=Date.now()+15000;while(Date.now()<until){if(await gatewayHealthy(url))return;await Bun.sleep(100);}throw new Error('Gateway did not start; inspect gateway.log');
 }
 export async function startClient(name:string,root=repoRoot){

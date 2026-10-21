@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Void · TypeScript client</title><link rel="stylesheet" href="/style.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Void · TypeScript client</title><link id="sdk-favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E"><link rel="stylesheet" href="/style.css"></head>
 <body>
-  <header><div class="brand">VOID <span>634 / TYPESCRIPT</span></div><div id="status" role="status">Disconnected</div></header>
+  <header><div class="brand">VOID <span>634 / TYPESCRIPT</span></div><span id="sdk-status" class="sdk-status" data-state="offline" role="status" aria-live="polite">SDK: Offline</span><div id="status" role="status">Disconnected</div></header>
   <main>
     <section class="world">
       <div class="toolbar"><div><h1>World view</h1><p>Native TypeScript · cache terrain and objects · live entities</p></div><span id="position">Awaiting character</span></div>
@@ -18,7 +18,7 @@
       <div class="control-grid">
 
       <details class="control-card" open><summary>Character</summary><div class="control-content"><form id="login"><label>Username<input name="username" autocomplete="username" maxlength="12" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button id="connect">Connect</button></form><button id="disconnect" hidden>Disconnect</button><p id="error" role="alert"></p><p id="target" class="muted"></p></div></details>
-      <details class="control-card gateway-panel"><summary>SDK gateway</summary><div class="control-content"><p>Attach agents to this session using gateway role tokens.</p><form id="gateway-form"><label>Gateway URL<input id="gateway-url" type="url" required></label><label>Client token<input id="gateway-token" type="password" autocomplete="off" required></label><button id="gateway-attach" disabled>Attach gateway</button></form><button id="gateway-detach" type="button" hidden>Detach gateway</button><p id="gateway-status" role="status">Gateway detached.</p></div></details>
+      <details class="control-card gateway-panel"><summary>SDK gateway</summary><div class="control-content"><p>Local development sessions register automatically after login. Agents attach by character name; manual settings remain available below.</p><button id="gateway-auto" type="button" disabled>Reconnect automatically</button><form id="gateway-form"><label>Gateway URL<input id="gateway-url" type="url" required></label><label>Client token<input id="gateway-token" type="password" autocomplete="off" required></label><button id="gateway-attach" disabled>Attach gateway</button></form><button id="gateway-detach" type="button" hidden>Detach gateway</button><p id="gateway-status" role="status">Gateway detached.</p></div></details>
       <details class="control-card" open><summary>Combat</summary><div class="control-content"><p id="player-health" role="status">HP: awaiting state</p><progress id="hp-bar" hidden></progress><p id="combat-weapon" class="muted">Connect to see combat styles.</p><div id="combat-styles" class="combat-styles"></div><p id="combat-help" class="sync-status"></p></div></details>
       <details class="control-card" open><summary>Game tabs</summary><div class="control-content"><div id="game-tabs" class="game-tabs"></div></div></details>
 <details class="control-card" open><summary>Nearby objects</summary><div class="control-content"><label for="object-filter">Filter objects</label><input id="object-filter" type="search" placeholder="Door, tree, ladder…"><div id="nearby-objects" class="nearby-npcs">Connect to see nearby objects.</div></div></details>

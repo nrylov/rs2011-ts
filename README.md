@@ -220,7 +220,7 @@ Firemaking on path tiles uses the optional Void fire-placement fix described in 
 
 ## Gateway: hosted clients, local agents
 
-A dedicated gateway now supports persistent remote clients with local SDK controllers and read-only observers. Start `bun run gateway`, run each bot with `bun run client:gateway`, and connect locally with `connectGateway` or `runGatewayScript`. Game passwords and cache stay on the game-client host. Browser clients can publish from the **Publish this client to a gateway** panel. The authenticated fleet listing provides status/positions for dashboard work.
+A dedicated gateway now supports persistent remote clients with local SDK controllers and read-only observers. Start `bun run gateway`, run each bot with `bun run client:gateway`, and connect locally with `connectGateway` or `runGatewayScript`. Game passwords and cache stay on the game-client host. Local browser clients started with `bun run dev:lite` automatically publish configured accounts after login. Agents attach by character name without a page button or token entry. The header and favicon show gateway availability and controller attachment; the **SDK gateway** panel retains manual settings and detach. The authenticated fleet listing provides status/positions for dashboard work.
 
 See [remote setup, role tokens, API differences and remaining rs-sdk parity](docs/gateway.md). Generate private per-role credentials with `bun scripts/create-gateway-config.ts botname`; the gateway binds to loopback by default. [examples/remote-bot.ts](examples/remote-bot.ts) demonstrates local scripts attached to a hosted session.
 

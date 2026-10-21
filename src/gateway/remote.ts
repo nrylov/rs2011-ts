@@ -1,6 +1,6 @@
 import type {BotSDK,BotActions} from '../core/sdk.ts';
 import {botKey,deadline,encode,botActions,queryMethods,sdkActions,type Mode,type PublishedState,type WorldSnapshot} from './protocol.ts';
-export interface GatewayConnectionOptions {url:string;name:string;token:string;mode?:Mode;takeover?:boolean;timeout?:number;}
+export interface GatewayConnectionOptions {url:string;name:string;token:string;mode?:Mode;takeover?:boolean;timeout?:number;label?:string;}
 export type RemoteBotActions=Pick<BotActions,typeof botActions[number]>;
 type QueryName=typeof queryMethods[number];type ActionName=typeof sdkActions[number];
 type RemoteQueries={ [K in QueryName]: (...args:Parameters<BotSDK[K]>)=>Promise<Awaited<ReturnType<BotSDK[K]>>> };
@@ -87,7 +87,7 @@ export class GatewaySDK {
 export async function connectGateway(options:GatewayConnectionOptions):Promise<GatewaySDK>{
  const name=botKey(options.name),timeout=deadline(options.timeout),mode=options.mode??'control';if(!['control','observe'].includes(mode))throw new Error('Invalid gateway mode');const url=new URL(options.url);if(!['ws:','wss:'].includes(url.protocol)||url.username||url.password||url.search)throw new Error('Use a ws:// or wss:// gateway URL without credentials or query parameters');
  return new Promise((resolve,reject)=>{const socket=new WebSocket(url),sdk=new GatewaySDK(socket,mode,timeout);let authenticated=false,settled=false;const fail=(error:Error)=>{if(settled)return;settled=true;clearTimeout(timer);sdk.end(error.message);reject(error);};const timer=setTimeout(()=>fail(new Error('Gateway connection timed out')),15000);
-  socket.onopen=()=>socket.send(JSON.stringify({type:'hello',version:1,role:'agent',bot:name,token:options.token,mode,takeover:options.takeover===true}));
+  socket.onopen=()=>socket.send(JSON.stringify({type:'hello',version:1,role:'agent',bot:name,token:options.token,mode,takeover:options.takeover===true,label:options.label}));
   socket.onmessage=e=>{try{const m=JSON.parse(String(e.data));if(m.type==='ready'){authenticated=true;return;}if(m.type==='error'&&!settled){fail(new Error(m.error));return;}sdk.receive(m);if(authenticated&&m.type==='state'&&!settled){settled=true;clearTimeout(timer);resolve(sdk);}}catch{if(settled)sdk.end('Invalid gateway response');else fail(new Error('Invalid gateway response'));}};
   socket.onerror=()=>fail(new Error('Unable to connect to gateway'));socket.onclose=()=>{if(!settled)fail(new Error('Gateway connection closed before ready'));sdk.end();};
  });

@@ -1,3 +1,4 @@
+import {browserBootstrap} from './gateway/browser-bootstrap.ts';
 import { connect, type Socket } from 'node:net';
 import { resolve } from 'node:path';
 import { DEFAULT_MODULUS } from './core/wire.ts';
@@ -14,7 +15,8 @@ const cachePath=process.env.VOID_CACHE_PATH;
 type Relay={socket?:Socket};
 const server=Bun.serve<Relay, never>({
   hostname:'127.0.0.1',port:Number(process.env.PORT??8082),
-  fetch(request,server){
+  async fetch(request,server){
+    if(new URL(request.url).pathname==='/gateway/bootstrap')return browserBootstrap(request,{enabled:process.env.BROWSER_GATEWAY_AUTO_ATTACH==='1',address:server.requestIP(request)?.address??null,configPath:process.env.GATEWAY_CONFIG??resolve(root,'gateway.config.json'),gatewayUrl:process.env.GATEWAY_URL??'ws://127.0.0.1:7780/gateway'});
     const url=new URL(request.url);
     if(url.pathname==='/game'){
       if(request.headers.get('origin')!==url.origin)return new Response('Invalid origin',{status:403});

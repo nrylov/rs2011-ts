@@ -1,6 +1,7 @@
 import type {BotSDK,BotActions} from '../core/sdk.ts';
-import {botKey,decode,methods,type PublishedState} from './protocol.ts';
-export async function attachGatewayClient(options:{url:string;name:string;token:string;sdk:BotSDK;bot:BotActions;onStatus?:(status:string)=>void}){
+import {botKey,decode,methods,type GatewayPresence,type PublishedState} from './protocol.ts';
+export async function attachGatewayClient(options:{url:string;name:string;token:string;sdk:BotSDK;bot:BotActions;onStatus?:(status:string)=>void;onPresence?:(presence:GatewayPresence)=>void;signal?:AbortSignal}){
+ if(options.signal?.aborted)throw new Error('Gateway attachment cancelled');
  const parsed=new URL(options.url);if(!['ws:','wss:'].includes(parsed.protocol)||parsed.username||parsed.password||parsed.search)throw new Error('Use a ws:// or wss:// gateway URL without credentials or query parameters');
  const name=botKey(options.name);let socket:WebSocket|undefined,stopped=false,registered=false,retry:ReturnType<typeof setTimeout>|undefined,publishTimer:ReturnType<typeof setTimeout>|undefined,activeMutation=false,attempt=0;let activeWalk:string|undefined,walkCancelled=false;
  let resolve!:()=>void,reject!:(e:Error)=>void;const ready=new Promise<void>((yes,no)=>{resolve=yes;reject=no;});
@@ -9,7 +10,8 @@ export async function attachGatewayClient(options:{url:string;name:string;token:
  const schedule=()=>{if(!publishTimer)publishTimer=setTimeout(publish,100);};
  const unsubscribe=options.sdk.session.subscribe(schedule);
  const timer=setTimeout(()=>{reject(new Error('Gateway registration timed out'));close();},15000);
- function close(){stopped=true;clearTimeout(timer);clearTimeout(retry);clearTimeout(publishTimer);clearInterval(heartbeat);unsubscribe();socket?.close();options.onStatus?.('disconnected');}
+ function close(){if(stopped)return;stopped=true;registered=false;options.signal?.removeEventListener('abort',abort);reject(new Error('Gateway attachment cancelled'));options.onPresence?.({controller:null,observers:0});clearTimeout(timer);clearTimeout(retry);clearTimeout(publishTimer);clearInterval(heartbeat);unsubscribe();socket?.close();options.onStatus?.('disconnected');}
+ function abort(){close();}
  async function execute(m:any,ws:WebSocket){let mutation=false;try{
   if(!methods.has(m.method)||typeof m.id!=='string'||!Number.isFinite(m.expiresAt)||Date.now()>m.expiresAt)throw new Error('Expired or unsupported gateway command');
   const args=decode(m.args);if(!Array.isArray(args))throw new Error('Arguments must be an array');mutation=methods.get(m.method)!;if(mutation&&activeMutation)throw new Error('A game action is still running');if(mutation)activeMutation=true;
@@ -19,9 +21,9 @@ export async function attachGatewayClient(options:{url:string;name:string;token:
  }catch(e){if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:'result',id:m.id,error:e instanceof Error?e.message:String(e)}));}}
  function connect(){if(stopped)return;registered=false;options.onStatus?.('connecting');const ws=socket=new WebSocket(options.url);
   ws.onopen=()=>ws.send(JSON.stringify({type:'hello',version:1,role:'client',bot:name,token:options.token}));
-  ws.onmessage=e=>{try{const m=JSON.parse(String(e.data));if(m.type==='ready'){registered=true;attempt=0;clearTimeout(timer);options.onStatus?.('connected');publish();resolve();}else if(m.type==='call'){void execute(m,ws);}else if(m.type==='cancel'&&m.id===activeWalk){walkCancelled=true;}else if(m.type==='error'){options.onStatus?.(m.error);reject(new Error(m.error));close();}}catch{ws.close(1008,'Invalid gateway message');}};
-  ws.onerror=()=>{};ws.onclose=()=>{if(socket!==ws)return;registered=false;if(!stopped){options.onStatus?.('reconnecting');retry=setTimeout(connect,Math.min(15000,500*2**Math.min(attempt++,5)));}};
+  ws.onmessage=e=>{try{const m=JSON.parse(String(e.data));if(m.type==='ready'){registered=true;attempt=0;clearTimeout(timer);options.onStatus?.('connected');publish();resolve();}else if(m.type==='presence'){options.onPresence?.({controller:m.controller??null,observers:m.observers??0});}else if(m.type==='call'){void execute(m,ws);}else if(m.type==='cancel'&&m.id===activeWalk){walkCancelled=true;}else if(m.type==='error'){options.onStatus?.(m.error);reject(new Error(m.error));close();}}catch{ws.close(1008,'Invalid gateway message');}};
+  ws.onerror=()=>{};ws.onclose=()=>{if(socket!==ws)return;registered=false;options.onPresence?.({controller:null,observers:0});if(!stopped){options.onStatus?.('reconnecting');retry=setTimeout(connect,Math.min(15000,500*2**Math.min(attempt++,5)));}};
  }
- const heartbeat=setInterval(()=>{if(registered)send({type:'ping'});},20000);connect();
+ const heartbeat=setInterval(()=>{if(registered)send({type:'ping'});},20000);options.signal?.addEventListener('abort',abort,{once:true});connect();
  try{await ready;return {close,publish,get connected(){return registered;}};}catch(e){close();throw e;}
 }

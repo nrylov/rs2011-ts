@@ -31,7 +31,7 @@ The local `dev/run-*.sh` scripts provide equivalent commands and work from any
 working directory. Use Ctrl+C to stop each service. For orderly game shutdown,
 log players out or stop the client services first, then stop the game server.
 The agent's configured MCP starts automatically when the agent is opened.
-Browser gateway attachment is currently manual.
+The lightweight browser automatically registers configured accounts after login. Its header and favicon distinguish gateway availability from an attached controller. Manual attachment and detach remain in the SDK gateway panel.
 
 Check that required local files exist without starting services:
 
@@ -61,3 +61,7 @@ Void 2.11.0 distribution, Java 21 runtime, prepared cache and matching overlay
 before starting the game. Copying `dev/` is also a way to preserve this machine's
 local setup. Back up `dev/server/data/saves/`, `.env`, `gateway.config.json`, and
 private bot credentials; Git does not back them up.
+
+`dev:lite` enables trusted localhost automatic gateway provisioning. Set
+`BROWSER_GATEWAY_AUTO_ATTACH=0` to disable it. See [gateway setup](gateway.md)
+for origin restrictions and public-hosting requirements.

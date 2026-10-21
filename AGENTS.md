@@ -18,6 +18,10 @@ Setup creates private `bot.env`, a starter `script.ts`, and `lab_log.md`. It reg
 
 `start-client` starts a lightweight game client and starts a local gateway if needed. Leave it running. One game client owns each account session. Attaching SDK scripts never requires logging the same account into another game client.
 
+## Browser-owned sessions
+
+A lightweight browser started with `bun run dev:lite` automatically registers a configured account after game login. When its header shows SDK: Available, MCP/scripts attach by character name and operate that same browser session; do not open a second game login. No token needs to be pasted into the page. A green header/favicon identifies the current controller. Closing the agent leaves the game open. If automatic attachment is unavailable, inspect the SDK gateway status before starting a replacement client. See `docs/gateway.md` for local provisioning limits and manual controls.
+
 ## MCP
 
 `create_bot` creates the account directory. `execute_code(bot_name, code, timeout?)` attaches to its current gateway client and starts a local lightweight client when needed and configured. Code runs asynchronously with `sdk` and `bot` globals. SDK queries that use cache or remote dispatch must be awaited.

@@ -18,6 +18,7 @@ switch(mode){
   break;
  }
  case 'lite':
+  Object.assign(env,{BROWSER_GATEWAY_AUTO_ATTACH:process.env.BROWSER_GATEWAY_AUTO_ATTACH??'1'});
   required=[env.VOID_CACHE_PATH];
   command=[process.execPath,resolve(root,'src/server.ts')];
   break;

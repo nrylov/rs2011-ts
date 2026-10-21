@@ -132,3 +132,27 @@ test('an expired walking RPC cancels later legs and releases its action lock',as
  expect((await listGatewayBots(t.gateway.url,config.monitorToken))[0].busy).toBe(false);expect(t.s.status).toBe('playing');
  }finally{remote?.close();await t.close();}
 });
+
+test('publisher sees controller identifiers, observers and explicit takeover without losing its game session',async()=>{
+ const t=await setup();let controller,observer,replacement,endpoint;const seen:any[]=[];
+ try{
+  t.endpoint.close();await Bun.sleep(30);
+  endpoint=await attachGatewayClient({url:t.gateway.url,name:'test',token:config.bots.test.clientToken,sdk:t.sdk,bot:t.bot,onPresence:p=>seen.push(p)});
+  await Bun.sleep(10);expect(seen.at(-1)).toEqual({controller:null,observers:0});
+  controller=await connectGateway({...options(t.gateway.url),label:'Tutorial agent'});await Bun.sleep(10);
+  const first=seen.at(-1);expect(first.controller.label).toBe('Tutorial agent');expect(first.controller.id.length).toBe(8);
+  observer=await connectGateway(options(t.gateway.url,'observe'));await Bun.sleep(10);expect(seen.at(-1).observers).toBe(1);
+  replacement=await connectGateway({...options(t.gateway.url),takeover:true,label:'Replacement'});await Bun.sleep(20);
+  expect(seen.at(-1).controller.label).toBe('Replacement');expect(seen.at(-1).controller.id).not.toBe(first.controller.id);
+  replacement.close();await Bun.sleep(20);expect(seen.at(-1)).toEqual({controller:null,observers:1});
+  expect(t.s.status).toBe('playing');expect(endpoint.connected).toBe(true);
+ }finally{controller?.close();observer?.close();replacement?.close();endpoint?.close();await t.close();}
+});
+
+test('aborting an attachment before registration closes the pending publisher and preserves the game',async()=>{
+ const t=await setup(),abort=new AbortController();const slow=Bun.serve({port:0,fetch(req,s){if(s.upgrade(req))return;return new Response(null,{status:400});},websocket:{message(){}}});
+ try{
+  const pending=attachGatewayClient({url:`ws://127.0.0.1:${slow.port}`,name:'test',token:config.bots.test.clientToken,sdk:t.sdk,bot:t.bot,signal:abort.signal});
+  await Bun.sleep(20);abort.abort();await expect(pending).rejects.toThrow('cancelled');expect(t.s.status).toBe('playing');
+ }finally{await slow.stop(true);await t.close();}
+});

@@ -1,6 +1,7 @@
 import type {World} from '../core/world.ts';
 export type WorldSnapshot=ReturnType<World['snapshot']>;
 export type Mode='control'|'observe';
+export interface GatewayPresence {controller:{id:string;label:string}|null;observers:number;}
 export interface BotCredentials {clientToken:string;controlToken:string;observeToken:string;}
 export interface GatewayConfig {bots:Record<string,BotCredentials>;monitorToken:string;}
 export interface PublishedState {world:WorldSnapshot;status:string;error:string|null;}

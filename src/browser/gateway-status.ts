@@ -1,0 +1,3 @@
+export type GatewayDisplayState='offline'|'connecting'|'available'|'controlled'|'detached'|'unavailable';
+export const gatewayColours:Record<GatewayDisplayState,string>={offline:'#64748b',connecting:'#eab308',available:'#38bdf8',controlled:'#22c55e',detached:'#64748b',unavailable:'#f97316'};
+export function gatewayFavicon(state:GatewayDisplayState){return 'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#0f172a"/><path d="M7 8h5l4 15 4-15h5l-7 19h-4z" fill="#e2e8f0"/><circle cx="25" cy="25" r="6" fill="${gatewayColours[state]}" stroke="#0f172a" stroke-width="2"/></svg>`);}

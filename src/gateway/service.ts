@@ -1,6 +1,6 @@
 import {timingSafeEqual} from 'node:crypto';
 import {botKey,deadline,decode,methods,type GatewayConfig,type PublishedState,type Mode} from './protocol.ts';
-interface Peer {socket:Bun.ServerWebSocket<Peer>;role?:'client'|'agent';bot?:string;mode?:Mode;seen:number;authTimer?:ReturnType<typeof setTimeout>;}
+interface Peer {socket:Bun.ServerWebSocket<Peer>;role?:'client'|'agent';bot?:string;mode?:Mode;label?:string;id?:string;seen:number;authTimer?:ReturnType<typeof setTimeout>;}
 interface Bot {client?:Peer;controller?:Peer;agents:Set<Peer>;state?:PublishedState;updatedAt:number;awaitingState?:boolean;busy?:string;}
 interface Pending {bot:string;peer:Peer;id:string;method:string;mutation:boolean;expired:boolean;timer:ReturnType<typeof setTimeout>;}
 const equal=(a:unknown,b:string)=>typeof a==='string'&&Buffer.byteLength(a)===Buffer.byteLength(b)&&timingSafeEqual(Buffer.from(a),Buffer.from(b));
@@ -13,7 +13,8 @@ export function startGateway(options:{config:GatewayConfig;port?:number;hostname
  const config=validateConfig(options.config),bots=new Map(Object.keys(config.bots).map(k=>[k,{agents:new Set<Peer>(),updatedAt:0} as Bot])),pending=new Map<string,Pending>(),peers=new Set<Peer>();
  const send=(p:Peer,data:unknown)=>{if(p.socket.readyState===1){if(p.socket.getBufferedAmount()>2_000_000){p.socket.close(1013,'Subscriber is too slow');return;}p.socket.send(JSON.stringify(data));}};
  const state=(b:Bot)=>({type:'state',state:b.state??null,online:!!b.client&&!b.awaitingState,ageMs:b.updatedAt?Date.now()-b.updatedAt:null});
- const fanout=(b:Bot)=>{for(const p of b.agents)send(p,state(b));};
+ const presence=(b:Bot)=>{if(b.client)send(b.client,{type:'presence',controller:b.controller?{id:b.controller.id!,label:b.controller.label!}:null,observers:[...b.agents].filter(p=>p.mode==='observe').length});};
+ const fanout=(b:Bot)=>{for(const p of b.agents)send(p,state(b));presence(b);};
  function finish(key:string,error?:string,result?:unknown){const job=pending.get(key);if(!job)return;clearTimeout(job.timer);pending.delete(key);const b=bots.get(job.bot)!;if(b.busy===key)b.busy=undefined;if(!job.expired)send(job.peer,{type:'result',id:job.id,...(error?{error}:{value:result??null})});}
  function failClient(b:Bot){b.client=undefined;for(const [key,p]of pending)if(bots.get(p.bot)===b)finish(key,'Game client disconnected');fanout(b);}
  const server=Bun.serve<Peer>({hostname:options.hostname??'127.0.0.1',port:options.port??7780,
@@ -23,8 +24,8 @@ export function startGateway(options:{config:GatewayConfig;port?:number;hostname
    open(ws){const p=ws.data;p.socket=ws;peers.add(p);p.authTimer=setTimeout(()=>ws.close(1008,'Authentication required'),5000);},
    message(ws,raw){const p=ws.data;try{if(typeof raw!=='string')throw new Error('JSON messages required');const m=JSON.parse(raw);p.seen=Date.now();
     if(!p.role){if(m.type!=='hello'||m.version!==1)throw new Error('Gateway protocol 1 required');const key=botKey(m.bot),creds=config.bots[key],b=bots.get(key);if(!creds||!b)throw new Error('Authentication failed');
-     if(m.role==='client'){if(!equal(m.token,creds.clientToken))throw new Error('Authentication failed');if(b.client)throw new Error('A game client is already registered for this bot');p.role='client';p.bot=key;b.client=p;b.awaitingState=true;send(p,{type:'ready',role:'client'});fanout(b);}
-     else if(m.role==='agent'){const mode:Mode=m.mode==='observe'?'observe':'control';if(m.mode!==mode||!equal(m.token,mode==='observe'?creds.observeToken:creds.controlToken))throw new Error('Authentication failed');if(mode==='control'&&b.controller){if(m.takeover!==true)throw new Error('Bot already has a controller; use takeover explicitly');send(b.controller,{type:'error',error:'Control was taken over by another agent'});b.controller.socket.close(1008,'Control taken over');}p.role='agent';p.bot=key;p.mode=mode;b.agents.add(p);if(mode==='control')b.controller=p;send(p,{type:'ready',role:'agent',mode});send(p,state(b));}
+     if(m.role==='client'){if(!equal(m.token,creds.clientToken))throw new Error('Authentication failed');if(b.client)throw new Error('A game client is already registered for this bot');p.role='client';p.bot=key;b.client=p;b.awaitingState=true;send(p,{type:'ready',role:'client'});presence(b);fanout(b);}
+     else if(m.role==='agent'){const mode:Mode=m.mode==='observe'?'observe':'control';if(m.mode!==mode||!equal(m.token,mode==='observe'?creds.observeToken:creds.controlToken))throw new Error('Authentication failed');if(mode==='control'&&b.controller){if(m.takeover!==true)throw new Error('Bot already has a controller; use takeover explicitly');send(b.controller,{type:'error',error:'Control was taken over by another agent'});b.controller.socket.close(1008,'Control taken over');}p.role='agent';p.bot=key;p.mode=mode;p.id=crypto.randomUUID().slice(0,8);p.label=typeof m.label==='string'?m.label.replace(/[\x00-\x1f\x7f]/g,'').trim().slice(0,64)||'SDK agent':'SDK agent';b.agents.add(p);if(mode==='control')b.controller=p;send(p,{type:'ready',role:'agent',mode});send(p,state(b));presence(b);}
      else throw new Error('Invalid gateway role');clearTimeout(p.authTimer);return;
     }
     if(m.type==='ping'){send(p,{type:'pong'});return;}
@@ -41,7 +42,7 @@ export function startGateway(options:{config:GatewayConfig;port?:number;hostname
      const job:Pending={bot:p.bot!,peer:p,id:m.id,method:m.method,mutation,expired:false,timer:setTimeout(()=>{const j=pending.get(key);if(!j)return;send(p,{type:'result',id:m.id,error:'Gateway request timed out; the game action may still be running'});if(j.mutation){j.expired=true;if(j.method==='bot.walkTo'&&b.client)send(b.client,{type:'cancel',id:key});}else pending.delete(key);},timeout)};pending.set(key,job);if(mutation)b.busy=key;send(b.client,{type:'call',id:key,method:m.method,args:m.args,expiresAt:Date.now()+timeout});
     }catch(e){send(p,{type:'result',id:m.id,error:e instanceof Error?e.message:String(e)});}
    }catch(e){send(p,{type:'error',error:e instanceof Error?e.message:'Invalid gateway message'});ws.close(1008,'Gateway protocol error');}},
-   close(ws){const p=ws.data;clearTimeout(p.authTimer);peers.delete(p);if(!p.bot)return;const b=bots.get(p.bot)!;if(b.client===p)failClient(b);b.agents.delete(p);if(b.controller===p)b.controller=undefined;for(const [key,j]of pending)if(j.peer===p){if(j.method==='bot.walkTo'&&b.client)send(b.client,{type:'cancel',id:key});if(!j.mutation){clearTimeout(j.timer);pending.delete(key);}}},
+   close(ws){const p=ws.data;clearTimeout(p.authTimer);peers.delete(p);if(!p.bot)return;const b=bots.get(p.bot)!;if(b.client===p)failClient(b);b.agents.delete(p);if(b.controller===p)b.controller=undefined;presence(b);for(const [key,j]of pending)if(j.peer===p){if(j.method==='bot.walkTo'&&b.client)send(b.client,{type:'cancel',id:key});if(!j.mutation){clearTimeout(j.timer);pending.delete(key);}}},
   },
  });
  const heartbeat=setInterval(()=>{for(const p of peers)if(Date.now()-p.seen>60000)p.socket.close(1001,'Heartbeat expired');},10000);

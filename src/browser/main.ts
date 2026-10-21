@@ -22,8 +22,9 @@ const activity=new ActivityIndicator(get('player-activity'),()=>session,async id
 });
 // Refresh only this small indicator so finite animations expire without redrawing the map.
 setInterval(()=>activity.render(),500);
+let activeUsername='';
 let renderedMessages:Session|undefined,renderedMessageSequence=-1;
-const gatewayControls=new GatewayControls(()=>controls&&session?.status==='playing'?{sdk:controls.sdk,bot:controls.bot}:null);
+const gatewayControls=new GatewayControls(()=>controls&&session?.status==='playing'?{sdk:controls.sdk,bot:controls.bot,name:activeUsername}:null);
 const developerConsole=new DeveloperConsole(()=>controls&&session?.status==='playing'?{sdk:controls.sdk,bot:controls.bot}:null);
 
 const SKILLS = ['Attack','Defence','Strength','Constitution','Ranged','Prayer','Magic','Cooking','Woodcutting','Fletching','Fishing','Firemaking','Crafting','Smithing','Mining','Herblore','Agility','Thieving','Slayer','Farming','Runecrafting','Hunter','Construction','Summoning','Dungeoneering'];
@@ -78,6 +79,7 @@ form.addEventListener('submit', event => {
     clearTimeout(opening);
     try {
       current=session=new Session({send:bytes=>{if(socket.readyState!==WebSocket.OPEN)throw new Error('WebSocket closed');socket.send(bytes);},close:()=>socket.close()}, {username,password,modulus:config.modulus});
+      activeUsername=username;
       const rawSdk=new BotSDK(current,data),rawBot=new BotActions(rawSdk);
       const sdk=traceActions(rawSdk,'sdk',actionLog.history,sdkActions),bot=traceActions(rawBot,'bot',actionLog.history,botActions);controls=new Controls(sdk,bot,map);
       Object.defineProperty(window,'rs2011',{value:{sdk,bot,map,session:current},configurable:true});
