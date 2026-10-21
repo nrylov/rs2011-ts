@@ -15,10 +15,17 @@
     "build:login-sync": "bun scripts/build-void-login-sync.ts",
     "gateway": "bun src/gateway/main.ts",
     "client:gateway": "bun src/gateway/runner.ts",
-    "gateway:cli": "bun src/gateway/cli.ts"
+    "gateway:cli": "bun src/gateway/cli.ts",
+    "mcp": "bun mcp/server.ts",
+    "bot:create": "bun bots/create-bot.ts",
+    "bot:client": "bun bots/start-client.ts",
+    "bot:state": "bun bots/state.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.3.0",
     "typescript": "^5.9.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0"
   }
 }

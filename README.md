@@ -297,3 +297,17 @@ if (npc) await sdk.castSpell('Wind Strike', {kind:'npc', target:npc});
 `castSpell(nameOrIdOrRegExp, target?, option?)` returns `dispatched: true`, which means the request was sent. Observe the resulting inventory, XP, dialogue or position to confirm the effect. Target kinds are `npc`, `player`, `self` (target your own character), `item` (inventory item or slot), `object` and `ground-item`. The spell catalogue publishes the permitted kinds; stale local targets and hidden spell components are rejected. An optional action label chooses among self-cast options. Some spells open selection or production menus and need follow-up actions; spell dispatch does not automate those menus or guarantee every server spell is implemented correctly.
 
 `homeTeleport(timeout=45000)` specifically casts **Lumbridge Home Teleport** and observes the server's Lumbridge arrival tiles. Complete Terrova's final conversation first to unlock the Tutorial Island exit. Starting its animation is not success. Cooldowns and fresh server refusals reject the helper. The developer console has a **Home Teleport** preset. Other home destinations can be dispatched by name through `castSpell`; confirmed-arrival handling currently covers Lumbridge. All methods also work through the remote gateway.
+
+
+## Agent setup and MCP
+
+Open this repository in your coding agent and ask it to start a new bot. The repo's `AGENTS.md` and MCP configuration describe the workflow. Setup creates `bots/{username}/bot.env`, `script.ts` and `lab_log.md` and registers private gateway role tokens without overwriting existing accounts.
+
+```sh
+bun bots/create-bot.ts mybot
+bun bots/start-client.ts mybot  # persistent lightweight client; leave running
+bun bots/state.ts mybot         # observer query
+bun bots/mybot/script.ts
+```
+
+The MCP server provides `create_bot`, `execute_code`, `list_bots` and `disconnect_bot`. `execute_code` exposes `sdk` and `bot`, attaches to an existing gateway client, and can start a local lightweight client automatically. Scripts remain in the account's directory. Gateway clients and local agent scripts can run on different machines; game credentials/cache stay on the client host. See [MCP tools, configuration, cancellation and remote setup](mcp/README.md).

@@ -4,7 +4,7 @@ interface Peer {socket:Bun.ServerWebSocket<Peer>;role?:'client'|'agent';bot?:str
 interface Bot {client?:Peer;controller?:Peer;agents:Set<Peer>;state?:PublishedState;updatedAt:number;awaitingState?:boolean;busy?:string;}
 interface Pending {bot:string;peer:Peer;id:string;mutation:boolean;expired:boolean;timer:ReturnType<typeof setTimeout>;}
 const equal=(a:unknown,b:string)=>typeof a==='string'&&Buffer.byteLength(a)===Buffer.byteLength(b)&&timingSafeEqual(Buffer.from(a),Buffer.from(b));
-function validateConfig(input:GatewayConfig){
+export function validateConfig(input:GatewayConfig){
  const bots:GatewayConfig['bots']=Object.create(null);if(!input?.bots||!Object.keys(input.bots).length)throw new Error('Configure at least one bot');
  const tokens=new Set<string>();for(const [name,creds]of Object.entries(input.bots)){const key=botKey(name);if(bots[key])throw new Error('Duplicate normalized bot name');for(const field of ['clientToken','controlToken','observeToken'] as const){const token=creds?.[field];if(typeof token!=='string'||token.length<24||tokens.has(token))throw new Error('Use unique tokens of at least 24 characters for every gateway role');tokens.add(token);}bots[key]=creds;}
  if(typeof input.monitorToken!=='string'||input.monitorToken.length<24||tokens.has(input.monitorToken))throw new Error('Use a separate monitorToken of at least 24 characters');return {bots,monitorToken:input.monitorToken};
@@ -45,5 +45,6 @@ export function startGateway(options:{config:GatewayConfig;port?:number;hostname
   },
  });
  const heartbeat=setInterval(()=>{for(const p of peers)if(Date.now()-p.seen>60000)p.socket.close(1001,'Heartbeat expired');},10000);
- return {server,url:`ws://${options.hostname??'127.0.0.1'}:${server.port}/gateway`,async stop(){clearInterval(heartbeat);for(const j of pending.values())clearTimeout(j.timer);pending.clear();for(const p of peers){clearTimeout(p.authTimer);p.socket.close(1001,'Gateway stopped');}await server.stop(true);}};
+ function addBots(input:GatewayConfig){const next=validateConfig(input);if(next.monitorToken!==config.monitorToken||Object.entries(config.bots).some(([name,creds])=>!next.bots[name]||(['clientToken','controlToken','observeToken'] as const).some(key=>creds[key]!==next.bots[name][key])))throw new Error('Token changes or bot removals require a gateway restart');let added=0;for(const[name,creds]of Object.entries(next.bots))if(!config.bots[name]){config.bots[name]=creds;bots.set(name,{agents:new Set<Peer>(),updatedAt:0});added++;}return added;}
+ return {addBots,server,url:`ws://${options.hostname??'127.0.0.1'}:${server.port}/gateway`,async stop(){clearInterval(heartbeat);for(const j of pending.values())clearTimeout(j.timer);pending.clear();for(const p of peers){clearTimeout(p.authTimer);p.socket.close(1001,'Gateway stopped');}await server.stop(true);}};
 }

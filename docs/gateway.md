@@ -142,7 +142,7 @@ This establishes remote session ownership, authenticated control/observation, ac
 
 | Area | Current gap |
 | --- | --- |
-| Agent tooling | Dedicated MCP tools (`list_bots`, bounded script execution, connection management); local Bun scripts work now. |
+| Agent tooling | Initial MCP tools and account-directory setup are available; richer agent scheduling, persistent task tracking and automatic game-session recovery remain. |
 | Fleet GUI | A standalone map dashboard that consumes fleet positions; the authenticated listing feed is ready. |
 | Action coverage | Item-on-object/NPC actions, broader skilling/crafting/shop/trade/combat helpers, chat/friends and more interface controls. |
 | State coverage | Combat/targeting/animation evidence, NPC transform masks, more ClientScript-driven UI and instanced regions. |

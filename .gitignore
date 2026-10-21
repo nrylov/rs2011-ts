@@ -7,3 +7,7 @@ dist/
 .DS_Store
 
 gateway.config.json
+
+bots/*/bot.env
+gateway.config.json.lock
+gateway.config.json.*.tmp

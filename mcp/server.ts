@@ -1,0 +1,22 @@
+import{Server}from'@modelcontextprotocol/sdk/server/index.js';
+import{StdioServerTransport}from'@modelcontextprotocol/sdk/server/stdio.js';
+import{ListToolsRequestSchema,CallToolRequestSchema,ListResourcesRequestSchema,ReadResourceRequestSchema}from'@modelcontextprotocol/sdk/types.js';
+import{join,resolve}from'node:path';
+import{BotManager}from'./manager.ts';
+import{createBot}from'../bots/create-bot.ts';
+import{repoRoot}from'../bots/config.ts';
+const sourceRoot=resolve(import.meta.dir,'..');
+const root=process.env.RS2011_BOT_ROOT??repoRoot,manager=new BotManager(root),server=new Server({name:'rs2011-bots',version:'0.1.0'},{capabilities:{tools:{},resources:{}}});
+const resources={'rs2011://sdk':{name:'SDK guide',path:join(sourceRoot,'README.md')},'rs2011://agents':{name:'Agent workflow',path:join(sourceRoot,'AGENTS.md')},'rs2011://gateway':{name:'Gateway guide',path:join(sourceRoot,'docs/gateway.md')}};
+server.setRequestHandler(ListToolsRequestSchema,async()=>({tools:[
+ {name:'create_bot',description:'Create bots/{username}/ with private credentials, gateway roles, starter script and session notes. Omit name for a random username. Does not log into the game.',inputSchema:{type:'object',properties:{name:{type:'string',pattern:'^[A-Za-z0-9]{1,12}$'}},additionalProperties:false}},
+ {name:'execute_code',description:'Execute TypeScript with sdk and bot globals on a configured bot. Attach to an existing client or start a local lightweight client when configured. One execution per bot; newer calls cancel the prior program. Cancellation stops further script commands; accepted hosted game actions may still finish. Keep snippets short; save durable scripts in bots/{name}/.',inputSchema:{type:'object',properties:{bot_name:{type:'string'},code:{type:'string',maxLength:65536},timeout:{type:'number',description:'Minutes; default 2, maximum 60.',minimum:1/60,maximum:60}},required:['bot_name','code'],additionalProperties:false}},
+ {name:'list_bots',description:'List configured bots, gateway/client connection status, position and running MCP executions without taking control.',inputSchema:{type:'object',properties:{},additionalProperties:false}},
+ {name:'disconnect_bot',description:'Cancel an MCP execution and stop a lightweight client started by this MCP process. Externally started or browser clients remain running.',inputSchema:{type:'object',properties:{name:{type:'string'}},required:['name'],additionalProperties:false}}
+]}));
+const response=(value:unknown,error=false)=>({content:[{type:'text' as const,text:JSON.stringify(value,(_,v)=>typeof v==='bigint'?v.toString():v,2).slice(0,64000)}],isError:error});
+server.setRequestHandler(CallToolRequestSchema,async(request,extra)=>{try{const a=request.params.arguments??{};switch(request.params.name){case'create_bot':return response(await createBot(a.name as string|undefined,{root}));case'execute_code':{const result=await manager.execute(a.bot_name as string,a.code as string,Number(a.timeout??2)*60000,extra.signal);return response(result,(result as any)?.ok===false);}case'list_bots':{const bots=await manager.list();return response({bots,count:bots.length});}case'disconnect_bot':return response(await manager.disconnect(a.name as string));default:throw new Error('Unknown tool');}}catch(e){return response({error:e instanceof Error?e.message:String(e)},true);}});
+server.setRequestHandler(ListResourcesRequestSchema,async()=>({resources:Object.entries(resources).map(([uri,r])=>({uri,name:r.name,mimeType:'text/markdown'}))}));
+server.setRequestHandler(ReadResourceRequestSchema,async request=>{const resource=resources[request.params.uri as keyof typeof resources];if(!resource)throw new Error('Unknown resource');return{contents:[{uri:request.params.uri,mimeType:'text/markdown',text:await Bun.file(resource.path).text()}]};});
+await server.connect(new StdioServerTransport());
+let stopping=false;const stop=async()=>{if(stopping)return;stopping=true;await manager.close();await server.close();process.exit(0);};process.once('SIGINT',stop);process.once('SIGTERM',stop);
