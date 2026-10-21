@@ -36,7 +36,7 @@ export class PrayerService {
    this.sdk.session.clickInterface(271,8,0,-1,prayer.index);
    await this.sdk.session.waitFor(w=>{
     if(this.book()!==state.book||!this.sdk.isOpen(271)||w.varcs.get(181)===1)throw new Error('Prayer book or interface changed before confirmation');
-    if(w.messageSequence>sequence)for(const m of w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length)))if([0,4,109].includes(m.type)&&/^(?:You (?:can't|cannot|need|must|don't|do not|have)|This prayer)/i.test(plainText(m.text)))throw new Error(plainText(m.text));
+    if(w.messageSequence>sequence)for(const m of w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length)))if([0,4,109].includes(m.type)&&/^(?:You (?:can't|cannot|need|must|don't|do not|haven't|have (?:to|not|no|run out|insufficient))|This prayer)/i.test(plainText(m.text)))throw new Error(plainText(m.text));
     const mask=w.varps.get(varp);return mask!==undefined&&!!(mask&(1<<prayer.bit))===enabled;
    },timeout);return this.state();
   }finally{this.changing=false;}

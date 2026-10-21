@@ -1,3 +1,4 @@
+import {SpellService,type SpellTarget} from './spells.ts';
 import {MagicService} from './magic.ts';
 import {PrayerService} from './prayer.ts';
 import {CombatService} from './combat.ts';
@@ -27,13 +28,17 @@ export const inventoryOption=(slot:number)=>[0,1,2,6,7][slot];
 export const equipmentComponents:Record<number,number>={0:8,1:11,2:14,3:17,4:20,5:23,7:26,9:29,10:32,12:35,13:38};
 export class BotSDK {
  readonly dialogue:DialogueService;
+ readonly spells:SpellService;
  readonly magic:MagicService;
  readonly prayers:PrayerService;
  readonly combat:CombatService;
  readonly creation:CreationService;
  private changingRun=false;
- constructor(readonly session:Session,readonly data:GameData){this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);this.combat=new CombatService(this);this.prayers=new PrayerService(this);this.magic=new MagicService(this);}
+ constructor(readonly session:Session,readonly data:GameData){this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);this.combat=new CombatService(this);this.prayers=new PrayerService(this);this.magic=new MagicService(this);this.spells=new SpellService(this);}
  getState(){return this.session.world;}
+ getSpells(){return this.spells.list();}
+ castSpell(spell:string|RegExp,target?:SpellTarget,option?:string){return this.spells.cast(spell,target,option);}
+ homeTeleport(timeout=45000){return this.spells.home(timeout);}
  getCombatSpells(){return this.magic.spells();}
  castSpellOnNpc(spell:string|RegExp,target:Entity|string|RegExp,timeout=20000){return this.magic.cast(spell,target,timeout);}
  getPrayerState(){return this.prayers.state();}

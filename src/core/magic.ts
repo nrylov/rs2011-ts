@@ -24,7 +24,7 @@ export class MagicService {
    validate();if(!this.sdk.isOpen(spell.interfaceId))throw new Error('Spellbook changed before casting');
    const sequence=w.messageSequence,xp=skill.xp,mindRunes=this.sdk.count(558);this.sdk.session.castSpellOnNpc(spell.interfaceId,spell.component,index);
    await this.sdk.session.waitFor(state=>{
-    if(state.messageSequence>sequence)for(const m of state.messages.slice(-Math.min(state.messageSequence-sequence,state.messages.length)))if([0,4,109].includes(m.type)&&/^(?:You (?:can't|cannot|need|must|don't|do not|have)|This spell)/i.test(plainText(m.text)))throw new Error(plainText(m.text));
+    if(state.messageSequence>sequence)for(const m of state.messages.slice(-Math.min(state.messageSequence-sequence,state.messages.length)))if([0,4,109].includes(m.type)&&/^(?:You (?:can't|cannot|need|must|don't|do not|haven't|have (?:to|not|no|run out|insufficient))|This spell)/i.test(plainText(m.text)))throw new Error(plainText(m.text));
     return(state.skills.get(6)?.xp??xp)>xp||this.sdk.count(558)<mindRunes;
    },timeout);
    return{spell:{...spell,aliases:[...spell.aliases]},target:{index,type,name:definition.name},effect:((this.sdk.getState().skills.get(6)?.xp??xp)>xp?'magic-xp':'runes-consumed') as 'magic-xp'|'runes-consumed',xp:(this.sdk.getState().skills.get(6)?.xp??xp)-xp};

@@ -23,3 +23,5 @@ export type {Health,CombatState,CombatStyle,EquipmentStat} from './core/combat.t
 export type {PrayerBook,PrayerEntry,PrayerState} from './core/prayer.ts';
 
 export type {CombatSpell} from './core/magic.ts';
+
+export type {SpellDefinition,SpellTarget} from './core/spells.ts';

@@ -39,6 +39,9 @@ export class GatewaySDK {
  findNearbyObject(...args:Parameters<BotSDK['findNearbyObject']>){return this.query.findNearbyObject(...args);}
  nearbyNpcs(){return this.query.nearbyNpcs();}
  findNearbyNpc(...args:Parameters<BotSDK['findNearbyNpc']>){return this.query.findNearbyNpc(...args);}
+ getSpells(){return this.query.getSpells();}
+ castSpell(...args:Parameters<BotSDK['castSpell']>){return this.send.castSpell(...args);}
+ homeTeleport(...args:Parameters<BotSDK['homeTeleport']>){return this.send.homeTeleport(...args);}
  getCombatSpells(){return this.query.getCombatSpells();}
  castSpellOnNpc(...args:Parameters<BotSDK['castSpellOnNpc']>){return this.send.castSpellOnNpc(...args);}
  getPrayerState(){return this.query.getPrayerState();}

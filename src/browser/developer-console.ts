@@ -11,6 +11,8 @@ const examples:[string,string][]=[
  ['Disable run','await sdk.setRunning(false)'],
  ['Inspect run state','sdk.getRunState()'],
  ['Inspect HP','await sdk.getHealth()'],
+ ['List current spells','await sdk.getSpells()'],
+ ['Home Teleport','await sdk.homeTeleport()'],
  ['Cast Air Strike on a chicken',"await sdk.castSpellOnNpc('Air Strike', /^chicken$/i)"],
  ['Inspect prayers','await sdk.getPrayerState()'],
  ['Open Prayer List','await sdk.openPrayerList()'],

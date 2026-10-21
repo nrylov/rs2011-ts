@@ -279,3 +279,21 @@ await sdk.castSpellOnNpc('Air Strike', /^chicken$/i);
 ```
 
 Revision 634 calls this **Wind Strike**; both names and `wind_strike` are accepted. `getCombatSpells()` lists supported named spells (initially Wind Strike). Casting opens Magic Spellbook, validates the current NPC and spell component, and sends the real spell-on-NPC request. A result observes Magic XP (`effect: 'magic-xp'`) or mind-rune consumption (`effect: 'runes-consumed'`); it does not promise damage or tutorial completion. On this Void server a miss consumes runes without awarding combat XP. Allow the cast animation/cooldown to finish and try again if the tutorial still asks you to cast. Missing runes and other fresh server refusals are reported. Both prayer and casting methods are available through the remote gateway; observers can query but cannot cast or toggle prayers.
+
+## Full spellbook dispatch and Home Teleport
+
+The SDK now lists named spells from the current modern, ancient, lunar or Dungeoneering book, using revision 634 cache target flags. This covers combat, teleports, enchantments and utility spells. The regular game rules still enforce skill levels, runes, quest unlocks, targets and location restrictions.
+
+```ts
+console.log(await sdk.getSpells()); // names, ids, target kinds and actions
+await sdk.homeTeleport(); // waits for actual Lumbridge arrival
+await sdk.castSpell('Varrock Teleport'); // dispatch only
+const ring = await sdk.findInventoryItem('Sapphire ring');
+if (ring) await sdk.castSpell('Lvl-1 Enchant', {kind:'item', target:ring});
+const npc = await sdk.findNearbyNpc(/^chicken$/i);
+if (npc) await sdk.castSpell('Wind Strike', {kind:'npc', target:npc});
+```
+
+`castSpell(nameOrIdOrRegExp, target?, option?)` returns `dispatched: true`, which means the request was sent. Observe the resulting inventory, XP, dialogue or position to confirm the effect. Target kinds are `npc`, `player`, `self` (target your own character), `item` (inventory item or slot), `object` and `ground-item`. The spell catalogue publishes the permitted kinds; stale local targets and hidden spell components are rejected. An optional action label chooses among self-cast options. Some spells open selection or production menus and need follow-up actions; spell dispatch does not automate those menus or guarantee every server spell is implemented correctly.
+
+`homeTeleport(timeout=45000)` specifically casts **Lumbridge Home Teleport** and observes the server's Lumbridge arrival tiles. Complete Terrova's final conversation first to unlock the Tutorial Island exit. Starting its animation is not success. Cooldowns and fresh server refusals reject the helper. The developer console has a **Home Teleport** preset. Other home destinations can be dispatched by name through `castSpell`; confirmed-arrival handling currently covers Lumbridge. All methods also work through the remote gateway.

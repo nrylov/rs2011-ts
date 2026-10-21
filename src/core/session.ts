@@ -148,6 +148,10 @@ export class Session {
   castSpellOnNpc(interfaceId:number,component:number,npcIndex:number){
     this.send(61,new Writer().addLe16(-1).i32((interfaceId<<16)|component).le16(npcIndex).add8(0).add16(-1).finish());
   }
+  castSpellOnPlayer(id:number,c:number,index:number){this.send(48,new Writer().addLe16(-1).le16(index).le16(-1).inverse32((id<<16)|c).neg8(0).finish());}
+  castSpellOnItem(id:number,c:number,item:{id:number;slot:number}){this.send(72,new Writer().i32(149<<16).inverse32((id<<16)|c).add16(-1).u16(-1).add16(item.slot).u16(item.id).finish());}
+  castSpellOnObject(id:number,c:number,t:{id:number;x:number;y:number}){this.send(54,new Writer().u16(-1).addLe16(t.x).le32((id<<16)|c).add16(t.y).sub8(0).le16(-1).le16(t.id).finish());}
+  castSpellOnGroundItem(id:number,c:number,t:{id:number;x:number;y:number}){this.send(34,new Writer().le16(t.x).add16(t.id).le16(-1).u16(t.y).u8(0).add16(-1).middle32((id<<16)|c).finish());}
   closeInterface() { this.send(70); }
   enterNumber(value:number){if(!Number.isInteger(value)||value<0||value>2147483647)throw new Error('Invalid amount');this.send(32,new Writer().i32(value).finish());this.world.numberInput=null;this.notify();}
   enterText(value:string){const text=new Writer().text(value).finish();if(text.length>255)throw new Error('Input is too long');this.send(1,new Writer().u8(text.length).raw(text).finish());}
