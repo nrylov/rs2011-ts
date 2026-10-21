@@ -110,6 +110,8 @@ The common methods are available directly on the remote SDK: inventory/entity se
 
 For dialogue transitions, `await sdk.waitForDialog({after: previousDialog, timeout: 15000, signal})` observes the hosted client without issuing gameplay actions. It waits for a stable new dialogue token, excludes tutorial instructions unless `includeInstructions: true`, and supports a local AbortSignal, timeout and disconnect. It does not serialize callbacks or signals to the gateway. Omit `after` to accept an already-open conversation. Read the published options before choosing.
 
+`await bot.openBank()` selects a nearby target with an actual banking action, preferring direct Bank/Use-quickly actions. It also supports bank-booth/chest Use and banker Talk-to, advances their conversation, and selects only a uniquely labelled "access my bank account" choice. It returns after bank interface 762 is observed, not after dispatch. Unknown choices, refusals and unmet PIN requirements are not guessed. Pass an explicit target and optional timeout as `await bot.openBank(booth, 20000)`. The helper does not retry by interrupting an already-dispatched interaction.
+
 Named emotes and run mode are also available directly:
 
 ```ts

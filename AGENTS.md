@@ -54,6 +54,8 @@ Save this as `bots/mybot/task.ts` and run `bun bots/mybot/task.ts`.
 Before and after a task, inspect `bun bots/state.ts mybot`; it uses observer mode.
 Record outcomes and next steps in the character's `lab_log.md`.
 
+`await bot.openBank()` handles direct bank actions and the normal banker account menu, then waits for the bank interface. It does not choose unknown dialogues or enter a PIN. If inventory actions report Equipment Stats is open, use `await bot.closeInterface()` and select Inventory before retrying.
+
 `castSpell` and raw sends confirm dispatch only. Named helpers document the specific state changes they observe. Never assume a successful send proves a server effect. Inspect messages, dialogue, inventory, XP and position. Follow server rules and revision 634 IDs; the 2004 rs-sdk is a design reference, not an ID reference.
 
 For long travel use `await bot.walkTo(x, y, {timeout: 180000, tolerance: 2})`; do not manually break same-floor travel into arbitrary local waypoints. `sdk.planRoute(x, y)` inspects the route and its doors without moving. Automatic door handling obeys tutorial/quest refusals. Stairs, ladders and other floor/transit changes are still explicit actions. Use an MCP execution timeout longer than the requested walk. Cancellation stops subsequent walking legs, while a leg already accepted by the game may finish.

@@ -127,8 +127,9 @@ export class BotSDK {
  }
  sendDropItem(item:Item|number){this.sendItemOption(this.inventoryItem(item),7);}
  inventoryActionError(){
+  if(this.isOpen(667))return 'Close Equipment Stats before using inventory items.';
   if(this.isOpen(762)||this.isOpen(11))return 'Close the bank or deposit box before using inventory items.';
-  if(!this.isOpen(149))return this.isOpen(372)?'Inventory has not unlocked at this tutorial stage. Follow the current tutorial instructions: the Guide and Survival Expert unlock the Inventory tab.':'Inventory interface is closed. Select Inventory from Game tabs or close the current interface.';
+  if(!this.isOpen(149))return this.isOpen(372)?'Inventory interface is closed. Select Inventory from Game tabs; if it is unavailable, follow the current tutorial instructions.':'Inventory interface is closed. Select Inventory from Game tabs or close the current interface.';
   return null;
  }
  private inventoryItem(item:Item|number){const current=this.getInventory().find(i=>i.slot===(typeof item==='number'?item:item.slot));if(!current||typeof item!=='number'&&current.id!==item.id)throw new Error('Item slot changed; query inventory again');return current;}
@@ -268,7 +269,39 @@ export class BotActions {
  async interactObject(target:MapObject,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissCurrentDialog();const index=target.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('Object has no matching action');const sequence=this.sdk.getState().messageSequence;this.sdk.sendObjectOption(target,index);await this.sdk.session.waitFor(w=>{const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);return effect(w);},timeout);});}
  async interactNpc(target:Entity,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissCurrentDialog();const def=await this.sdk.npcDefinition(target.type!);if(!def)throw new Error('NPC is hidden in its current form');const index=def.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('NPC has no matching action');this.sdk.session.interactNpc(target.index,index);await this.sdk.session.waitFor(effect,timeout);});}
  async chopTree(target:MapObject,timeout=30_000){const logIds:Record<string,number>={Tree:1511,'Dead tree':1511,Oak:1521,Willow:1519,'Maple tree':1517,'Yew tree':1515,'Magic tree':1513,Teak:6333,Mahogany:6332};const logId=logIds[target.name];if(logId===undefined)throw new Error('Log type is not mapped for this tree; use interactObject with an explicit effect');const before=this.sdk.count(logId),xp=this.sdk.getState().skills.get(8)?.xp??0;await this.interactObject(target,/^chop/i,w=>this.sdk.count(logId)>before&&(w.skills.get(8)?.xp??0)>xp,timeout);return {logs:this.sdk.count(logId)-before,xp:(this.sdk.getState().skills.get(8)?.xp??0)-xp};}
- async openBank(target?:MapObject|Entity){if(this.sdk.isOpen(762))return;const t=target??await this.sdk.findNearbyNpc(/^banker$/i)??await this.sdk.findNearbyObject(/^bank booth$/i);if(!t)throw new Error('No nearby banker or bank booth');if('index'in t)await this.interactNpc(t,/^bank$/i,()=>this.sdk.isOpen(762));else await this.interactObject(t,/use-quickly|bank/i,()=>this.sdk.isOpen(762));}
+ /** Open a usable nearby bank, including booths whose Use action opens the banker menu. */
+ async openBank(target?:MapObject|Entity,timeout=20000){return this.exclusive(async()=>{
+  this.timeout(timeout);if(this.sdk.isOpen(762))return;
+  await this.dismissCurrentDialog();const end=Date.now()+timeout;
+  type Candidate={target:MapObject|Entity;option:number;rank:number};const candidates:Candidate[]=[];
+  const addNpc=async(n:Entity)=>{const current=this.sdk.getState().npcs.get(n.index);if(!current||current.type!==n.type)return;const def=await this.sdk.npcDefinition(current.type!);if(!def)return;let option=def.options.findIndex(s=>!!s&&/^Bank$/i.test(s)),rank=0;if(option<0&&/^banker$/i.test(def.name)){option=def.options.findIndex(s=>!!s&&/^Talk-to$/i.test(s));rank=2;}if(option>=0)candidates.push({target:current,option,rank});};
+  const addObject=(o:MapObject)=>{let option=o.options.findIndex(s=>!!s&&/^(?:Use-quickly|Bank)$/i.test(s)),rank=0;if(option<0&&/^bank (?:booth|chest)$/i.test(o.name)){option=o.options.findIndex(s=>!!s&&/^Use$/i.test(s));rank=1;}if(option>=0)candidates.push({target:o,option,rank});};
+  if(target){if('index'in target)await addNpc(target);else addObject(target);}
+  else{const [npcs,objects]=await Promise.all([this.sdk.nearbyNpcs(),this.sdk.nearbyObjects()]);for(const n of npcs)await addNpc(n);for(const o of objects)if(/^bank (?:booth|chest)$/i.test(o.name))addObject(o);}
+  const p=this.sdk.getState().player;if(!p)throw new Error('Player is not in the world');
+  candidates.sort((a,b)=>a.rank-b.rank||Math.max(Math.abs(a.target.x-p.x),Math.abs(a.target.y-p.y))-Math.max(Math.abs(b.target.x-p.x),Math.abs(b.target.y-p.y)));
+  const selected=candidates[0];if(!selected)throw new Error(target?'This target has no usable banking action':'No nearby bank with a usable Bank, Use-quickly, Use, or banker Talk-to action');
+  const before=await this.sdk.getDialog(),sequence=this.sdk.getState().messageSequence,pressed=new Set<string>();let steps=0,stableSince=0,stableToken:string|undefined;
+  if('index'in selected.target)await this.sdk.sendNpcOption(selected.target,selected.option);else this.sdk.sendObjectOption(selected.target,selected.option);
+  while(Date.now()<end){
+   if(this.sdk.isOpen(762))return;
+   if(this.sdk.session.status!=='playing')throw new Error('Game connection closed while opening bank');
+   const refused=this.rejectionSince(sequence);if(refused)throw new Error(refused);
+   const dialog=await this.sdk.getDialog();
+   if(dialog&&dialog.kind!=='instruction'&&dialog.token!==before?.token&&!pressed.has(dialog.token)){
+    if(stableToken!==dialog.token){stableToken=dialog.token;stableSince=Date.now();}
+    if(Date.now()-stableSince<120){await new Promise(resolve=>setTimeout(resolve,75));continue;}
+    const failure=dialog.lines.map(plainText).find(line=>/^(?:I (?:can't|cannot) reach|You (?:can't|cannot|need|must))/i.test(line));if(failure)throw new Error(failure);
+    let button=dialog.continueButton;
+    if(dialog.kind==='choice'){
+     const choices=dialog.options.filter(o=>/\baccess my bank account\b/i.test(o.text));if(choices.length!==1)throw new Error('Banking requires a dialogue choice; inspect getDialog() before continuing');button=choices[0];
+    }
+    if(button){if(++steps>8)throw new Error('Bank dialogue exceeded its step limit');pressed.add(dialog.token);this.sdk.dialogue.press(dialog,button);}
+   }
+   await new Promise(resolve=>setTimeout(resolve,75));
+  }
+  throw new Error('Bank did not open before the timeout. Check dialogue, PIN requirements, and whether the target can be reached.');
+ });}
  async confirmAppearance(){return this.exclusive(async()=>{if(!this.sdk.isOpen(1028))throw new Error('Character creation is not open');this.sdk.session.clickInterface(1028,117);await this.sdk.session.waitFor(()=>!this.sdk.isOpen(1028),5000);});}
  async closeInterface(){return this.exclusive(async()=>{const creation=await this.sdk.getCreationMenu(),ids=[762,11,667,...(creation?[creation.id,...(creation.id===905?[916]:[])]:[])];const open=ids.filter(id=>this.sdk.isOpen(id));if(!open.length)return;this.sdk.session.closeInterface();await this.sdk.session.waitFor(()=>open.every(id=>!this.sdk.isOpen(id)),5000);});}
  async depositItem(item:Item,amount:1|5|10|'all'=1){return this.exclusive(async()=>{
