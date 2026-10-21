@@ -53,7 +53,7 @@ export async function createPeer(port=0){
         }
         while(stage===2){
           if(pending===null){if(!buffer.length)return;pending=(buffer[0]-cipherIn!.next())&255;buffer=buffer.slice(1);}
-          const size=({0:0,4:0,35:5,63:3,29:3,5:3,62:3,65:3,27:7,36:7,80:7,56:7,38:7,23:8,59:8,9:8,15:8,17:8,39:8,33:8,60:8,11:8,42:8,2:6,70:0,32:4} as Record<number,number>)[pending];
+          const size=({0:0,4:0,35:5,63:3,29:3,5:3,62:3,65:3,27:7,36:7,80:7,56:7,38:7,23:8,59:8,9:8,15:8,17:8,39:8,33:8,60:8,11:8,42:8,2:6,70:0,32:4,72:16} as Record<number,number>)[pending];
           if(size===undefined)throw new Error(`Unexpected client opcode ${pending}`);
           if(buffer.length<size)return;const body=new Reader(buffer.slice(0,size));buffer=buffer.slice(size);
           received.push({opcode:pending,body:body.data.slice()});

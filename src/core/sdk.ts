@@ -1,4 +1,4 @@
-import { DialogueService, type Dialog, type DialogPattern, type DialogWaitOptions } from './dialogue.ts';
+import { DialogueService, plainText, type Dialog, type DialogPattern, type DialogWaitOptions } from './dialogue.ts';
 export {plainText,type Dialog,type DialogButton,type DialogPattern,type DialogWaitOptions} from './dialogue.ts';
 import { Session } from './session.ts';
 import type { Item, Entity, World, GroundItem } from './world.ts';
@@ -109,6 +109,7 @@ export class BotSDK {
 }
 export class BotActions {
  private busy=false;
+ private rejectionSince(sequence:number){const w=this.sdk.getState();if(w.messageSequence<=sequence)return null;const messages=w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length));for(const m of messages){if(![0,109].includes(m.type))continue;const text=plainText(m.text);if(/^(?:You (?:can't|cannot|don't|do not|need|must|should)|Nothing interesting happens|You are (?:unable|too)|You have to)/i.test(text))return text;}return null;}
  private timeout(value:number){if(!Number.isFinite(value)||value<=0)throw new Error('Action timeout must be positive');}
  private requireItem(item:Item,container='93:0'){const current=this.sdk.getState().containers.get(container)?.find(i=>i.slot===item.slot);if(!current||current.id!==item.id||current.amount<1)throw new Error('Item slot changed; query the current container before acting');}
 
@@ -180,13 +181,13 @@ export class BotActions {
  });}
  /** Resolves after inventory contents or the active dialogue change. Dispatch is not proof that a recipe completed. */
  async useItemOnItem(source:Item,target:Item,timeout=15_000){return this.exclusive(async()=>{
-  this.timeout(timeout);this.requireItem(source);this.requireItem(target);const relevant=()=>JSON.stringify(this.sdk.getInventory().filter(i=>i.slot===source.slot||i.slot===target.slot)),before=relevant(),dialog=await this.sdk.getDialog();this.sdk.sendUseItemOnItem(source,target);
-  const deadline=Date.now()+timeout;while(Date.now()<deadline){if(relevant()!==before)return {effect:'inventory' as const};const next=await this.sdk.getDialog();if(next&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};if(this.sdk.session.status!=='playing')throw new Error('Game connection closed');await new Promise(r=>setTimeout(r,50));}
+  this.timeout(timeout);this.requireItem(source);this.requireItem(target);const relevant=()=>JSON.stringify(this.sdk.getInventory().filter(i=>i.slot===source.slot||i.slot===target.slot)),before=relevant(),dialog=await this.sdk.getDialog(),sequence=this.sdk.getState().messageSequence;this.sdk.sendUseItemOnItem(source,target);
+  const deadline=Date.now()+timeout;while(Date.now()<deadline){if(relevant()!==before)return {effect:'inventory' as const};const next=await this.sdk.getDialog();if(next&&next.kind!=='instruction'&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);if(this.sdk.session.status!=='playing')throw new Error('Game connection closed');await new Promise(r=>setTimeout(r,50));}
   throw new Error('No inventory or dialogue change was observed. Check game messages and recipe requirements.');
  });}
  async burnLogs(logs:Item,timeout=45_000){return this.exclusive(async()=>{
-  this.timeout(timeout);this.requireItem(logs);const tinderbox=await this.sdk.findInventoryItem(/^tinderbox$/i);if(!tinderbox)throw new Error('No tinderbox in inventory');const count=this.sdk.count(logs.id),xp=this.sdk.getState().skills.get(11)?.xp??0;
-  this.sdk.sendUseItemOnItem(tinderbox,logs);await this.sdk.session.waitFor(w=>this.sdk.count(logs.id)<count&&(w.skills.get(11)?.xp??0)>xp,timeout);return {xp:(this.sdk.getState().skills.get(11)?.xp??0)-xp};
+  this.timeout(timeout);this.requireItem(logs);const tinderbox=await this.sdk.findInventoryItem(/^tinderbox$/i);if(!tinderbox)throw new Error('No tinderbox in inventory');const count=this.sdk.count(logs.id),xp=this.sdk.getState().skills.get(11)?.xp??0,sequence=this.sdk.getState().messageSequence;
+  this.sdk.sendUseItemOnItem(tinderbox,logs);await this.sdk.session.waitFor(w=>{if(this.sdk.count(logs.id)<count&&(w.skills.get(11)?.xp??0)>xp)return true;const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal+(refusal.includes("light a fire here")?' Move to a clear nearby tile and try again.':''));return false;},timeout);return {xp:(this.sdk.getState().skills.get(11)?.xp??0)-xp};
  });}
  async dropItem(item:Item,timeout=10_000){return this.exclusive(async()=>{
   this.timeout(timeout);this.requireItem(item);const before=this.sdk.count(item.id);this.sdk.sendDropItem(item);

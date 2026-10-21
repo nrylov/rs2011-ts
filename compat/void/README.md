@@ -28,3 +28,10 @@ The overlay includes the original JAR's script registry plus the new listener. K
 For a source build, replace `game/src/main/kotlin/content/area/misthalin/tutorial_island/TutorialObjects.kt` with this file. Copy `tests/TutorialStartingDoorTest.kt` to the matching test package and run that test alongside the existing tutorial tests.
 
 For the optional binary overlay, add `VOID_TUTORIAL_DOOR_FIX=1` to the build command above. The resulting overlay includes both the read-only login listener and this gameplay fix. The default build remains login synchronization only. This replacement is tied to the inspected Void 2.11.0 API; review it against updated source before enabling it for another release. The original server JAR remains untouched.
+
+
+## Optional fire-placement fix
+
+`Firemaking.kt` corrects a separate Void rule that rejected every ground decoration, including nonblocking tutorial path detail. It now follows the engine's floor-decoration collision rule (`interactive == 1 && solid == 1`). Existing ground objects (including fires), blocking floor decorations and doorway checks remain restricted.
+
+For a source build, replace `game/src/main/kotlin/content/skill/firemaking/Firemaking.kt` and copy `tests/FiremakingPlacementTest.kt` into its test package. To include this in the binary overlay, set `VOID_FIREMAKING_FIX=1`. Set both `VOID_FIREMAKING_FIX=1` and `VOID_TUTORIAL_DOOR_FIX=1` to build an overlay with both gameplay fixes and login synchronization. Both flags are off by default. Keep the overlay paired with the exact source-compatible server release.

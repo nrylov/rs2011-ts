@@ -29,7 +29,7 @@ export class World {
   uiRevision=0;interfaceMounts=new Map<number,number>();interfaceVersions=new Map<number,number>();
   windowId=0; hidden=new Map<number,boolean>(); interfaceRevision=0;
   scripts:{id:number;args:(number|string)[]}[]=[];
-  messages: Message[] = [];
+  messages: Message[] = [];messageSequence=0;
   varps = new Map<number, number>();
   varbits=new Map<number,number>();variableUpdates=new Map<string,number>();private configRevision=0;
   groundItems=new Map<number,GroundItem>();private groundSequence=0;
@@ -120,7 +120,7 @@ export class World {
       case 52: {
         const type = r.smart(); r.i32(); const mask = r.u8();
         const name = mask & 1 ? r.text() : undefined; if (mask & 2) r.text();
-        this.messages.push({ type, name, text: r.text() });
+        this.messageSequence++;this.messages.push({ type, name, text: r.text() });
         if (this.messages.length > 200) this.messages.shift(); break;
       }
       case 55: return 'logout';

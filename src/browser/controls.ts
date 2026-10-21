@@ -6,7 +6,7 @@ import type { ItemType } from '../cache/definitions.ts';
 const el=(tag:string,text:string)=>{const e=document.createElement(tag);e.textContent=text;return e;};
 const get=(id:string)=>document.getElementById(id)!;
 export class Controls {
- private objectKey='';private objectRequest=0;private selectedItem:Item|null=null;private items=new Map<number,ItemType>();private pending=new Set<number>();private missing=new Set<number>();private renderRevision=0;private collisionKey='';private collisionRequest=0;private dialogToken='';private dialogPending=false;private currentDialog:Dialog|null=null;private npcSignature='';
+ private containerKeys=new Map<string,string>();private objectKey='';private objectRequest=0;private selectedItem:Item|null=null;private items=new Map<number,ItemType>();private pending=new Set<number>();private missing=new Set<number>();private renderRevision=0;private collisionKey='';private collisionRequest=0;private dialogToken='';private dialogPending=false;private currentDialog:Dialog|null=null;private npcSignature='';
  constructor(readonly sdk:BotSDK,readonly bot:BotActions,readonly map:MapView){
   map.onMenu=(x,y,cx,cy)=>{void this.mapMenu(x,y,cx,cy).catch(e=>this.report(String(e)));};
   get('object-filter').oninput=()=>{this.objectKey='';this.renderObjects();};
@@ -38,23 +38,28 @@ export class Controls {
   for(const i of this.sdk.getGroundItems().filter(i=>i.x===x&&i.y===y)){const def=await this.sdk.data.item(i.id);actions.push({label:`Take ${def.name}${i.amount>1?' × '+i.amount:''}`,run:()=>this.run(`Take ${def.name}`,()=>this.bot.pickupItem(i))});}
   actions.push({label:'Walk here',run:()=>this.walk(x,y)});this.menu(`${x}, ${y}`,actions,cx,cy);
  }
- private definition(id:number){if(!this.items.has(id)&&!this.pending.has(id)&&!this.missing.has(id)){this.pending.add(id);void Promise.resolve(this.sdk.data.item(id)).then(d=>this.items.set(id,d)).catch(()=>{this.missing.add(id);}).finally(()=>{this.pending.delete(id);this.render();});}return this.items.get(id);}
+ private definition(id:number){if(!this.items.has(id)&&!this.pending.has(id)&&!this.missing.has(id)){this.pending.add(id);void Promise.resolve(this.sdk.data.item(id)).then(d=>this.items.set(id,d)).catch(()=>{this.missing.add(id);}).finally(()=>{this.pending.delete(id);this.containerKeys.clear();this.render();});}return this.items.get(id);}
  private itemMenu(item:Item,kind:'inventory'|'equipment'|'bank',event:MouseEvent){
   const def=this.items.get(item.id),name=def?.name??`Item ${item.id}`,actions:{label:string;run:()=>unknown}[]=[];
   if(kind==='inventory'&&(this.sdk.isOpen(762)||this.sdk.isOpen(11)))for(const amount of [1,5,10,'all'] as const)actions.push({label:`Deposit ${amount}`,run:()=>this.run('Deposit',()=>this.bot.depositItem(item,amount))});
   else if(kind==='bank')for(const amount of [1,5,10,'all'] as const)actions.push({label:`Withdraw ${amount}`,run:()=>this.run('Withdraw',()=>this.bot.withdrawItem(item,amount))});
   else if(kind==='equipment')actions.push({label:'Remove',run:()=>this.run('Unequip',()=>this.bot.unequipItem(item))});
   else {
-   if(this.selectedItem){const source=this.selectedItem;actions.push({label:`Use ${this.definition(source.id)?.name??source.id} → ${name}`,run:()=>{this.selectedItem=null;this.render();this.run('Use items',()=>this.bot.useItemOnItem(source,item));}});}
+   if(this.selectedItem){const source=this.selectedItem;actions.push({label:`Use ${this.definition(source.id)?.name??source.id} → ${name}`,run:()=>{this.selectedItem=null;this.render();this.useItems(source,item);}});}
    actions.push({label:`Use ${name}…`,run:()=>{const error=this.sdk.inventoryActionError();if(error)throw new Error(error);this.selectedItem=item;this.render();this.report(`Select another inventory item to use ${name} on. Escape cancels.`);}});
    def?.options.forEach((option,index)=>{if(!option)return;actions.push({label:option,run:()=>{if(index===4&&/^drop$/i.test(option))this.run(`Drop ${name}`,()=>this.bot.dropItem(item));else if(index===1)this.run('Equip',()=>this.bot.equipItem(item));else{this.sdk.sendItemOption(item,inventoryOption(index));this.report(`${option} ${name}: sent to game.`);}}});});
   }
   this.menu(name,actions,event.clientX,event.clientY);
  }
+ private useItems(source:Item,target:Item){
+  const names=[this.definition(source.id)?.name??'',this.definition(target.id)?.name??''];const box=names.findIndex(n=>/^tinderbox$/i.test(n)),log=names.findIndex(n=>/logs$/i.test(n));
+  if(box>=0&&log>=0&&box!==log)this.run('Light logs',()=>this.bot.burnLogs(log===0?source:target));else this.run('Use items',()=>this.bot.useItemOnItem(source,target));
+ }
  private container(id:string,items:Item[],count:number,kind:'inventory'|'equipment'|'bank'){
+  const key=JSON.stringify([items,count,kind,kind==='inventory'?this.selectedItem:null]);if(this.containerKeys.get(id)===key)return;this.containerKeys.set(id,key);
   get(id).replaceChildren(...Array.from({length:count},(_,slot)=>{
    const item=items.find(i=>i.slot===slot),button=document.createElement('button');button.type='button';button.className='slot'+(kind==='inventory'&&this.selectedItem?.slot===slot?' selected':'');button.disabled=!item;
-   if(item){button.dataset.itemId=String(item.id);const d=this.definition(item.id);button.append(el('span',d?.name??`Item ${item.id}`),el('small',item.amount>1?`× ${item.amount}`:''));button.title=`${d?.name??item.id} · slot ${slot}`;button.onclick=e=>{if(kind==='inventory'&&this.selectedItem&&this.selectedItem.slot!==item.slot){const source=this.selectedItem;this.selectedItem=null;this.render();this.run('Use items',()=>this.bot.useItemOnItem(source,item));}else this.itemMenu(item,kind,e);};button.oncontextmenu=e=>{e.preventDefault();this.itemMenu(item,kind,e);};}return button;
+   if(item){button.dataset.itemId=String(item.id);const d=this.definition(item.id);button.append(el('span',d?.name??`Item ${item.id}`),el('small',item.amount>1?`× ${item.amount}`:''));button.title=`${d?.name??item.id} · slot ${slot}`;button.onclick=e=>{if(kind==='inventory'&&this.selectedItem&&this.selectedItem.slot!==item.slot){const source=this.selectedItem;this.selectedItem=null;this.render();this.useItems(source,item);}else this.itemMenu(item,kind,e);};button.oncontextmenu=e=>{e.preventDefault();this.itemMenu(item,kind,e);};}return button;
   }));
  }
  private updateCollision(){
