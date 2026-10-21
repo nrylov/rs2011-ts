@@ -80,3 +80,22 @@ test('remote prayer activation uses the hosted confirmed setter and observer que
 });
 test('remote spell casts preserve target arguments and reject observer actions',async()=>{const t=await setup();let remote,observer;try{const calls:unknown[]=[];t.sdk.castSpellOnNpc=async(spell,target)=>{calls.push([spell,target]);return {spell:{id:'wind_strike',name:'Wind Strike',aliases:['Air Strike'],interfaceId:192,component:25,level:1},target:{index:12,type:1017,name:'Chicken'},effect:'magic-xp',xp:5.5};};remote=await connectGateway(options(t.gateway.url));observer=await connectGateway(options(t.gateway.url,'observe'));expect((await remote.getCombatSpells())[0].id).toBe('wind_strike');expect((await remote.castSpellOnNpc('Air Strike',/^chicken$/i)).xp).toBe(5.5);expect(calls).toEqual([['Air Strike',/^chicken$/i]]);await expect(observer.castSpellOnNpc('Air Strike','Chicken')).rejects.toThrow('Observer');}finally{remote?.close();observer?.close();await t.close();}});
 test('remote named spell actions and confirmed Home Teleport use the hosted session',async()=>{const t=await setup();let remote,observer;try{t.sdk.data.interface=async(id)=>id===548?[{id:176,parent:65535,options:['Magic Spellbook'],type:0,hidden:false,text:'',setting:0}]:id===192?[{id:24,parent:65535,options:['Cast'],type:5,hidden:false,text:'',setting:2}]:[];const w=t.s.world;w.windowId=548;w.interfaces.set(25,192);w.player!.x=3141;w.player!.y=3090;remote=await connectGateway(options(t.gateway.url));observer=await connectGateway(options(t.gateway.url,'observe'));expect((await observer.getSpells())[0].id).toBe('lumbridge_home_teleport');expect((await remote.castSpell('Home Teleport')).dispatched).toBe(true);const action=remote.homeTeleport(1000);await Bun.sleep(30);w.tick++;w.player!.x=3222;w.player!.y=3218;(t.s as unknown as{notify():void}).notify();expect((await action).effect).toBe('teleported');await expect(observer.castSpell('Home Teleport')).rejects.toThrow('Observer');await expect(observer.homeTeleport()).rejects.toThrow('Observer');}finally{remote?.close();observer?.close();await t.close();}});
+
+test('remote NPC options dispatch Net, reject stale targets and respect observer permissions',async()=>{
+ const t=await setup();let remote,observer;
+ try{
+  const p=t.s.world.player!,npc={index:25,type:316,x:p.x+1,y:p.y,level:p.level};
+  (t.sdk.data as any).npc=(id:number)=>({id,name:'Fishing spot',options:['Net','Bait',null,null,null]});
+  t.s.world.npcs.set(npc.index,npc);t.endpoint.publish();
+  remote=await connectGateway(options(t.gateway.url));
+  expect(await remote.sendNpcOption(npc,/^net$/i)).toEqual({dispatched:true,npcIndex:25,option:'Net'});
+  await Bun.sleep(30);
+  expect(t.peer.received.some(p=>p.opcode===63)).toBe(true);
+  await expect(remote.sendNpcOption(npc,'Talk-to')).rejects.toThrow('no matching action');
+  await expect(remote.sendNpcOption(npc,5)).rejects.toThrow('no matching action');
+  t.s.world.npcs.delete(npc.index);
+  await expect(remote.sendNpcOption(npc,'Net')).rejects.toThrow('left view');
+  observer=await connectGateway(options(t.gateway.url,'observe'));
+  await expect(observer.sendNpcOption(npc,'Net')).rejects.toThrow('Observer');
+ }finally{remote?.close();observer?.close();await t.close();}
+});

@@ -79,6 +79,7 @@ export class GatewaySDK {
  sendDropItem(...args:Parameters<BotSDK['sendDropItem']>){return this.send.sendDropItem(...args);}
  sendTakeGroundItem(...args:Parameters<BotSDK['sendTakeGroundItem']>){return this.send.sendTakeGroundItem(...args);}
  sendUseItemOnObject(...args:Parameters<BotSDK['sendUseItemOnObject']>){return this.send.sendUseItemOnObject(...args);}
+ sendNpcOption(...args:Parameters<BotSDK['sendNpcOption']>){return this.send.sendNpcOption(...args);}
  sendObjectOption(...args:Parameters<BotSDK['sendObjectOption']>){return this.send.sendObjectOption(...args);}
 }
 export async function connectGateway(options:GatewayConnectionOptions):Promise<GatewaySDK>{

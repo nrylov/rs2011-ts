@@ -160,6 +160,20 @@ export class BotSDK {
   if(!Number.isInteger(index)||index<0||index>4||!target.options[index])throw new Error('Object has no matching action');
   this.session.interactObject(target.id,target.x,target.y,index);
  }
+ /** Dispatch any current NPC option. Confirms dispatch only; observe XP, inventory or dialogue separately. */
+ async sendNpcOption(target:Entity|string|RegExp,option:string|RegExp|number=0){
+  const selected=typeof target==='string'||target instanceof RegExp?await this.findNearbyNpc(target):target;
+  if(!selected)throw new Error('No matching nearby NPC');
+  const current=this.getState().npcs.get(selected.index);
+  if(!current||current.type!==selected.type||current.level!==this.getState().player?.level)throw new Error('NPC changed or left view; query nearby NPCs again');
+  const def=await this.npcDefinition(current.type!);if(!def)throw new Error('NPC is hidden in its current form');
+  const index=typeof option==='number'?option:def.options.findIndex(s=>!!s&&match(s,option));
+  if(!Number.isInteger(index)||index<0||index>4||!def.options[index])throw new Error('NPC has no matching action');
+  const latest=this.getState().npcs.get(current.index);
+  if(!latest||latest.type!==current.type||latest.level!==this.getState().player?.level)throw new Error('NPC changed or left view; query nearby NPCs again');
+  this.session.interactNpc(latest.index,index);
+  return {dispatched:true as const,npcIndex:latest.index,option:def.options[index]};
+ }
  async findNearbyObject(pattern:string|RegExp,radius=24){return (await this.nearbyObjects(radius)).find(o=>match(o.name,pattern))??null;}
  async npcDefinition(type:number):Promise<NpcType|null>{
   let def=await this.data.npc(type);const seen=new Set<number>();
