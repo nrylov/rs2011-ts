@@ -30,6 +30,18 @@ export class DialogueService {
    const mount=mounts[0];if(!mount)return null;
    const [parent,id]=mount,profile=DIALOGUE_PROFILES[id],components=await this.definitions(id);
    if(revision!==w.uiRevision)continue;
+   if(id===905){
+    // Revision 634 CS2 builds these buttons from server-supplied client variables.
+    // The cache alone contains neither the current product names nor the active slots.
+    const types=['Make','Make sets','Cook','Roast','Offer','Sell','Bake','Cut','Deposit','Make','Teleport','Select','Make sets','Take','Return','Heat','Add'];
+    const verb=types[w.varcs.get(754)??0]??'Make',buttons:DialogButton[]=[];
+    for(const [slot,varc] of [755,756,757,758,759,760,1139,1140,1141,1142].entries()){
+     const item=w.varcs.get(varc);if(item===undefined||item<0)continue;
+     const name=plainText(w.varcStrings.get([132,133,134,135,136,137,280,281,282,283][slot])??`Item ${item}`);
+     buttons.push({index:buttons.length+1,component:14+slot,text:`${verb} ${name}`,dispatch:'continue'});
+    }
+    return {id,parent,token:this.token(id,parent),kind:'choice',title:verb,lines:['Choose a quantity, then select the item.'],text:[],buttons,options:buttons,continueButton:null};
+   }
    const byId=new Map(components.map(c=>[c.id,c]));
    const visible=(c:Component)=>{let at:Component|undefined=c;const seen=new Set<number>();while(at&&!seen.has(at.id)){seen.add(at.id);if(w.hidden.get((id<<16)|at.id)??at.hidden)return false;at=byId.get(at.parent);}return true;};
    const text=(c:Component)=>plainText(w.texts.get((id<<16)|c.id)??c.text);

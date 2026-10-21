@@ -67,11 +67,20 @@ export class BotSDK {
   for(const o of w.objectChanges.values())if(o.id!==null&&!defs.has(o.id))defs.set(o.id,await this.data.object(o.id));
   return sceneObjects(regions,w,id=>defs.get(id)).filter(o=>o.level===p.level&&Math.max(Math.abs(o.x-p.x),Math.abs(o.y-p.y))<=radius).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));
  }
- /** Raw revision-634 object dispatch; use interactObject with a predicate for observed effects. */
- sendObjectOption(target:MapObject,option:string|RegExp|number=0){
+ /** Validate a captured object against the current scene before dispatch. */
+ private validateObject(target:MapObject){
   const p=this.getState().player;if(!p||target.level!==p.level)throw new Error('Object is not on the current floor');
   if(!Number.isInteger(target.x)||!Number.isInteger(target.y)||target.x<0||target.y<0||target.x>16383||target.y>16383||Math.max(Math.abs(target.x-p.x),Math.abs(target.y-p.y))>52)throw new Error('Object is outside the local interaction area');
   const change=this.getState().objectChanges.get(objectKey(target.x,target.y,target.level,target.shape));if(change&&change.id!==target.id)throw new Error('Object changed; query nearby objects again');
+ }
+ /** Dispatch inventory item on a world object; the server handles approach and recipe checks. */
+ sendUseItemOnObject(source:Item|number,target:MapObject){
+  const error=this.inventoryActionError();if(error)throw new Error(error);
+  const item=this.inventoryItem(source);this.validateObject(target);this.session.useItemOnObject(item,target);
+ }
+ /** Raw revision-634 object dispatch; use interactObject with a predicate for observed effects. */
+ sendObjectOption(target:MapObject,option:string|RegExp|number=0){
+  this.validateObject(target);
   const index=typeof option==='number'?option:target.options.findIndex(s=>!!s&&match(s,option));
   if(!Number.isInteger(index)||index<0||index>4||!target.options[index])throw new Error('Object has no matching action');
   this.session.interactObject(target.id,target.x,target.y,index);
@@ -99,6 +108,11 @@ export class BotSDK {
   const p=this.getState().player;if(!p)throw new Error('No player state');
   if(Math.max(Math.abs(x-p.x),Math.abs(y-p.y))>52)throw new Error('Destination is outside the local routing window');
   return (await this.collisionMap()).route(p,{x,y});
+ }
+ async selectRecipeQuantity(amount:1|5|10|'all'){
+  if(![1,5,10,'all'].includes(amount))throw new Error('Recipe quantity must be 1, 5, 10 or all');
+  if(!this.isOpen(905)||!this.isOpen(916))throw new Error('No recipe quantity interface is open');
+  this.session.clickInterface(916,amount==='all'?8:({1:5,5:6,10:7}[amount]),0);
  }
  getDialog(){return this.dialogue.read();}
  waitForDialog(options:DialogWaitOptions={}){return this.dialogue.wait(options);}
@@ -184,6 +198,20 @@ export class BotActions {
   this.timeout(timeout);this.requireItem(source);this.requireItem(target);const relevant=()=>JSON.stringify(this.sdk.getInventory().filter(i=>i.slot===source.slot||i.slot===target.slot)),before=relevant(),dialog=await this.sdk.getDialog(),sequence=this.sdk.getState().messageSequence;this.sdk.sendUseItemOnItem(source,target);
   const deadline=Date.now()+timeout;while(Date.now()<deadline){if(relevant()!==before)return {effect:'inventory' as const};const next=await this.sdk.getDialog();if(next&&next.kind!=='instruction'&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);if(this.sdk.session.status!=='playing')throw new Error('Game connection closed');await new Promise(r=>setTimeout(r,50));}
   throw new Error('No inventory or dialogue change was observed. Check game messages and recipe requirements.');
+ });}
+ /** Resolves on consumption/conversion of the source item or a new recipe dialogue, not packet dispatch. */
+ async useItemOnObject(source:Item,target:MapObject,timeout=20_000){return this.exclusive(async()=>{
+  this.timeout(timeout);this.requireItem(source);
+  const relevant=()=>JSON.stringify(this.sdk.getInventory().filter(i=>i.id===source.id||i.slot===source.slot)),before=relevant(),dialog=await this.sdk.getDialog(),sequence=this.sdk.getState().messageSequence;
+  this.sdk.sendUseItemOnObject(source,target);
+  const deadline=Date.now()+timeout;while(Date.now()<deadline){
+   if(relevant()!==before)return {effect:'inventory' as const};
+   const next=await this.sdk.getDialog();if(next&&next.kind!=='instruction'&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};
+   const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);
+   if(this.sdk.session.status!=='playing')throw new Error('Game connection closed');
+   await new Promise(r=>setTimeout(r,50));
+  }
+  throw new Error('No item conversion or recipe dialogue was observed. Check game messages, access to the object and recipe requirements.');
  });}
  async burnLogs(logs:Item,timeout=45_000){return this.exclusive(async()=>{
   this.timeout(timeout);this.requireItem(logs);const tinderbox=await this.sdk.findInventoryItem(/^tinderbox$/i);if(!tinderbox)throw new Error('No tinderbox in inventory');const count=this.sdk.count(logs.id),xp=this.sdk.getState().skills.get(11)?.xp??0,sequence=this.sdk.getState().messageSequence;

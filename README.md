@@ -190,3 +190,22 @@ Firemaking on path tiles uses the optional Void fire-placement fix described in 
 A dedicated gateway now supports persistent remote clients with local SDK controllers and read-only observers. Start `bun run gateway`, run each bot with `bun run client:gateway`, and connect locally with `connectGateway` or `runGatewayScript`. Game passwords and cache stay on the game-client host. Browser clients can publish from the **Publish this client to a gateway** panel. The authenticated fleet listing provides status/positions for dashboard work.
 
 See [remote setup, role tokens, API differences and remaining rs-sdk parity](docs/gateway.md). Generate private per-role credentials with `bun scripts/create-gateway-config.ts botname`; the gateway binds to loopback by default. [examples/remote-bot.ts](examples/remote-bot.ts) demonstrates local scripts attached to a hosted session.
+
+## Cooking and item-on-object use
+
+In the lightweight client, select **Use Raw shrimps…** from the inventory menu, then click the fire on the map and choose **Use Raw shrimps → Fire**. Alternatively, filter Nearby objects by `Fire`, open **Actions**, and choose the same interaction. Escape cancels the selected item. The server approaches the object and applies the normal cooking rules; a burnt shrimp is a possible result.
+
+```js
+const shrimp = await sdk.findInventoryItem(/^raw shrimps$/i);
+const fire = await sdk.findNearbyObject(/^fire$/i);
+if (!shrimp || !fire) throw new Error('Raw shrimps and a nearby fire required');
+const result = await bot.useItemOnObject(shrimp, fire);
+if (result.effect === 'dialogue') {
+  await sdk.selectRecipeQuantity('all'); // or 1, 5, 10
+  await bot.chooseDialogOption(/shrimps/i, { expected: result.dialog });
+}
+```
+
+A single shrimp cooks directly. Multiple raw items can open the recipe dialogue: choose a quantity, then the named product. Revision 634 generates these choices from server client-variable updates, so the lightweight dialogue panel and SDK decode those variables as well as ordinary text. `useItemOnObject` resolves when the source inventory changes or a recipe dialogue opens; it does not promise a successfully cooked product or a completed batch. Observe the resulting inventory and Cooking XP for that. `sdk.sendUseItemOnObject(itemOrSlot, object)` is the raw dispatch. Both methods and recipe quantity selection are available through the remote gateway.
+
+The separate Kotlin browser client advances animated movement through a paced game loop. When its tab is in the background, browser timer throttling can leave its displayed movement behind the server state. The TypeScript client's tile positions come directly from decoded player updates and do not wait for that animation. This cooking change does not modify the Kotlin client's scheduler.

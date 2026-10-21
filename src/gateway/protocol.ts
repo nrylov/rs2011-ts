@@ -5,8 +5,8 @@ export interface BotCredentials {clientToken:string;controlToken:string;observeT
 export interface GatewayConfig {bots:Record<string,BotCredentials>;monitorToken:string;}
 export interface PublishedState {world:WorldSnapshot;status:string;error:string|null;}
 export const queryMethods=['getInventory','getEquipment','getBank','getInventoryStatus','getEquipmentStatus','count','isOpen','findInventoryItem','nearbyObjects','findNearbyObject','nearbyNpcs','findNearbyNpc','npcDefinition','routeTo','getDialog','getGameTabs','getGameTabStatus','getGroundItems','findGroundItem'] as const;
-export const sdkActions=['selectGameTab','sendItemOption','sendUseItemOnItem','sendDropItem','sendTakeGroundItem','sendObjectOption','sendClickDialog','clickDialogByText'] as const;
-export const botActions=['walkTo','talkTo','continueDialog','chooseDialogOption','navigateDialog','dismissDialog','chopTree','openBank','confirmAppearance','closeInterface','depositItem','withdrawItem','equipItem','unequipItem','useItemOnItem','burnLogs','dropItem','pickupItem'] as const;
+export const sdkActions=['selectRecipeQuantity','selectGameTab','sendItemOption','sendUseItemOnItem','sendUseItemOnObject','sendDropItem','sendTakeGroundItem','sendObjectOption','sendClickDialog','clickDialogByText'] as const;
+export const botActions=['walkTo','talkTo','continueDialog','chooseDialogOption','navigateDialog','dismissDialog','chopTree','openBank','confirmAppearance','closeInterface','depositItem','withdrawItem','equipItem','unequipItem','useItemOnItem','useItemOnObject','burnLogs','dropItem','pickupItem'] as const;
 export const methods=new Map<string,boolean>([...queryMethods.map(m=>[`sdk.${m}`,false] as const),...sdkActions.map(m=>[`sdk.${m}`,true] as const),...botActions.map(m=>[`bot.${m}`,true] as const)]);
 export function botKey(name:string){if(typeof name!=='string'||!name.trim()||!/^[a-z0-9_ ]{1,12}$/i.test(name))throw new Error('Invalid bot name');const key=name.replaceAll('_',' ').trim().toLowerCase();if(!key)throw new Error('Invalid bot name');return key;}
 /** Functions stay on the caller. Only data and bounded regex patterns cross the wire. */

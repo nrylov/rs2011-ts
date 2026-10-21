@@ -1,6 +1,7 @@
 import { BotSDK, BotActions, inventoryOption, equipmentComponents, plainText } from '../core/sdk.ts';
 import type { Dialog } from '../core/dialogue.ts';
 import type { Item, Entity } from '../core/world.ts';
+import type { MapObject } from '../cache/terrain.ts';
 import type { MapView } from './map.ts';
 import type { ItemType } from '../cache/definitions.ts';
 const el=(tag:string,text:string)=>{const e=document.createElement(tag);e.textContent=text;return e;};
@@ -30,10 +31,10 @@ export class Controls {
  async walk(x:number,y:number){this.run('Walk',async()=>{const path=await this.sdk.routeTo(x,y);if(!path)throw new Error('No local route. Open blocking doors or choose another tile.');this.map.route=path;this.map.draw(this.sdk.getState());await this.bot.walkTo(x,y);this.map.route=[];this.map.draw(this.sdk.getState());});}
  async mapMenu(x:number,y:number,cx:number,cy:number){
   const actions:{label:string;run:()=>unknown}[]=[];
-  for(const o of this.map.objectsAt(x,y))o.options.forEach((option,index)=>{if(option)actions.push({label:`${option} ${o.name}`,run:()=>{
+  for(const o of this.map.objectsAt(x,y)){actions.push(...this.objectUseActions(o));o.options.forEach((option,index)=>{if(option)actions.push({label:`${option} ${o.name}`,run:()=>{
    if(/^chop/i.test(option)&&o.name==='Tree')this.run('Chop tree',()=>this.bot.chopTree(o));
    else {this.sdk.sendObjectOption(o,index);this.report(`${option} ${o.name}: sent to game.`);}
-  }});});
+  }});});}
   for(const n of this.sdk.getState().npcs.values())if(n.x===x&&n.y===y&&n.level===this.sdk.getState().player?.level){const def=await this.sdk.npcDefinition(n.type!);if(!def)continue;def.options.forEach((option,index)=>{if(option)actions.push({label:`${option} ${def.name}`,run:()=>{if(/^talk[ -]?to$/i.test(option))this.talkTo(n);else{this.sdk.session.interactNpc(n.index,index);this.report(`${option} ${def.name}: sent to game.`);}}});});}
   for(const i of this.sdk.getGroundItems().filter(i=>i.x===x&&i.y===y)){const def=await this.sdk.data.item(i.id);actions.push({label:`Take ${def.name}${i.amount>1?' × '+i.amount:''}`,run:()=>this.run(`Take ${def.name}`,()=>this.bot.pickupItem(i))});}
   actions.push({label:'Walk here',run:()=>this.walk(x,y)});this.menu(`${x}, ${y}`,actions,cx,cy);
@@ -46,10 +47,17 @@ export class Controls {
   else if(kind==='equipment')actions.push({label:'Remove',run:()=>this.run('Unequip',()=>this.bot.unequipItem(item))});
   else {
    if(this.selectedItem){const source=this.selectedItem;actions.push({label:`Use ${this.definition(source.id)?.name??source.id} → ${name}`,run:()=>{this.selectedItem=null;this.render();this.useItems(source,item);}});}
-   actions.push({label:`Use ${name}…`,run:()=>{const error=this.sdk.inventoryActionError();if(error)throw new Error(error);this.selectedItem=item;this.render();this.report(`Select another inventory item to use ${name} on. Escape cancels.`);}});
+   actions.push({label:`Use ${name}…`,run:()=>{const error=this.sdk.inventoryActionError();if(error)throw new Error(error);this.selectedItem=item;this.render();this.report(`Select an inventory item or a nearby object (such as a fire) to use ${name} on. Escape cancels.`);}});
    def?.options.forEach((option,index)=>{if(!option)return;actions.push({label:option,run:()=>{if(index===4&&/^drop$/i.test(option))this.run(`Drop ${name}`,()=>this.bot.dropItem(item));else if(index===1)this.run('Equip',()=>this.bot.equipItem(item));else{this.sdk.sendItemOption(item,inventoryOption(index));this.report(`${option} ${name}: sent to game.`);}}});});
   }
   this.menu(name,actions,event.clientX,event.clientY);
+ }
+ private objectUseActions(target:MapObject){
+  const source=this.selectedItem;if(!source)return [];
+  return [{label:`Use ${this.definition(source.id)?.name??source.id} → ${target.name}`,run:()=>{
+   this.selectedItem=null;this.render();this.hideMenu();this.report(`Using item on ${target.name}…`);
+   void this.bot.useItemOnObject(source,target).then(result=>this.report(result.effect==='dialogue'?'Choose an option in the recipe dialogue.':'Item conversion observed. Check inventory and game messages for the result.')).catch(e=>this.report(e instanceof Error?e.message:String(e)));
+  }}];
  }
  private useItems(source:Item,target:Item){
   const names=[this.definition(source.id)?.name??'',this.definition(target.id)?.name??''];const box=names.findIndex(n=>/^tinderbox$/i.test(n)),log=names.findIndex(n=>/logs$/i.test(n));
@@ -72,7 +80,7 @@ export class Controls {
  render(){
   this.updateCollision();
   if(this.selectedItem&&(this.sdk.session.status!=='playing'||this.sdk.inventoryActionError()||!this.sdk.getInventory().some(i=>i.slot===this.selectedItem!.slot&&i.id===this.selectedItem!.id)))this.selectedItem=null;
-  const selection=get('item-selection');selection.hidden=!this.selectedItem;selection.replaceChildren();if(this.selectedItem){selection.append(el('span',`Use ${this.definition(this.selectedItem.id)?.name??this.selectedItem.id} on another item `));const cancel=el('button','Cancel');cancel.onclick=()=>{this.selectedItem=null;this.render();};selection.append(cancel);}
+  const selection=get('item-selection');selection.hidden=!this.selectedItem;selection.replaceChildren();if(this.selectedItem){selection.append(el('span',`Use ${this.definition(this.selectedItem.id)?.name??this.selectedItem.id} on an item or nearby object `));const cancel=el('button','Cancel');cancel.onclick=()=>{this.selectedItem=null;this.render();};selection.append(cancel);}
   const ground=this.sdk.getGroundItems();get('ground-items').replaceChildren(...(ground.length?ground.map(i=>{const def=this.definition(i.id),row=el('div','');row.className='nearby-npc';row.append(el('span',`${def?.name??'Item '+i.id}${i.amount>1?' × '+i.amount:''} · ${i.x}, ${i.y}`));const take=el('button','Take');take.onclick=()=>this.run(`Take ${def?.name??'item'}`,()=>this.bot.pickupItem(i));row.append(take);return row;}):[el('p','No visible ground items.')]));
   get('inventory-access').textContent=this.sdk.inventoryActionError()??'';
   const sync=this.sdk.getInventoryStatus(),equipmentSync=this.sdk.getEquipmentStatus();
@@ -94,7 +102,7 @@ export class Controls {
   void this.bot.talkTo(n).then(()=>this.report('Conversation opened.')).catch(e=>this.report(String(e))).finally(()=>{this.dialogPending=false;this.dialogToken='';this.render();});
  }
  private renderDialog(d:Dialog|null){
-  const key=`${d?.token??'closed'}:${this.dialogPending}:${this.sdk.session.status}`;this.currentDialog=d;
+  const key=`${d?.token??'closed'}:${this.dialogPending}:${this.sdk.session.status}:${this.sdk.isOpen(916)}`;this.currentDialog=d;
   if(this.dialogToken===key)return;this.dialogToken=key;
   const box=get('dialog');box.setAttribute('aria-busy',String(this.dialogPending));box.replaceChildren();box.hidden=!d;if(!d)return;
   box.dataset.dialogToken=d.token;
@@ -102,6 +110,9 @@ export class Controls {
   const hint=el('span',this.dialogPending?'Waiting for reply…':d.continueButton?'Space to continue':d.options.length?'Choose a response':'');header.append(hint);box.append(header);
   for(const text of d.lines)box.append(el('p',text));
   const actions=el('div','');actions.className='dialog-actions';
+  if(d.id===905&&this.sdk.isOpen(916))for(const amount of [1,5,10,'all'] as const){
+   const quantity=el('button',`Quantity: ${amount}`) as HTMLButtonElement;quantity.type='button';quantity.onclick=()=>{void this.sdk.selectRecipeQuantity(amount).then(()=>this.report(`Quantity ${amount} sent. Select the product to begin.`)).catch(e=>this.report(String(e)));};actions.append(quantity);
+  }
   for(const button of d.buttons){
    const node=el('button',button.text) as HTMLButtonElement;node.type='button';node.setAttribute('aria-label',button.text);node.dataset.dialogIndex=String(button.index);
    if(d.options.includes(button)){const key=el('kbd',String(button.index));node.prepend(key);}
@@ -124,11 +135,11 @@ export class Controls {
  private renderObjects(){
   const w=this.sdk.getState(),p=w.player;if(!p)return;
   const filter=(get('object-filter') as HTMLInputElement).value.trim().toLowerCase();
-  const key=JSON.stringify([p.x,p.y,p.level,filter,[...w.objectChanges.values()]]);if(key===this.objectKey)return;this.objectKey=key;const request=++this.objectRequest;
+  const key=JSON.stringify([p.x,p.y,p.level,filter,this.selectedItem,[...w.objectChanges.values()]]);if(key===this.objectKey)return;this.objectKey=key;const request=++this.objectRequest;
   void this.sdk.nearbyObjects(16).then(objects=>{
    if(request!==this.objectRequest)return;
-   const matches=objects.filter(o=>o.options.some(Boolean)&&(!filter||o.name.toLowerCase().includes(filter))),rows=matches.slice(0,30).map(o=>{
-    const row=el('div','');row.className='nearby-npc';row.append(el('span',`${o.name} · ${o.x}, ${o.y}`));const actions=el('button','Actions');actions.setAttribute('aria-label',`Actions for ${o.name} at ${o.x}, ${o.y}`);actions.onclick=e=>this.menu(o.name,o.options.flatMap((option,index)=>option?[{label:option,run:()=>{this.sdk.sendObjectOption(o,index);this.report(`${option} ${o.name}: sent to game.`);}}]:[]),e.clientX,e.clientY);row.append(actions);return row;
+   const matches=objects.filter(o=>(this.selectedItem||o.options.some(Boolean))&&(!filter||o.name.toLowerCase().includes(filter))),rows=matches.slice(0,30).map(o=>{
+    const row=el('div','');row.className='nearby-npc';row.append(el('span',`${o.name} · ${o.x}, ${o.y}`));const actions=el('button','Actions');actions.setAttribute('aria-label',`Actions for ${o.name} at ${o.x}, ${o.y}`);actions.onclick=e=>this.menu(o.name,[...this.objectUseActions(o),...o.options.flatMap((option,index)=>option?[{label:option,run:()=>{this.sdk.sendObjectOption(o,index);this.report(`${option} ${o.name}: sent to game.`);}}]:[])],e.clientX,e.clientY);row.append(actions);return row;
    });get('nearby-objects').replaceChildren(...(rows.length?rows:[el('p','No matching interactive objects within 16 tiles.')]));if(matches.length>30)get('nearby-objects').append(el('small',`Showing 30 of ${matches.length}; filter by name for more.`));
   }).catch(e=>{if(request!==this.objectRequest)return;this.objectKey='';get('nearby-objects').textContent=`Objects unavailable: ${e}`;});
  }

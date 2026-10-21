@@ -141,6 +141,9 @@ export class Session {
   useItemOnItem(from:{id:number;slot:number},to:{id:number;slot:number}){
     this.send(72,new Writer().i32(149<<16).inverse32(149<<16).add16(from.slot).u16(from.id).add16(to.slot).u16(to.id).finish());
   }
+  useItemOnObject(item:{id:number;slot:number},target:{id:number;x:number;y:number}){
+    this.send(54,new Writer().u16(item.id).addLe16(target.x).le32(149<<16).add16(target.y).sub8(0).le16(item.slot).le16(target.id).finish());
+  }
   closeInterface() { this.send(70); }
   enterNumber(value:number){if(!Number.isInteger(value)||value<0||value>2147483647)throw new Error('Invalid amount');this.send(32,new Writer().i32(value).finish());}
   enterText(value:string){const text=new Writer().text(value).finish();if(text.length>255)throw new Error('Input is too long');this.send(1,new Writer().u8(text.length).raw(text).finish());}

@@ -30,6 +30,7 @@ export class World {
   windowId=0; hidden=new Map<number,boolean>(); interfaceRevision=0;
   scripts:{id:number;args:(number|string)[]}[]=[];
   messages: Message[] = [];messageSequence=0;
+  varcs=new Map<number,number>();varcStrings=new Map<number,string>();
   varps = new Map<number, number>();
   varbits=new Map<number,number>();variableUpdates=new Map<string,number>();private configRevision=0;
   groundItems=new Map<number,GroundItem>();private groundSequence=0;
@@ -111,6 +112,10 @@ export class World {
         for(let i=types.length-1;i>=0;i--)args[i]=types[i]==='s'?r.text():r.i32();
         this.scripts.push({id:r.i32(),args});if(this.scripts.length>100)this.scripts.shift();break;
       }
+      case 3: {const value=signed(r.u8(),8),id=r.addLe16();this.varcs.set(id,value);this.interfaceVersions.set(905,++this.uiRevision);break;}
+      case 16: {const value=r.le32(),id=r.le16();this.varcs.set(id,value);this.interfaceVersions.set(905,++this.uiRevision);break;}
+      case 92: {const text=r.text(),id=r.add16();this.varcStrings.set(id,text);this.interfaceVersions.set(905,++this.uiRevision);break;}
+      case 53: {const id=r.addLe16(),text=r.text();this.varcStrings.set(id,text);this.interfaceVersions.set(905,++this.uiRevision);break;}
       case 44: { const value=r.inverse32();const id=r.add16();this.varps.set(id,value);this.variableUpdates.set(`p${id}`,++this.configRevision);break; }
       case 37: { const id = r.le16(), parent = r.le32() >>> 0; r.add8(); this.interfaces.set(parent, id);this.interfaceMounts.set(parent,++this.uiRevision);this.interfaceRevision++; break; }
       case 112: {const parent=r.i32()>>>0;this.interfaces.delete(parent);this.interfaceMounts.delete(parent);this.uiRevision++;this.interfaceRevision++;break;}

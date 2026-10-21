@@ -48,10 +48,12 @@ export class GatewaySDK {
  clickDialogByText(...args:Parameters<BotSDK['clickDialogByText']>){return this.send.clickDialogByText(...args);}
  getGroundItems(...args:Parameters<BotSDK['getGroundItems']>){return this.query.getGroundItems(...args);}
  findGroundItem(...args:Parameters<BotSDK['findGroundItem']>){return this.query.findGroundItem(...args);}
+ selectRecipeQuantity(...args:Parameters<BotSDK['selectRecipeQuantity']>){return this.send.selectRecipeQuantity(...args);}
  selectGameTab(...args:Parameters<BotSDK['selectGameTab']>){return this.send.selectGameTab(...args);}
  sendUseItemOnItem(...args:Parameters<BotSDK['sendUseItemOnItem']>){return this.send.sendUseItemOnItem(...args);}
  sendDropItem(...args:Parameters<BotSDK['sendDropItem']>){return this.send.sendDropItem(...args);}
  sendTakeGroundItem(...args:Parameters<BotSDK['sendTakeGroundItem']>){return this.send.sendTakeGroundItem(...args);}
+ sendUseItemOnObject(...args:Parameters<BotSDK['sendUseItemOnObject']>){return this.send.sendUseItemOnObject(...args);}
  sendObjectOption(...args:Parameters<BotSDK['sendObjectOption']>){return this.send.sendObjectOption(...args);}
 }
 export async function connectGateway(options:GatewayConnectionOptions):Promise<GatewaySDK>{
