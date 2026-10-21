@@ -9,10 +9,12 @@ import {refusalFeedback} from './message-feedback.ts';
 const el=(tag:string,text:string)=>{const e=document.createElement(tag);e.textContent=text;return e;};
 const get=(id:string)=>document.getElementById(id)!;
 export class Controls {
+ private runPending=false;
  private messageSequence=0;
  private containerKeys=new Map<string,string>();private objectKey='';private objectRequest=0;private selectedItem:Item|null=null;private items=new Map<number,ItemType>();private pending=new Set<number>();private missing=new Set<number>();private renderRevision=0;private collisionKey='';private collisionRequest=0;private dialogToken='';private dialogPending=false;private currentDialog:Dialog|null=null;private npcSignature='';
  constructor(readonly sdk:BotSDK,readonly bot:BotActions,readonly map:MapView){
   map.onMenu=(x,y,cx,cy)=>{void this.mapMenu(x,y,cx,cy).catch(e=>this.report(String(e)));};
+  get('run-toggle').onclick=()=>{const state=this.sdk.getRunState();if(this.runPending||state.enabled===null)return;this.runPending=true;this.render();this.run(state.enabled?'Disable run':'Enable run',()=>this.sdk.setRunning(!state.enabled).finally(()=>{this.runPending=false;this.render();}));};
   get('object-filter').oninput=()=>{this.objectKey='';this.renderObjects();};
   get('map-collision').onchange=()=>{this.collisionKey='';this.updateCollision();};
   get('open-inventory').onclick=()=>{void sdk.selectGameTab('Inventory').then(()=>this.report('Inventory tab click sent.')).catch(e=>this.report(String(e)));};
@@ -81,6 +83,10 @@ export class Controls {
   void this.sdk.collisionMap().then(c=>{if(request!==this.collisionRequest)return;this.map.blocked=[...c.blocked].map(k=>{const [x,y]=k.split(',').map(Number);return{x,y};});this.map.draw(w);}).catch(e=>{this.collisionKey='';this.report(String(e));});
  }
  render(){
+  const running=this.sdk.getRunState(),runButton=get('run-toggle') as HTMLButtonElement;
+  runButton.disabled=this.runPending||this.sdk.session.status!=='playing'||!running.available||running.enabled===null;
+  runButton.textContent=this.runPending?'Changing run…':running.enabled===null?'Run: '+running.mode:running.enabled?'Disable run':'Enable run';
+  runButton.setAttribute('aria-pressed',String(running.enabled===true));get('run-energy').textContent=`Energy: ${running.energy}%`;
   const w=this.sdk.getState(),feedback=refusalFeedback(w.messages,w.messageSequence,this.messageSequence);this.messageSequence=w.messageSequence;
   if(feedback)this.report(feedback);
   this.updateCollision();

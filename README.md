@@ -167,6 +167,24 @@ The **Open Inventory tab** button sits above the inventory. It enables when the 
 If `getGameTabs()` returns `[]`, run `await sdk.getGameTabStatus()` to see the active window, visible tabs, and the current tutorial instruction. At stage 0, every tab is hidden by the server. Start with `await bot.talkTo('RuneScape guide')` and progress the conversation with the dialogue panel or `await bot.navigateDialog()`. Once the Options tab appears, select it when prompted. Inventory unlocks later at the Survival Expert step. A tab click cannot skip these server-side stages.
 
 
+## Emotes and run mode
+
+The developer console and SDK support named revision 634 emotes and explicit run mode:
+
+```js
+await sdk.performEmote('Wave'); // opens the Emotes tab automatically
+```
+
+```js
+await sdk.setRunning(true); // enable run; false disables it
+```
+
+Use `await sdk.getEmotes()` for cache-defined names and `sdk.getRunState()` for the current mode, availability and run energy. The **Enable run / Disable run** button above the map shows the same server-confirmed state and energy. `setRunning` is idempotent and waits for a server movement update; it rejects unknown, resting or unavailable states rather than guessing.
+
+`performEmote` confirms dispatch, not animation completion. Wait for the animation to finish before sending another interface action: the server can ignore clicks while an emote is playing, even after tutorial instructions change. The emote catalogue does not guarantee that quest/event emotes are unlocked; the server enforces those requirements. During Tutorial Island, perform an emote when prompted, let it finish, then enable run. If run was already enabled before that tutorial step, explicitly disable and enable it so the tutorial receives the required click.
+
+All four methods are also available through the remote gateway; await remote queries, including `await sdk.getRunState()`.
+
 ## Nearby objects
 
 The lightweight **Nearby objects** panel lists interactive objects within 16 tiles, nearest first. Filter by name and choose **Actions** for the cache-defined menu. Map menus expose the same actions. The SDK can query a wider local area and dispatch the named action:

@@ -21,6 +21,7 @@ export const inventoryOption=(slot:number)=>[0,1,2,6,7][slot];
 export const equipmentComponents:Record<number,number>={0:8,1:11,2:14,3:17,4:20,5:23,7:26,9:29,10:32,12:35,13:38};
 export class BotSDK {
  readonly dialogue:DialogueService;
+ private changingRun=false;
  constructor(readonly session:Session,readonly data:GameData){this.dialogue=new DialogueService(session,id=>data.interface(id));}
  getState(){return this.session.world;}
  getInventoryStatus(){return this.getState().containerSync.get('93:0')??'unknown';}
@@ -46,6 +47,52 @@ export class BotSDK {
   if(!tab)throw new Error(status.reason??`${label} tab is not currently available.${status.instruction.length?' Follow the current tutorial instruction: '+status.instruction.join(' '):' Available tabs: '+status.tabs.map(t=>t.label).join(', ')}`);
   if(this.getState().windowId!==tab.interfaceId)throw new Error('Game window changed; query the current tabs again');
   this.session.clickInterface(tab.interfaceId,tab.component,tab.option);
+ }
+ /** Revision 634 cache catalogue. Presence here does not imply a quest/event emote is unlocked. */
+ async getEmotes(){
+  const components=await this.data.interface(464),w=this.getState(),byId=new Map(components.map(c=>[c.id,c]));
+  return components.flatMap(c=>{
+   let at:Component|undefined=c;const seen=new Set<number>();
+   while(at){if(seen.has(at.id)|| (w.hidden.get((464<<16)|at.id)??at.hidden))return [];seen.add(at.id);at=byId.get(at.parent);}
+   return c.options.flatMap((name,option)=>name.trim()&&option<10?[{name:name.trim(),interfaceId:464,component:c.id,option}]:[]);
+  });
+ }
+ /** Opens the Emotes tab and dispatches a named cache action; the server enforces unlocks. */
+ async performEmote(name:string|RegExp){
+  if(typeof name!=='string'&&!(name instanceof RegExp))throw new Error('Pass an emote name or RegExp');
+  const matches=(await this.getEmotes()).filter(e=>match(e.name,name));
+  if(matches.length!==1)throw new Error(`${matches.length?'Ambiguous':'Unknown or hidden'} emote. Use getEmotes() to inspect names.`);
+  const chosen=matches[0];await this.selectGameTab('Emotes');
+  if(!this.isOpen(464))await this.session.waitFor(()=>this.isOpen(464),5000);
+  const current=(await this.getEmotes()).find(e=>e.component===chosen.component&&e.option===chosen.option&&e.name===chosen.name);
+  if(!this.isOpen(464)||!current)throw new Error('Emotes interface changed; query the current emotes again');
+  this.session.clickInterface(464,current.component,current.option);
+  return {...current,dispatched:true as const};
+ }
+ getRunState(){
+  const mode=this.getState().varps.get(173);
+  return {enabled:mode===0?false:mode===1?true:null,mode:mode===0?'walk':mode===1?'run':mode===3?'rest':mode===4?'music':'unknown',energy:this.getState().runEnergy,available:this.isOpen(750)};
+ }
+ /** Idempotent desired state, confirmed by the server's movement varp (173). */
+ async setRunning(enabled:boolean,timeout=5000){
+  if(typeof enabled!=='boolean'||!Number.isFinite(timeout)||timeout<=0)throw new Error('Pass a boolean run mode and a positive timeout');
+  if(this.changingRun)throw new Error('A run mode change is already pending');this.changingRun=true;
+  try{
+   const before=this.getRunState();if(!before.available)throw new Error('Run orb is not currently available');
+   if(before.enabled===null)throw new Error(before.mode==='unknown'?'Run mode has not synchronized yet':'Stop resting before changing run mode');
+   if(before.enabled===enabled)return before;
+   const components=await this.data.interface(750),orb=components.find(c=>c.options.some(o=>/^Turn Run mode on$/i.test(o))),option=orb?.options.findIndex(o=>/^Turn Run mode on$/i.test(o))??-1;
+   if(!orb)throw new Error('Run orb action is unavailable in this cache');
+   const byId=new Map(components.map(c=>[c.id,c]));let at:Component|undefined=orb;const seen=new Set<number>();
+   while(at){if(seen.has(at.id)||(this.getState().hidden.get((750<<16)|at.id)??at.hidden))throw new Error('Run orb action is hidden');seen.add(at.id);at=byId.get(at.parent);}
+   if(!this.isOpen(750)||this.getRunState().enabled!==before.enabled)throw new Error('Run mode changed while loading the orb; query the current state again');
+   const sequence=this.getState().messageSequence;this.session.clickInterface(750,orb.id,option);
+   await this.session.waitFor(w=>{
+    if(w.messageSequence>sequence)for(const m of w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length)))if([0,4,109].includes(m.type)&&/^(?:You (?:don't|do not|can't|cannot|need)|Nothing interesting)/i.test(plainText(m.text)))throw new Error(plainText(m.text));
+    return this.getRunState().enabled===enabled;
+   },timeout);
+   return this.getRunState();
+  }finally{this.changingRun=false;}
  }
  sendDropItem(item:Item|number){this.sendItemOption(this.inventoryItem(item),7);}
  inventoryActionError(){

@@ -98,6 +98,18 @@ GATEWAY_URL=ws://127.0.0.1:7780/gateway bun run gateway:cli list
 
 The common methods are available directly on the remote SDK: inventory/entity searches, nearby objects/NPCs/ground items, dialogue and game-tab queries, tab selection and item/object dispatch. `sdk.query` exposes the complete supported read-only method set; `sdk.send` exposes the supported low-level mutating methods. Every remote dispatch returns a promise and must be awaited. RegExp patterns and optional arguments are supported; functions cannot be serialized into remote calls.
 
+Named emotes and run mode are also available directly:
+
+```ts
+const emotes = await sdk.getEmotes();
+await sdk.performEmote('Wave'); // dispatch only; allow the animation to finish
+const run = await sdk.getRunState();
+await sdk.setRunning(true); // idempotent; waits for server confirmation
+await sdk.setRunning(false);
+```
+
+`performEmote` opens the Emotes tab and preserves cache option slots. The catalogue is not an unlock list; server rules still apply. Interface clicks can be ignored while an emote animation is running, so do not immediately chain another action after its dispatch result.
+
 `sdk.bot` currently supports:
 
 - Movement, Talk-to, dialogue continuation/choices/navigation and dismissal.

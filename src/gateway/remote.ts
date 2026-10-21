@@ -40,6 +40,10 @@ export class GatewaySDK {
  nearbyNpcs(){return this.query.nearbyNpcs();}
  findNearbyNpc(...args:Parameters<BotSDK['findNearbyNpc']>){return this.query.findNearbyNpc(...args);}
  getDialog(){return this.query.getDialog();}
+ getEmotes(){return this.query.getEmotes();}
+ getRunState(){return this.query.getRunState();}
+ performEmote(...args:Parameters<BotSDK['performEmote']>){return this.send.performEmote(...args);}
+ setRunning(...args:Parameters<BotSDK['setRunning']>){return this.send.setRunning(...args);}
  getGameTabs(){return this.query.getGameTabs();}
  getGameTabStatus(){return this.query.getGameTabStatus();}
  waitForTicks(ticks:number,timeout=this.timeout){if(!Number.isInteger(ticks)||ticks<0)throw new Error('Ticks must be a nonnegative integer');const target=(this.getState()?.tick??0)+ticks;return this.waitForCondition(w=>w.tick>=target,timeout);}
