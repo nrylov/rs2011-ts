@@ -123,7 +123,7 @@ export class BotSDK {
 }
 export class BotActions {
  private busy=false;
- private rejectionSince(sequence:number){const w=this.sdk.getState();if(w.messageSequence<=sequence)return null;const messages=w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length));for(const m of messages){if(![0,109].includes(m.type))continue;const text=plainText(m.text);if(/^(?:You (?:can't|cannot|don't|do not|need|must|should)|Nothing interesting happens|You are (?:unable|too)|You have to)/i.test(text))return text;}return null;}
+ private rejectionSince(sequence:number){const w=this.sdk.getState();if(w.messageSequence<=sequence)return null;const messages=w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length));for(const m of messages){if(![0,4,109].includes(m.type))continue;const text=plainText(m.text);if(/^(?:You (?:can't|cannot|don't|do not|need|must|should)|I (?:can't|cannot) reach|Your inventory|Nothing interesting happens|You are (?:unable|too)|You have to)/i.test(text))return text;}return null;}
  private timeout(value:number){if(!Number.isFinite(value)||value<=0)throw new Error('Action timeout must be positive');}
  private requireItem(item:Item,container='93:0'){const current=this.sdk.getState().containers.get(container)?.find(i=>i.slot===item.slot);if(!current||current.id!==item.id||current.amount<1)throw new Error('Item slot changed; query the current container before acting');}
 
@@ -173,7 +173,7 @@ export class BotActions {
  });}
  async dismissDialog(){return this.exclusive(()=>this.dismissCurrentDialog());}
  private async dismissCurrentDialog(){const d=await this.sdk.getDialog();if(!d?.continueButton)return false;await this.advanceDialog(null,d,5000);return true;}
- async interactObject(target:MapObject,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissCurrentDialog();const index=target.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('Object has no matching action');this.sdk.sendObjectOption(target,index);await this.sdk.session.waitFor(effect,timeout);});}
+ async interactObject(target:MapObject,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissCurrentDialog();const index=target.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('Object has no matching action');const sequence=this.sdk.getState().messageSequence;this.sdk.sendObjectOption(target,index);await this.sdk.session.waitFor(w=>{const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);return effect(w);},timeout);});}
  async interactNpc(target:Entity,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissCurrentDialog();const def=await this.sdk.npcDefinition(target.type!);if(!def)throw new Error('NPC is hidden in its current form');const index=def.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('NPC has no matching action');this.sdk.session.interactNpc(target.index,index);await this.sdk.session.waitFor(effect,timeout);});}
  async chopTree(target:MapObject,timeout=30_000){const logIds:Record<string,number>={Tree:1511,'Dead tree':1511,Oak:1521,Willow:1519,'Maple tree':1517,'Yew tree':1515,'Magic tree':1513,Teak:6333,Mahogany:6332};const logId=logIds[target.name];if(logId===undefined)throw new Error('Log type is not mapped for this tree; use interactObject with an explicit effect');const before=this.sdk.count(logId),xp=this.sdk.getState().skills.get(8)?.xp??0;await this.interactObject(target,/^chop/i,w=>this.sdk.count(logId)>before&&(w.skills.get(8)?.xp??0)>xp,timeout);return {logs:this.sdk.count(logId)-before,xp:(this.sdk.getState().skills.get(8)?.xp??0)-xp};}
  async openBank(target?:MapObject|Entity){if(this.sdk.isOpen(762))return;const t=target??await this.sdk.findNearbyNpc(/^banker$/i)??await this.sdk.findNearbyObject(/^bank booth$/i);if(!t)throw new Error('No nearby banker or bank booth');if('index'in t)await this.interactNpc(t,/^bank$/i,()=>this.sdk.isOpen(762));else await this.interactObject(t,/use-quickly|bank/i,()=>this.sdk.isOpen(762));}
@@ -196,7 +196,7 @@ export class BotActions {
  /** Resolves after inventory contents or the active dialogue change. Dispatch is not proof that a recipe completed. */
  async useItemOnItem(source:Item,target:Item,timeout=15_000){return this.exclusive(async()=>{
   this.timeout(timeout);this.requireItem(source);this.requireItem(target);const relevant=()=>JSON.stringify(this.sdk.getInventory().filter(i=>i.slot===source.slot||i.slot===target.slot)),before=relevant(),dialog=await this.sdk.getDialog(),sequence=this.sdk.getState().messageSequence;this.sdk.sendUseItemOnItem(source,target);
-  const deadline=Date.now()+timeout;while(Date.now()<deadline){if(relevant()!==before)return {effect:'inventory' as const};const next=await this.sdk.getDialog();if(next&&next.kind!=='instruction'&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);if(this.sdk.session.status!=='playing')throw new Error('Game connection closed');await new Promise(r=>setTimeout(r,50));}
+  const deadline=Date.now()+timeout;while(Date.now()<deadline){if(relevant()!==before)return {effect:'inventory' as const};const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);const next=await this.sdk.getDialog();if(next&&next.kind!=='instruction'&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};if(this.sdk.session.status!=='playing')throw new Error('Game connection closed');await new Promise(r=>setTimeout(r,50));}
   throw new Error('No inventory or dialogue change was observed. Check game messages and recipe requirements.');
  });}
  /** Resolves on consumption/conversion of the source item or a new recipe dialogue, not packet dispatch. */
@@ -206,8 +206,8 @@ export class BotActions {
   this.sdk.sendUseItemOnObject(source,target);
   const deadline=Date.now()+timeout;while(Date.now()<deadline){
    if(relevant()!==before)return {effect:'inventory' as const};
-   const next=await this.sdk.getDialog();if(next&&next.kind!=='instruction'&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};
    const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);
+   const next=await this.sdk.getDialog();if(next&&next.kind!=='instruction'&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};
    if(this.sdk.session.status!=='playing')throw new Error('Game connection closed');
    await new Promise(r=>setTimeout(r,50));
   }

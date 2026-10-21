@@ -18,3 +18,13 @@ test('firemaking waits for XP after log consumption',async()=>{
 test('firemaking promptly explains a blocked tile instead of waiting for its whole timeout',async()=>{
  const t=await setup();try{const action=t.bot.burnLogs(t.sdk.getInventory()[1],1000);const result=action.catch(e=>e as Error);await Bun.sleep(20);t.peer.emit(52,message("You can't light a fire here."));expect((await result as Error).message).toContain('Move to a clear nearby tile');}finally{await t.close();}
 });
+test('engine no-interest feedback rejects item use even when its statement popup arrives',async()=>{
+ const t=await setup();try{let popup=false;t.sdk.getDialog=async()=>popup?({kind:'continue',token:'refusal',lines:['Nothing interesting happens.']}) as never:null;
+ const action=t.bot.useItemOnItem(t.sdk.getInventory()[0],t.sdk.getInventory()[1],1000);const caught=action.catch(e=>e as Error);await Bun.sleep(20);popup=true;t.peer.emit(52,new Writer().smart(4).i32(0).u8(0).text('Nothing interesting happens.').finish());expect((await caught as Error).message).toBe('Nothing interesting happens.');
+ }finally{await t.close();}
+});
+test('object helpers surface level refusals rather than waiting for their whole timeout',async()=>{
+ const t=await setup();try{t.s.world.index=1;t.s.world.players.set(1,{index:1,x:3100,y:3100,level:0});const oak={id:1281,name:'Oak',x:3101,y:3100,level:0,shape:10,rotation:0,width:2,height:2,solid:2,options:['Chop down',null,null,null,null]};
+ const action=t.bot.interactObject(oak,'Chop down',()=>false,1000);const caught=action.catch(e=>e as Error);await Bun.sleep(20);t.peer.emit(52,message('You need to have a Woodcutting level of 15.'));expect((await caught as Error).message).toContain('Woodcutting level of 15');
+ }finally{await t.close();}
+});
