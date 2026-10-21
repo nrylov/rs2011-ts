@@ -1,5 +1,6 @@
 /** Revision 634 dialogue interface IDs/continue components from Void dialogue.ifaces.toml. */
 export const DIALOGUE_PROFILES:Record<number,{name:string;continue?:number;speaker?:number}> = {
+ 178: {name:"quest_intro"},
  64: {"name":"dialogue_chat1","continue":5,"speaker":3},
  65: {"name":"dialogue_chat2","continue":6,"speaker":3},
  66: {"name":"dialogue_chat3","continue":7,"speaker":3},

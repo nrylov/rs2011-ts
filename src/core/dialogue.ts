@@ -45,6 +45,15 @@ export class DialogueService {
    const byId=new Map(components.map(c=>[c.id,c]));
    const visible=(c:Component)=>{let at:Component|undefined=c;const seen=new Set<number>();while(at&&!seen.has(at.id)){seen.add(at.id);if(w.hidden.get((id<<16)|at.id)??at.hidden)return false;at=byId.get(at.parent);}return true;};
    const text=(c:Component)=>plainText(w.texts.get((id<<16)|c.id)??c.text);
+   if(id===178){
+    // Quest offers are main-screen modals, not ordinary chat choices. Only
+    // publish the explicit decision buttons; map/reveal controls are separate.
+    const buttons:DialogButton[]=[];
+    for(const component of [73,74]){const c=byId.get(component);if(c&&visible(c))buttons.push({index:buttons.length+1,component,text:component===73?'Yes':'No',dispatch:'interface',option:0});}
+    const title=byId.get(14),fields=[[52,'Start point'],[55,'Requirements'],[59,'Required items'],[62,'Combat'],[66,'Rewards']] as const;
+    const lines=fields.flatMap(([component,label])=>{const c=byId.get(component),value=c?text(c):'';return value?[`${label}: ${value}`]:[];});
+    return {id,parent,token:this.token(id,parent),kind:buttons.length?'choice':'text',title:title?text(title):'Quest',lines,text:lines,buttons,options:buttons,continueButton:null};
+   }
    const buttons:DialogButton[]=[];
    for(const c of [...components].sort((a,b)=>a.id-b.id))if(visible(c)){
     if(c.setting&1){const label=text(c);if(label)buttons.push({index:buttons.length+1,component:c.id,text:label,dispatch:'continue'});}

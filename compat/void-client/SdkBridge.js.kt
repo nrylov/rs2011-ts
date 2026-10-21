@@ -23,6 +23,19 @@ actual object SdkBridge {
         return true
     }
 
+    // Match the local state set by LongKeyNode.method2807 for a map walk.
+    // The packet is already queued below; do not invoke the sender a second time.
+    private fun markWalkDestination(opcode: Int, payload: dynamic, length: Int) {
+        if (opcode != 35 || length != 5) return
+        fun byte(index: Int) = (payload[index] as Int) and 255
+        val worldY = byte(0) or (byte(1) shl 8)
+        val worldX = (byte(3) shl 8) or ((byte(4) - 128) and 255)
+        MediaStreamClient.anInt3203 = worldX - ArbVertexProgram.regionTileX
+        TerrainChunkBuilder.anInt1548 = worldY - RegionMapDecoder.regionTileY
+        ModelKeyBuilder.aBoolean6759 = false
+        CubemapTextureGlSource.method2264(false)
+    }
+
     private fun install() {
         val api = js("({version: 1})")
         api.sendPacket = sendPacket@{ opcode: Int, payload: dynamic ->
@@ -33,6 +46,7 @@ actual object SdkBridge {
             val node = WaterMaterialPass.method2148(FontMetaRef(opcode, length), TheoraVideoStream.aIsaacCipher_9029, -100)
             for (i in 0 until length) node.aClass348_Sub49_Sub2_7116!!.writeByte(false, payload[i] as Int)
             InterfaceComponentGroup.method3243(135, node)
+            markWalkDestination(opcode, payload, length)
         }
         api.readyForLogin = { WorldMapRenderer.anInt4674 == 3 && RenderAnimType.anInt2955 == 0 && GlWaterRenderPass.anInt7297 == 0 }
         api.login = { username: String, password: String ->

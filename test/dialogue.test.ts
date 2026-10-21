@@ -89,3 +89,11 @@ test('talkTo surfaces fresh reachability refusal promptly and cleans up listener
  (f.session as unknown as {interactNpc:()=>void}).interactNpc=()=>{f.world.messages.push({type:0,text:"I can't reach that!"});f.world.messageSequence++;f.notify();};
  await expect(f.bot.talkTo('Guide',1000)).rejects.toThrow("I can't reach that!");expect(f.listeners.size).toBe(0);
 });
+
+test('quest offers expose explicit Yes/No decisions and details, with stale and hidden-choice protection',async()=>{
+ const f=fixture(),yes=component(73,'',0,false,27),no=component(74,'',0,false,27);yes.options=['Yes'];no.options=['No'];
+ f.defs.set(178,[component(14,'The Restless Ghost'),component(27,''),component(52,'Talk to Father Aereck.'),component(55,'None.'),component(59,'None.'),component(62,'A level 7 skeleton.'),component(66,'1 Quest Point'),yes,no]);f.open(178);
+ const offer=(await f.sdk.getDialog())!;expect(offer).toMatchObject({id:178,title:'The Restless Ghost',kind:'choice',continueButton:null,options:[{component:73,text:'Yes',dispatch:'interface',option:0},{component:74,text:'No',dispatch:'interface',option:0}]});expect(offer.lines).toContain('Combat: A level 7 skeleton.');expect(f.sent).toHaveLength(0);
+ await f.sdk.clickDialogByText('Yes',offer);expect(f.sent).toEqual([{id:178,component:73,option:0}]);await f.sdk.clickDialogByText('No',offer);expect(f.sent[1]).toEqual({id:178,component:74,option:0});
+ f.close();await expect(f.sdk.clickDialogByText('Yes',offer)).rejects.toThrow('No dialogue is open');f.open(178);f.packet(108,new Writer().add8(1).le32((178<<16)|27).finish());expect((await f.sdk.getDialog())?.options).toEqual([]);
+});

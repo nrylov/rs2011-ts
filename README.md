@@ -341,3 +341,17 @@ await bot.walkTo(3212, 3428, {timeout: 180000, tolerance: 2}); // Varrock, same 
 `planRoute` returns a complete path to within the requested tolerance, with approach/crossing metadata for doors; it never reports a partial path as arrival. `routeTo` returns only the path and keeps closed doors blocked unless `{openDoors:true}` is passed. Unknown cache regions remain blocked. Routes cover up to 1024 tiles of displacement, with bounded search (100,000 visited tiles and 128 region loads by default; configurable up to 250,000/256). Larger detours may need intermediate destinations. This version walks on the current floor: stairs, ladders, boats, quest passages and teleports still require explicit interactions. It does not automatically enable run or select a safe route around hostile NPCs.
 
 Walking stops on stale player state, a detected death, unexpected teleportation/floor changes, repeated lack of progress or its deadline. Gateway controller disconnect/takeover, command expiry and loss of the gateway link stop subsequent walking legs. An already accepted movement leg can finish. Other previously accepted high-level actions retain their documented cancellation behavior. Existing browser clients and the gateway must be updated/restarted after the current run to activate this version; no live session is reloaded automatically.
+
+### Quest offers
+
+Quest-start offers (revision 634 interface 178, with **Start this quest? Yes / No**) appear in `await sdk.getDialog()` with the quest title, requirements, items, combat and rewards. They also use the lightweight client's existing dialogue controls. Agents can inspect the offer and choose explicitly:
+
+```ts
+const offer = await sdk.getDialog();
+if (offer?.id === 178) {
+  console.log(offer.title, offer.lines);
+  await bot.chooseDialogOption('Yes', {expected: offer}); // or 'No'
+}
+```
+
+The existing gateway/MCP dialogue API carries these offers; no automatic acceptance is performed. Published options disappear when the server hides the start-choice controls. A dispatched choice does not by itself establish a quest's subsequent progress.

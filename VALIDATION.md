@@ -222,3 +222,11 @@ The shared game-message entry point normalizes quest completion chat before enco
 - Added validated interface names for `isOpen`, including Inventory and bank, in both local and gateway SDKs.
 - Full TypeScript check: 206 passed, 4 skipped; typecheck and browser build passed.
 - On a copied game server, switched fixed → resizable → fullscreen → fixed → resizable through Graphics Options, checking root IDs, Inventory availability and tab selection at each step. The active game server/client were not restarted.
+
+### Quest offers and native walking feedback
+
+- Added quest-start interface 178 to dialogue discovery. Read the quest title and server-sent detail fields, expose only visible explicit Yes/No decision controls, and dispatch IF_BUTTON1 to components 73/74 with existing stale-snapshot protection. Existing local/lightweight/gateway/MCP dialogue paths share this service.
+- Typecheck, browser build and 207 tests passed (4 skipped). Quest-offer regression checks both decision packets, details, no implicit acceptance, closed/stale offers and hidden decision ancestors. Actual revision-634 cache definitions independently confirm the two action IDs and labels.
+- Native bridge walking now sets the destination coordinates and schedules the same marker update as the native walk sender, after queuing exactly one packet. Separate Kotlin/JS compilation passed; a diagnostic regular browser verified SDK walking updates the native minimap destination to the requested world tile.
+- Blank spinning menu reproduced independently: SDK and native varc 755 both contain Ball of wool (1759), yet the rendered product area is empty. This remains a separate rendering/script investigation; no claim that layout refreshes fix it.
+- No live game server, gateway or user browser restarted. Native bridge changes require rebuilding/loading a client bundle before becoming visible.
