@@ -50,7 +50,7 @@ export class GatewayControls {
    }
    if(!current())return;
    const bridge=await attachGatewayClient({url,name:owner.name,token,sdk:owner.sdk,bot:owner.bot,signal:abort.signal,
-    onStatus:status=>{if(!current())return;if(status==='connected')this.status('available',`${owner.name} is available to SDK agents.`);else if(status==='connecting'||status==='reconnecting')this.status('connecting',`Gateway ${status} for ${owner.name}…`);else this.status('unavailable',`Gateway: ${status}`);},
+    onStatus:status=>{if(!current())return;if(status==='connected')this.status('available',`${owner.name} is available to SDK agents.`);else if(status==='connecting'||status==='reconnecting')this.status('connecting',`Gateway ${status} for ${owner.name}…`);else{this.status('unavailable',`Gateway: ${status}`);if(status==='disconnected'&&this.bridge){this.bridge=undefined;this.owner=undefined;this.retryAt=Date.now()+1000;}}},
     onPresence:presence=>{if(!current())return;this.presence=presence;if(presence.controller)this.status('controlled',`${owner.name} is connected to ${presence.controller.label} (${presence.controller.id}).`);else if(this.state==='controlled')this.status('available',`${owner.name} is available to SDK agents.`);else this.paint();}
    });
    if(!current()){bridge.close();return;}this.bridge=bridge;get<HTMLInputElement>('gateway-token').value='';

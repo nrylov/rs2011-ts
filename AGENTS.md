@@ -4,6 +4,14 @@ This repository contains the revision 634 SDK, lightweight client and bot gatewa
 For gameplay, keep each persistent character's scripts and notes in `bots/{username}/`.
 For SDK/client development, work on the repository directly; do not create or control a gameplay account unless the task needs it.
 
+## Start or continue an account
+
+For “start a bot” or “continue an existing account”, first check whether `bots/{name}/bot.env` exists. Reuse it; never recreate credentials for a configured account. If only the game account exists, obtain its password and configure it once with `create_bot({name,password})`. Omit the password only for a genuinely new game account.
+
+Use MCP `start_bot({bot_name:name,client:'regular'})` for a visible game window. It opens the browser, signs in, and waits for SDK availability automatically. `client:'lightweight'` opens the map client; `client:'headless'` is explicit. `execute_code` also auto-starts and defaults to the regular client. Reuse an already attached session. Do not ask the user to open a page, enter tokens or sign in manually when this startup path is available.
+
+MCP `execute_code.timeout` is **seconds**, default 120, maximum 3600.
+
 ## Create and start a bot
 
 When asked to start a new bot, use the requested name (1–12 alphanumeric characters).
@@ -24,7 +32,7 @@ A lightweight browser started with `bun run dev:lite`, or a bridge-enabled regul
 
 ## MCP
 
-`create_bot` creates the account directory. `execute_code(bot_name, code, timeout?)` attaches to its current gateway client and starts a local lightweight client when needed and configured. Code runs asynchronously with `sdk` and `bot` globals. SDK queries that use cache or remote dispatch must be awaited.
+`create_bot` creates the account directory. `execute_code(bot_name, code, timeout?, client?)` attaches to its current gateway client and opens/signs into a visible regular client when needed. `timeout` is in seconds. Code runs asynchronously with `sdk` and `bot` globals. SDK queries that use cache or remote dispatch must be awaited.
 
 ```ts
 const state = sdk.getState();

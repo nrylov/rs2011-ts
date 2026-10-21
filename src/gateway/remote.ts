@@ -7,7 +7,7 @@ type RemoteQueries={ [K in QueryName]: (...args:Parameters<BotSDK[K]>)=>Promise<
 type RemoteSends={ [K in ActionName]: (...args:Parameters<BotSDK[K]>)=>Promise<Awaited<ReturnType<BotSDK[K]>>> };
 export class GatewaySDK {
  readonly bot:RemoteBotActions;readonly query:RemoteQueries;readonly send:RemoteSends;
- private state:PublishedState|null=null;private online=false;private closed=false;private received=0;private age=Infinity;private serial=0;
+ private closeReason='Gateway connection closed';private state:PublishedState|null=null;private online=false;private closed=false;private received=0;private age=Infinity;private serial=0;
  private calls=new Map<string,{resolve:(v:any)=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>();private listeners=new Set<()=>void>();private heartbeat:ReturnType<typeof setInterval>;
  constructor(private socket:WebSocket,readonly mode:Mode,private timeout:number){
   this.bot=Object.fromEntries(botActions.map(name=>[name,(...args:unknown[])=>{const requested=typeof args[2]==='number'?args[2]:(args[2] as {timeout?:number}|undefined)?.timeout??120000;return this.call(`bot.${name}`,args,name==='walkTo'?Math.min(600000,Math.max(100,requested+5000)):name==='talkTo'?Math.min(600000,Math.max(100,(typeof args[1]==='number'?args[1]:20000)+5000)):this.timeout);}])) as RemoteBotActions;
@@ -17,7 +17,7 @@ export class GatewaySDK {
  }
  receive(m:any){if(m.type==='state'){this.state=m.state;this.online=m.online===true;this.received=Date.now();this.age=typeof m.ageMs==='number'?m.ageMs:Infinity;this.notify();}else if(m.type==='result'){const pending=this.calls.get(m.id);if(pending){clearTimeout(pending.timer);this.calls.delete(m.id);m.error?pending.reject(new Error(m.error)):pending.resolve(m.value);}}else if(m.type==='error')this.end(m.error);}
  private notify(){for(const cb of this.listeners)try{cb();}catch(e){console.error('Gateway state observer failed',e);}}
- end(reason='Gateway connection closed'){if(this.closed)return;this.closed=true;this.online=false;clearInterval(this.heartbeat);for(const pending of this.calls.values()){clearTimeout(pending.timer);pending.reject(new Error(reason));}this.calls.clear();this.notify();this.socket.close();}
+ end(reason='Gateway connection closed'){if(this.closed)return;this.closeReason=reason;this.closed=true;this.online=false;clearInterval(this.heartbeat);for(const pending of this.calls.values()){clearTimeout(pending.timer);pending.reject(new Error(reason));}this.calls.clear();this.notify();this.socket.close();}
  close(){this.end();}
  getState(){return this.state?.world??null;}
  getStateAge(){return this.age+Date.now()-this.received;}
@@ -31,7 +31,7 @@ export class GatewaySDK {
  count(id:number,container='93:0'){return (this.getState()?.containers[container]??[]).reduce((n,i)=>n+(i.id===id?i.amount:0),0);}
  subscribe(cb:()=>void){this.listeners.add(cb);return ()=>this.listeners.delete(cb);}
  waitForCondition(predicate:(state:WorldSnapshot)=>boolean,timeout=this.timeout){deadline(timeout);return new Promise<WorldSnapshot>((resolve,reject)=>{let timer:ReturnType<typeof setTimeout>;const finish=(error?:Error,value?:WorldSnapshot)=>{clearTimeout(timer);unsubscribe();error?reject(error):resolve(value!);};const check=()=>{if(!this.isClientOnline()){finish(new Error('No playing game client is attached'));return;}const state=this.getState();try{if(state&&predicate(state))finish(undefined,state);}catch(e){finish(e instanceof Error?e:new Error(String(e)));}};const unsubscribe=this.subscribe(check);timer=setTimeout(()=>finish(new Error('State observation timed out')),timeout);check();});}
- call(method:string,args:unknown[]=[],timeout=this.timeout):Promise<any>{if(this.closed||this.socket.readyState!==WebSocket.OPEN)return Promise.reject(new Error('Gateway connection closed'));const id=String(++this.serial);let body:string;try{body=JSON.stringify({type:'call',id,method,args:encode(args),timeoutMs:deadline(timeout)});if(body.length>65536)throw new Error('Gateway request is too large');}catch(e){return Promise.reject(e);}
+ call(method:string,args:unknown[]=[],timeout=this.timeout):Promise<any>{if(this.closed||this.socket.readyState!==WebSocket.OPEN)return Promise.reject(new Error(this.closeReason));const id=String(++this.serial);let body:string;try{body=JSON.stringify({type:'call',id,method,args:encode(args),timeoutMs:deadline(timeout)});if(body.length>65536)throw new Error('Gateway request is too large');}catch(e){return Promise.reject(e);}
   return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.calls.delete(id);reject(new Error('Gateway request timed out; the game action may still be running'));},timeout+1000);this.calls.set(id,{resolve,reject,timer});try{this.socket.send(body);}catch(e){clearTimeout(timer);this.calls.delete(id);reject(e);}});
  }
  planRoute(...args:Parameters<BotSDK['planRoute']>){return this.query.planRoute(...args);}

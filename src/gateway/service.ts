@@ -18,7 +18,7 @@ export function startGateway(options:{config:GatewayConfig;port?:number;hostname
  function finish(key:string,error?:string,result?:unknown){const job=pending.get(key);if(!job)return;clearTimeout(job.timer);pending.delete(key);const b=bots.get(job.bot)!;if(b.busy===key)b.busy=undefined;if(!job.expired)send(job.peer,{type:'result',id:job.id,...(error?{error}:{value:result??null})});}
  function failClient(b:Bot){b.client=undefined;for(const [key,p]of pending)if(bots.get(p.bot)===b)finish(key,'Game client disconnected');fanout(b);}
  const server=Bun.serve<Peer>({hostname:options.hostname??'127.0.0.1',port:options.port??7780,
-  fetch(req,s){const url=new URL(req.url);if(url.pathname==='/health')return Response.json({ok:true,protocol:1});if(url.pathname==='/bots'){if(!equal(req.headers.get('authorization')?.replace(/^Bearer /,''),config.monitorToken))return new Response('Unauthorized',{status:401});return Response.json([...bots].map(([name,b])=>({name,online:!!b.client&&!b.awaitingState,status:b.state?.status??'offline',player:b.state?.world.player??null,updatedAt:b.updatedAt||null,controlled:!!b.controller,busy:!!b.busy})),{headers:{'Cache-Control':'no-store'}});}
+  fetch(req,s){const url=new URL(req.url);if(url.pathname==='/health')return Response.json({ok:true,protocol:1});if(url.pathname==='/bots'){if(!equal(req.headers.get('authorization')?.replace(/^Bearer /,''),config.monitorToken))return new Response('Unauthorized',{status:401});return Response.json([...bots].filter(([name])=>!!config.bots[name]).map(([name,b])=>({name,online:!!b.client&&!b.awaitingState,status:b.state?.status??'offline',player:b.state?.world.player??null,updatedAt:b.updatedAt||null,controlled:!!b.controller,busy:!!b.busy})),{headers:{'Cache-Control':'no-store'}});}
    if(url.pathname!=='/gateway')return new Response('Not found',{status:404});const origin=req.headers.get('origin');if(origin&&new URL(origin).host!==url.host&&!options.allowedOrigins?.includes(origin))return new Response('Invalid origin',{status:403});if(s.upgrade(req,{data:{seen:Date.now()} as Peer}))return;return new Response('WebSocket required',{status:426});},
   websocket:{maxPayloadLength:1_048_576,
    open(ws){const p=ws.data;p.socket=ws;peers.add(p);p.authTimer=setTimeout(()=>ws.close(1008,'Authentication required'),5000);},
@@ -47,5 +47,18 @@ export function startGateway(options:{config:GatewayConfig;port?:number;hostname
  });
  const heartbeat=setInterval(()=>{for(const p of peers)if(Date.now()-p.seen>60000)p.socket.close(1001,'Heartbeat expired');},10000);
  function addBots(input:GatewayConfig){const next=validateConfig(input);if(next.monitorToken!==config.monitorToken||Object.entries(config.bots).some(([name,creds])=>!next.bots[name]||(['clientToken','controlToken','observeToken'] as const).some(key=>creds[key]!==next.bots[name][key])))throw new Error('Token changes or bot removals require a gateway restart');let added=0;for(const[name,creds]of Object.entries(next.bots))if(!config.bots[name]){config.bots[name]=creds;bots.set(name,{agents:new Set<Peer>(),updatedAt:0});added++;}return added;}
- return {addBots,server,url:`ws://${options.hostname??'127.0.0.1'}:${server.port}/gateway`,async stop(){clearInterval(heartbeat);for(const j of pending.values())clearTimeout(j.timer);pending.clear();for(const p of peers){clearTimeout(p.authTimer);p.socket.close(1001,'Gateway stopped');}await server.stop(true);}};
+ function reloadConfig(input:GatewayConfig){
+  const next=validateConfig(input);let added=0,changed=0,removed=0;
+  // Validate the entire replacement before changing credentials. Only peers
+  // whose role was revoked are closed; unrelated bot sessions stay attached.
+  for(const [name,previous]of Object.entries(config.bots)){
+   const replacement=next.bots[name],b=bots.get(name)!;
+   if(!replacement){for(const p of peers)if(p.bot===name)p.socket.close(1008,'Bot registration removed');for(const [id,j]of pending)if(j.bot===name)finish(id,'Bot registration removed');b.state=undefined;delete config.bots[name];removed++;continue;}
+   const roles=(['clientToken','controlToken','observeToken'] as const).filter(role=>previous[role]!==replacement[role]);
+   if(roles.length){config.bots[name]=replacement;changed++;for(const p of peers){if(p.bot!==name)continue;const role=p.role==='client'?'clientToken':p.mode==='control'?'controlToken':'observeToken';if(roles.includes(role)){send(p,{type:'error',error:'Gateway credentials changed; reconnect with current credentials'});p.socket.close(1008,'Gateway credentials changed');}}}
+  }
+  for(const [name,creds]of Object.entries(next.bots))if(!config.bots[name]){config.bots[name]=creds;if(!bots.has(name))bots.set(name,{agents:new Set<Peer>(),updatedAt:0});added++;}
+  config.monitorToken=next.monitorToken;return {added,changed,removed};
+ }
+ return {reloadConfig,addBots,server,url:`ws://${options.hostname??'127.0.0.1'}:${server.port}/gateway`,async stop(){clearInterval(heartbeat);for(const j of pending.values())clearTimeout(j.timer);pending.clear();for(const p of peers){clearTimeout(p.authTimer);p.socket.close(1001,'Gateway stopped');}await server.stop(true);}};
 }

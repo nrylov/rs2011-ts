@@ -2,6 +2,10 @@
 
 The bridge lets the TypeScript SDK observe and control the regular Void Kotlin/JS client's existing session. SDK actions enter its normal outgoing packet queue using its current ISAAC cipher. SDK game-tab selections also run the regular client’s normal widget handler, updating the visible panel while dispatching the action once. Other SDK packet sends retain their existing behavior. Mouse and keyboard controls remain available. There is no second game login or handoff dialog. The gateway routes agent calls to the same BotSDK used by the lightweight client.
 
+## Agent startup
+
+Ask an agent in this repository to continue the named account in the regular client. MCP `start_bot({bot_name:'mybot',client:'regular'})` opens a dedicated browser window, signs in using saved `bot.env` credentials and waits for SDK availability. `execute_code` also starts this way when no client is attached. A running attached session is always reused. Node.js 22+ and installed Chromium/Chrome/Brave are required; browser profiles live under the ignored `dev/browsers` directory. Closing the agent leaves the browser open.
+
 ## Local use
 
 Start the game, gateway, and regular web client in separate terminals:
