@@ -123,7 +123,7 @@ export class World {
       case 92: {const text=r.text(),id=r.add16();this.varcStrings.set(id,text);this.interfaceVersions.set(905,++this.uiRevision);break;}
       case 53: {const id=r.addLe16(),text=r.text();this.varcStrings.set(id,text);this.interfaceVersions.set(905,++this.uiRevision);break;}
       case 44: { const value=r.inverse32();const id=r.add16();this.varps.set(id,value);this.variableUpdates.set(`p${id}`,++this.configRevision);break; }
-      case 37: { const id = r.le16(), parent = r.le32() >>> 0; r.add8(); for(const key of this.interfaceItems.keys())if((key>>>16)===id)this.interfaceItems.delete(key);this.interfaces.set(parent, id);this.interfaceMounts.set(parent,++this.uiRevision);this.interfaceRevision++; break; }
+      case 37: { const id = r.le16(), parent = r.le32() >>> 0; r.add8(); for(const key of this.interfaceItems.keys())if((key>>>16)===id)this.interfaceItems.delete(key);if(id===667)for(const key of this.texts.keys())if((key>>>16)===667)this.texts.delete(key);this.interfaces.set(parent, id);this.interfaceMounts.set(parent,++this.uiRevision);this.interfaceRevision++; break; }
       case 112: {const parent=r.i32()>>>0;this.interfaces.delete(parent);this.interfaceMounts.delete(parent);this.uiRevision++;this.interfaceRevision++;break;}
       case 7: { const id = r.u16(); this.varps.set(id, signed(r.u8(), 8));this.variableUpdates.set(`p${id}`,++this.configRevision); break; }
       case 73: { const value=signed(r.add8(),8),id=r.le16();this.varbits.set(id,value);this.variableUpdates.set(`b${id}`,++this.configRevision);break; }

@@ -112,6 +112,8 @@ await sdk.setRunning(false);
 
 Production is shared with the browser client: `await sdk.getCreationMenu()`, `await sdk.selectCreationProduct(product, amount, menu)`, `await sdk.selectCreationControl(label, menu)`, `await sdk.getNumberInput()`, `await sdk.submitNumber(value, sequence)` and `await sdk.bot.create(product, amount)` are routed to the hosted session. See [production API and coverage](production.md). A create result observes the first conversion or an input/menu transition; it does not certify batch completion.
 
+Health and combat queries are available to controllers and observers: `await sdk.getHealth()`, `await sdk.getCombatState()`, `await sdk.getCombatStyles()` and `await sdk.getEquipmentStats()`. Controllers can call `await sdk.selectCombatStyle('Defensive')`, `await sdk.openEquipmentStats()` and `await sdk.closeEquipmentStats()`. Style changes wait for server confirmation; opening equipment stats selects Worn Equipment and opens the real tutorial-triggering interface. These methods share the browser client's weapon, visibility and synchronization checks.
+
 `sdk.bot` currently supports:
 
 - Movement, Talk-to, dialogue continuation/choices/navigation and dismissal.

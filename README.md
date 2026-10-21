@@ -240,3 +240,21 @@ Tutorial Island hides the normal chat history under its instruction panel. The o
 ## Production across skills
 
 The lightweight **Production** panel and shared SDK now handle named products and quantities beyond cooking, including anvil smithing, smelting, fletching, crafting, jewellery, tanning and dedicated production menus. Use a bronze bar on an anvil while carrying a hammer, then choose **Bronze dagger**. In scripts, open the menu normally, inspect `await sdk.getCreationMenu()`, and call `await bot.create('Bronze dagger', 1)`. Make X prompts have a visible amount form and SDK access. See [production API, interface coverage and limitations](docs/production.md).
+
+
+## Health, combat styles and equipment stats
+
+The lightweight **Combat** panel shows current and maximum life points and the equipped weapon’s attack styles. HP uses the exact server life-points value, rather than the rounded Constitution skill update. Choose a style to wait for server confirmation; available buttons follow the weapon and tutorial unlocks.
+
+Beside **Equipment**, click **View equipment stats** to open the real equipment-bonuses interface, including the Tutorial Island step. It selects Worn Equipment automatically. The bonuses appear below the equipment slots with a Close button.
+
+```ts
+console.log(await sdk.getHealth()); // { current, max, constitutionLevel }
+console.log(await sdk.getCombatStyles());
+await sdk.selectCombatStyle('Defensive'); // or an exact style label, e.g. 'Lunge'
+await sdk.openEquipmentStats();
+console.log(await sdk.getEquipmentStats());
+await sdk.closeEquipmentStats();
+```
+
+These methods also work through the remote gateway. Styles accept a label, mode, RegExp or zero-based index; ambiguous modes reject with the available choices. Selection opens Combat Styles and waits for the authoritative style update, rejecting weapon changes during confirmation. `getCombatState()` includes weapon, selected index, availability and a reason when unavailable. Unknown health or unsynchronized values remain `null`. Maximum HP comes from the base Constitution XP level; current HP can exceed that maximum when boosted. Equipment bonuses preserve server text, including percentages, and remain unknown until received. These controls cover physical attack styles; spell selection and autocasting are separate future work.

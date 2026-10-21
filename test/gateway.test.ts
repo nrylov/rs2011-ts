@@ -64,3 +64,14 @@ test('remote production queries and actions use the hosted SDK and remain unavai
   const input={sequence:42,prompt:'Enter amount:'};t.s.world.numberInput=input;expect(await remote.getNumberInput()).toEqual(input);await remote.submitNumber(2,42);expect(t.s.world.numberInput).toBeNull();
  }finally{remote?.close();observer?.close();await t.close();}
 });
+test('remote health, combat styles and equipment stats share confirmed SDK actions and observer rules',async()=>{
+ const t=await setup();let remote,observer;try{
+  const component=(id:number,parent=65535,options:string[]=[],text='')=>({id,parent,options,text,type:text?4:0,hidden:false,setting:0});
+  t.sdk.data.varbit=()=>({id:7198,index:1240,start:1,end:15});t.sdk.data.item=async(id)=>({id,name:'Bronze dagger',params:{686:5}}) as any;
+  t.sdk.data.interface=async(id)=>id===548?[component(171,65535,['Combat Styles'])]:id===884?[component(10),...[11,12,13,14].map(id=>component(id,10))]:id===667?[component(30,65535,[],'Stab:')]:[];
+  const w=t.s.world;w.windowId=548;w.interfaces.clear();w.interfaces.set(1,884);w.containers.set('94:0',[{id:1205,slot:3,amount:1}]);w.containerSync.set('94:0','complete');w.varps.set(43,0);w.varps.set(1240,150);w.skills.set(3,{index:3,level:7,xp:1154});
+  remote=await connectGateway(options(t.gateway.url));observer=await connectGateway(options(t.gateway.url,'observe'));expect(await remote.getHealth()).toEqual({current:75,max:100,constitutionLevel:10});expect((await remote.getCombatStyles()).map(s=>s.label)).toEqual(['Stab','Lunge','Slash','Block']);
+  const selecting=remote.selectCombatStyle('Lunge',1000);const deadline=Date.now()+1000;while(!t.peer.received.some(p=>p.opcode===23&&new DataView(p.body.buffer,p.body.byteOffset,p.body.byteLength).getUint32(0)===(884<<16|12))&&Date.now()<deadline)await Bun.sleep(5);w.varps.set(43,1);(t.s as unknown as {notify():void}).notify();expect((await selecting).selectedIndex).toBe(1);
+  w.interfaces.set(2,667);w.texts.set((667<<16)|30,'Stab: +4');expect((await remote.getEquipmentStats()).stats[0].value).toBe(4);expect((await observer.getHealth()).current).toBe(75);await expect(observer.openEquipmentStats()).rejects.toThrow('Observer');await expect(observer.selectCombatStyle('Block')).rejects.toThrow('Observer');
+ }finally{remote?.close();observer?.close();await t.close();}
+});

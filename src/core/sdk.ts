@@ -1,3 +1,4 @@
+import {CombatService} from './combat.ts';
 import {CreationService,type CreationAmount,type CreationMenu} from './creation.ts';
 import type {EnumType} from '../cache/enums.ts';
 import { DialogueService, plainText, type Dialog, type DialogPattern, type DialogWaitOptions } from './dialogue.ts';
@@ -24,10 +25,18 @@ export const inventoryOption=(slot:number)=>[0,1,2,6,7][slot];
 export const equipmentComponents:Record<number,number>={0:8,1:11,2:14,3:17,4:20,5:23,7:26,9:29,10:32,12:35,13:38};
 export class BotSDK {
  readonly dialogue:DialogueService;
+ readonly combat:CombatService;
  readonly creation:CreationService;
  private changingRun=false;
- constructor(readonly session:Session,readonly data:GameData){this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);}
+ constructor(readonly session:Session,readonly data:GameData){this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);this.combat=new CombatService(this);}
  getState(){return this.session.world;}
+ getHealth(){return this.combat.health();}
+ getCombatState(){return this.combat.state();}
+ async getCombatStyles(){return (await this.getCombatState()).styles;}
+ selectCombatStyle(selection:string|RegExp|number,timeout=5000){return this.combat.select(selection,timeout);}
+ getEquipmentStats(){return this.combat.stats();}
+ openEquipmentStats(timeout=5000){return this.combat.openStats(timeout);}
+ closeEquipmentStats(timeout=5000){return this.combat.closeStats(timeout);}
  getInventoryStatus(){return this.getState().containerSync.get('93:0')??'unknown';}
  getEquipmentStatus(){return this.getState().containerSync.get('94:0')??'unknown';}
  getInventory(){return this.getState().containers.get('93:0')??[];}
@@ -234,7 +243,7 @@ export class BotActions {
  async chopTree(target:MapObject,timeout=30_000){const logIds:Record<string,number>={Tree:1511,'Dead tree':1511,Oak:1521,Willow:1519,'Maple tree':1517,'Yew tree':1515,'Magic tree':1513,Teak:6333,Mahogany:6332};const logId=logIds[target.name];if(logId===undefined)throw new Error('Log type is not mapped for this tree; use interactObject with an explicit effect');const before=this.sdk.count(logId),xp=this.sdk.getState().skills.get(8)?.xp??0;await this.interactObject(target,/^chop/i,w=>this.sdk.count(logId)>before&&(w.skills.get(8)?.xp??0)>xp,timeout);return {logs:this.sdk.count(logId)-before,xp:(this.sdk.getState().skills.get(8)?.xp??0)-xp};}
  async openBank(target?:MapObject|Entity){if(this.sdk.isOpen(762))return;const t=target??await this.sdk.findNearbyNpc(/^banker$/i)??await this.sdk.findNearbyObject(/^bank booth$/i);if(!t)throw new Error('No nearby banker or bank booth');if('index'in t)await this.interactNpc(t,/^bank$/i,()=>this.sdk.isOpen(762));else await this.interactObject(t,/use-quickly|bank/i,()=>this.sdk.isOpen(762));}
  async confirmAppearance(){return this.exclusive(async()=>{if(!this.sdk.isOpen(1028))throw new Error('Character creation is not open');this.sdk.session.clickInterface(1028,117);await this.sdk.session.waitFor(()=>!this.sdk.isOpen(1028),5000);});}
- async closeInterface(){return this.exclusive(async()=>{const creation=await this.sdk.getCreationMenu(),ids=[762,11,...(creation?[creation.id,...(creation.id===905?[916]:[])]:[])];const open=ids.filter(id=>this.sdk.isOpen(id));if(!open.length)return;this.sdk.session.closeInterface();await this.sdk.session.waitFor(()=>open.every(id=>!this.sdk.isOpen(id)),5000);});}
+ async closeInterface(){return this.exclusive(async()=>{const creation=await this.sdk.getCreationMenu(),ids=[762,11,667,...(creation?[creation.id,...(creation.id===905?[916]:[])]:[])];const open=ids.filter(id=>this.sdk.isOpen(id));if(!open.length)return;this.sdk.session.closeInterface();await this.sdk.session.waitFor(()=>open.every(id=>!this.sdk.isOpen(id)),5000);});}
  async depositItem(item:Item,amount:1|5|10|'all'=1){return this.exclusive(async()=>{
   if(!this.sdk.isOpen(762)&&!this.sdk.isOpen(11))throw new Error('Bank is not open');
   this.requireItem(item);

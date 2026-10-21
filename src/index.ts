@@ -17,3 +17,5 @@ export {attachGatewayClient} from './gateway/endpoint.ts';
 export type {GatewayConfig,WorldSnapshot,PublishedState} from './gateway/protocol.ts';
 
 export type {CreationMenu,CreationProduct,CreationAction,CreationAmount} from './core/creation.ts';
+
+export type {Health,CombatState,CombatStyle,EquipmentStat} from './core/combat.ts';
