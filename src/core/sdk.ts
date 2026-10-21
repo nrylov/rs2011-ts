@@ -202,6 +202,15 @@ export class BotSDK {
   return new CollisionMap(regions,sceneObjects(regions,w,id=>defs.get(id)),p.level);
  }
  planRoute(x:number,y:number,options:RouteOptions={}){return this.navigation.plan(x,y,options);}
+ /** Read-only approach plan; unlike tile tolerance, the final edge cannot cross a wall/closed door. */
+ async planNpcInteraction(target:Entity|string|RegExp,options:Omit<RouteOptions,'tolerance'|'interactionSize'>={}){
+  const selected=typeof target==='string'||target instanceof RegExp?await this.findNearbyNpc(target):target;
+  if(!selected)throw new Error('No matching nearby NPC');
+  const identity={index:selected.index,type:selected.type};
+  const live=()=>{const n=this.getState().npcs.get(identity.index);if(!n||n.type!==identity.type||n.level!==this.getState().player?.level)throw new Error('NPC changed or left view; query nearby NPCs again');return n;};
+  const def=await this.npcDefinition(live().type!);if(!def)throw new Error('NPC is hidden in its current form');
+  const current=live();return this.navigation.plan(current.x,current.y,{...options,tolerance:0,interactionSize:def.size});
+ }
  async routeTo(x:number,y:number,options:RouteOptions={}){return (await this.navigation.plan(x,y,{...options,openDoors:options.openDoors??false}))?.path??null;}
  async selectRecipeQuantity(amount:1|5|10|'all'){
   if(![1,5,10,'all'].includes(amount))throw new Error('Recipe quantity must be 1, 5, 10 or all');
@@ -242,11 +251,25 @@ export class BotActions {
  async chooseDialogOption(selection:DialogPattern|number,options:{expected?:Dialog;timeout?:number}={}){return this.exclusive(()=>this.advanceDialog(selection,options.expected,options.timeout));}
  async talkTo(target:Entity|DialogPattern,timeout=20_000){return this.exclusive(async()=>{
   if(!Number.isFinite(timeout)||timeout<=0)throw new Error('Dialogue timeout must be positive');
+  const end=Date.now()+timeout;
   const n=typeof target==='string'||target instanceof RegExp?await this.sdk.findNearbyNpc(target):target;if(!n)throw new Error('No matching nearby NPC');
-  const current=this.sdk.getState().npcs.get(n.index);if(!current||current.level!==this.sdk.getState().player?.level)throw new Error('NPC left view; query nearby NPCs again');
-  const def=await this.sdk.npcDefinition(current.type!);const option=def?.options.findIndex(s=>!!s&&/^talk[ -]?to$/i.test(s))??-1;if(option<0)throw new Error('NPC has no Talk-to action');
-  const before=await this.sdk.getDialog();this.sdk.session.interactNpc(current.index,option);
-  return this.sdk.waitForDialog({after:before,timeout});
+  const identity={index:n.index,type:n.type};
+  const live=()=>{const current=this.sdk.getState().npcs.get(identity.index);if(!current||current.type!==identity.type||current.level!==this.sdk.getState().player?.level)throw new Error('NPC changed or left view; query nearby NPCs again');return {...current};};
+  let current=live(),def:NpcType|null=null,option=-1;
+  const remaining=()=>{const value=end-Date.now();if(value<=0)throw new Error('Talk-to timed out while approaching the NPC');return value;};
+  for(let attempt=0;attempt<4;attempt++){
+   current=live();def=await this.sdk.npcDefinition(current.type!);
+   option=def?.options.findIndex(s=>!!s&&/^talk[ -]?to$/i.test(s))??-1;if(option<0)throw new Error('NPC has no Talk-to action');
+   try{await this.sdk.navigation.walk(current.x,current.y,{interactionSize:def!.size,timeout:Math.max(100,remaining())});}
+   catch(e){throw new Error(`Cannot approach ${def!.name} at ${current.x}, ${current.y}: ${e instanceof Error?e.message:String(e)}`);}
+   const latest=live();if(latest.x===current.x&&latest.y===current.y)break;
+   if(attempt===3)throw new Error(`Cannot approach ${def!.name}: NPC kept moving; query its current position and retry`);
+  }
+  remaining();const before=await this.sdk.getDialog(),sequence=this.sdk.getState().messageSequence,abort=new AbortController();let refused:string|null=null;
+  const unsubscribe=this.sdk.session.subscribe(()=>{refused=this.rejectionSince(sequence);if(refused)abort.abort();});
+  try{remaining();this.sdk.session.interactNpc(current.index,option);return await this.sdk.waitForDialog({after:before,timeout:remaining(),signal:abort.signal});}
+  catch(e){throw new Error(`Talking to ${def!.name} at ${current.x}, ${current.y} failed: ${refused??(e instanceof Error?e.message:String(e))}`);}
+  finally{unsubscribe();}
  });}
  async navigateDialog(choices:(DialogPattern|number)[]=[],options:{timeout?:number;maxSteps?:number}={}){return this.exclusive(async()=>{
   const timeout=options.timeout??30_000,maxSteps=options.maxSteps??30,deadline=Date.now()+timeout;

@@ -16,7 +16,7 @@ function fixture(definitions?:Map<number,Component[]>){
  ]);
  let onClick:(id:number,c:number)=>void=()=>{};
  const session={world,status:'playing',error:null,subscribe:(cb:()=>void)=>{listeners.add(cb);return()=>listeners.delete(cb);},continueDialogue:(id:number,c:number)=>{sent.push({id,component:c});onClick(id,c);},clickInterface:(id:number,c:number,option:number)=>{sent.push({id,component:c,option});onClick(id,c);}};
- const data={interface:async(id:number)=>{const d=defs.get(id);if(!d)throw new Error(`Unknown test interface ${id}`);return d;},npc:async(id:number)=>({id,name:'Guide',combat:0,size:1,options:['Talk-to']}),varbit:()=>({id:1,index:1,start:0,end:1})} as unknown as GameData;
+ const data={region:(x:number,y:number)=>({x,y,terrain:{flags:Array(16384).fill(0),underlays:[],overlays:[],shapes:[],rotations:[]},objects:[],underlayColours:{},overlayColours:{}}),interface:async(id:number)=>{const d=defs.get(id);if(!d)throw new Error(`Unknown test interface ${id}`);return d;},npc:async(id:number)=>({id,name:'Guide',combat:0,size:1,options:['Talk-to']}),varbit:()=>({id:1,index:1,start:0,end:1})} as unknown as GameData;
  const sdk=new BotSDK(session as unknown as Session,data),bot=new BotActions(sdk);
  const notify=()=>{for(const fn of listeners)fn();};
  const packet=(op:number,body:Uint8Array)=>{world.apply(op,body);notify();};
@@ -65,7 +65,7 @@ test('navigation stops at a choice without guessing or selecting a response cont
  const f=fixture();f.open(234);f.text(234,2,'Continue my journey');const result=await f.bot.navigateDialog();expect(result).toMatchObject({ended:false,awaitingChoice:true,steps:0});expect(f.sent).toHaveLength(0);
 });
 test('talkTo uses the live NPC and returns observed dialogue',async()=>{
- const f=fixture();f.world.index=1;f.world.players.set(1,{index:1,x:100,y:100,level:0});f.world.npcs.set(5,{index:5,type:945,x:101,y:100,level:0});
+ const f=fixture();f.world.index=1;f.world.playerUpdateAt=Date.now();f.world.players.set(1,{index:1,x:100,y:100,level:0});f.world.npcs.set(5,{index:5,type:945,x:101,y:100,level:0});
  (f.session as unknown as {interactNpc:(index:number,option:number)=>void}).interactNpc=(index,option)=>{expect(index).toBe(5);expect(option).toBe(0);f.open(241);};
  expect((await f.bot.talkTo('Guide',1000)).speaker).toBe('Name');
 });
@@ -82,4 +82,10 @@ test('a cache read racing a new UI update never publishes the old dialogue',asyn
 test('invalid limits do not dispatch and a looping conversation hits its step bound',async()=>{
  const f=fixture();f.open(241);await expect(f.bot.continueDialog({timeout:0})).rejects.toThrow('positive');expect(f.sent).toHaveLength(0);
  f.onClick=()=>queueMicrotask(()=>f.open(241));await expect(f.bot.navigateDialog([],{maxSteps:2})).rejects.toThrow('step limit');expect(f.sent).toHaveLength(2);
+});
+
+test('talkTo surfaces fresh reachability refusal promptly and cleans up listeners',async()=>{
+ const f=fixture();f.world.index=1;f.world.playerUpdateAt=Date.now();f.world.players.set(1,{index:1,x:100,y:100,level:0});f.world.npcs.set(5,{index:5,type:945,x:101,y:100,level:0});
+ (f.session as unknown as {interactNpc:()=>void}).interactNpc=()=>{f.world.messages.push({type:0,text:"I can't reach that!"});f.world.messageSequence++;f.notify();};
+ await expect(f.bot.talkTo('Guide',1000)).rejects.toThrow("I can't reach that!");expect(f.listeners.size).toBe(0);
 });

@@ -178,3 +178,19 @@ Generic NPC options are available through `await sdk.sendNpcOption(npc, 'Net')` 
 
 
 Long-distance navigation is shared with the hosted client. `await sdk.planRoute(x, y, {tolerance: 2})` is read-only and available to observers; `await sdk.routeTo(x, y)` returns a conservative path with closed doors blocked. Controllers use `await bot.walkTo(x, y, {timeout: 180000, tolerance: 2})` (or `sdk.bot.walkTo` on a raw GatewaySDK). Numeric third-argument timeouts remain supported. Walking calls automatically allocate a matching RPC deadline up to ten minutes and cancel further legs on controller disconnect, takeover, command expiry or publisher link loss. A leg already accepted by the game may finish. This does not log out the game client. Same-floor routes include named door/gate interactions, observed progress and bounded replanning; stairs/ladders/teleports are explicit. See the main README for route budgets and semantics. Update the gateway and browser publisher together after any active gameplay run.
+
+
+### NPCs behind doors
+
+`await bot.talkTo(npcOrName, timeoutMs)` now approaches the NPC with the shared door-aware walker before sending Talk-to. It opens ordinary closed doors, preserves tutorial/locked-passage refusals, and surfaces fresh server messages such as “I can't reach that!” promptly. Its timeout covers approach and dialogue together. Moving targets are refreshed with bounded retries. Gateway cancellation stops subsequent approach legs; an already accepted movement leg may finish.
+
+Inspect an approach without moving, including from an observer:
+
+```ts
+const npc = await sdk.findNearbyNpc('Seth Groats');
+const plan = await sdk.planNpcInteraction(npc);
+console.log(plan?.path.at(-1), plan?.doors.map(d => d.object));
+await bot.talkTo(npc, 30000);
+```
+
+`planNpcInteraction` returns a `RoutePlan` or `null` when no route is found. It uses the NPC footprint and an unblocked final interaction boundary. `planRoute(x, y, {tolerance: 1})` is geometric tile proximity and can legitimately stop across a wall; it is not an NPC reachability test. Advanced tile queries can use `{interactionSize: 1}` for the same boundary check. `sendNpcOption` remains a raw dispatch and does not open doors. Refresh browser publishers and restart the gateway/MCP after the active run to activate these additions.

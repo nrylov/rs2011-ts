@@ -194,3 +194,10 @@ SDK game-tab packets now enter the regular client's native widget action handler
 Strict TypeScript, browser assets and all 194 tests passed (four optional tests skipped). The Kotlin/JS development bundle compiled successfully. In a separate diagnostic browser against a copied Void server on port 43599, a real gateway controller selected Stats, Inventory, Worn Equipment, Options, Emotes and Inventory again. Captured frames confirmed the visible Skills, Equipment and other panels changed. A diagnostic-only outgoing-queue counter confirmed exactly one interface-button packet per selection. That instrumentation was excluded from the installed bundle. The live check exercised the resizable layout; fixed-layout handling shares the native handler but was not visually tested.
 
 The rebuilt bundle is installed in the gitignored local runtime. Existing browser sessions need a reload to load it; no running game server, regular-client relay or gateway restart is required.
+
+
+## Door-aware NPC dialogue — 2026-10-21
+
+Talk-to now uses the shared route follower with an interaction-boundary goal, door opening, bounded moving-target refresh and a total approach/dialogue deadline. NPC approach plans are exposed read-only through `planNpcInteraction`, including gateway observers. Dialogue waits preserve fresh server refusals. Gateway controller disconnect, takeover and request expiry cancel subsequent approach walking legs.
+
+Regressions cover cardinal/diagonal wall boundaries, closed-room doors, large NPC footprints, stale target identity, tutorial refusal, message/listener cleanup, observer planning and disconnect during an approach. The full suite passed 202 tests with four optional tests skipped; strict TypeScript and browser assets passed. A real cache query exposed farmhouse Door 45476 where a one-tile tolerance query reported immediate arrival. On a copied Void server, a diagnostic character at (3226,3293) planned the closed door at (3224,3293), opened it, then spoke to Seth Groats and received “M'arnin'....going to milk me cowsies!” No live user character or service was modified or restarted.

@@ -10,7 +10,7 @@ export class GatewaySDK {
  private state:PublishedState|null=null;private online=false;private closed=false;private received=0;private age=Infinity;private serial=0;
  private calls=new Map<string,{resolve:(v:any)=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>();private listeners=new Set<()=>void>();private heartbeat:ReturnType<typeof setInterval>;
  constructor(private socket:WebSocket,readonly mode:Mode,private timeout:number){
-  this.bot=Object.fromEntries(botActions.map(name=>[name,(...args:unknown[])=>{const requested=typeof args[2]==='number'?args[2]:(args[2] as {timeout?:number}|undefined)?.timeout??120000;return this.call(`bot.${name}`,args,name==='walkTo'?Math.min(600000,Math.max(100,requested+5000)):this.timeout);}])) as RemoteBotActions;
+  this.bot=Object.fromEntries(botActions.map(name=>[name,(...args:unknown[])=>{const requested=typeof args[2]==='number'?args[2]:(args[2] as {timeout?:number}|undefined)?.timeout??120000;return this.call(`bot.${name}`,args,name==='walkTo'?Math.min(600000,Math.max(100,requested+5000)):name==='talkTo'?Math.min(600000,Math.max(100,(typeof args[1]==='number'?args[1]:20000)+5000)):this.timeout);}])) as RemoteBotActions;
   this.query=Object.fromEntries(queryMethods.map(name=>[name,(...args:unknown[])=>this.call(`sdk.${name}`,args)])) as RemoteQueries;
   this.send=Object.fromEntries(sdkActions.map(name=>[name,(...args:unknown[])=>this.call(`sdk.${name}`,args)])) as RemoteSends;
   this.heartbeat=setInterval(()=>{if(socket.readyState===WebSocket.OPEN)socket.send(JSON.stringify({type:'ping'}));},20000);
@@ -35,6 +35,7 @@ export class GatewaySDK {
   return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.calls.delete(id);reject(new Error('Gateway request timed out; the game action may still be running'));},timeout+1000);this.calls.set(id,{resolve,reject,timer});try{this.socket.send(body);}catch(e){clearTimeout(timer);this.calls.delete(id);reject(e);}});
  }
  planRoute(...args:Parameters<BotSDK['planRoute']>){return this.query.planRoute(...args);}
+ planNpcInteraction(...args:Parameters<BotSDK['planNpcInteraction']>){return this.query.planNpcInteraction(...args);}
  routeTo(...args:Parameters<BotSDK['routeTo']>){return this.query.routeTo(...args);}
  findInventoryItem(...args:Parameters<BotSDK['findInventoryItem']>){return this.query.findInventoryItem(...args);}
  nearbyObjects(...args:Parameters<BotSDK['nearbyObjects']>){return this.query.nearbyObjects(...args);}

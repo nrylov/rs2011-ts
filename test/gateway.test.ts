@@ -182,3 +182,28 @@ test('remote dialogue waiting filters instructions, respects prior tokens and su
   const pending=remote.waitForDialog({timeout:1000});remote.close();await expect(pending).rejects.toThrow('No playing');
  }finally{remote?.close();await t.close();}
 });
+
+test('observer NPC approach plans include closed doors without sending game actions',async()=>{
+ const t=await setup();let observer;
+ try{
+  const p=t.s.world.player!;const target={index:999,type:945,x:p.x+1,y:p.y,level:p.level};t.s.world.npcs.set(target.index,target);
+  t.sdk.npcDefinition=async(id)=>({id,name:'Room guide',size:1,combat:0,options:['Talk-to']});
+  const gate={id:10,name:'Door',width:1,height:1,solid:2,shape:0,rotation:2,options:['Open'],x:p.x,y:p.y,level:p.level};
+  const region=t.sdk.data.region;t.sdk.data.region=async(x,y)=>{const r=await region(x,y);if(!r)return r;const flags=Array(16384).fill(1);for(let dx=0;dx<64;dx++)flags[(p.level*64+dx)*64+(p.y&63)]=0;return {...r,terrain:{...r.terrain,flags},objects:(p.x>>>6)===x&&(p.y>>>6)===y?[gate]:[]};};
+  observer=await connectGateway(options(t.gateway.url,'observe'));const count=t.peer.received.length;
+  const plan=await observer.planNpcInteraction(target);expect(plan?.doors[0].object.name).toBe('Door');expect(plan?.interactionSize).toBe(1);expect(t.peer.received.length).toBe(count);
+ }finally{observer?.close();await t.close();}
+});
+
+test('controller disconnect cancels the walk inside talkTo without sending the NPC interaction',async()=>{
+ const t=await setup();let remote;
+ try{
+  remote=await connectGateway(options(t.gateway.url));const p=t.s.world.player!;const target={index:999,type:945,x:p.x+30,y:p.y,level:p.level};t.s.world.npcs.set(target.index,target);
+  t.sdk.npcDefinition=async(id)=>({id,name:'Room guide',size:1,combat:0,options:['Talk-to']});
+  const pending=remote.bot.talkTo(target,10000).catch(e=>e);const until=Date.now()+2000;
+  while(!t.peer.received.some(p=>p.opcode===35)&&Date.now()<until)await Bun.sleep(5);
+  expect(t.peer.received.some(p=>p.opcode===35)).toBe(true);remote.close();await pending;await Bun.sleep(350);
+  const count=t.peer.received.filter(p=>p.opcode===35).length;await Bun.sleep(250);expect(t.peer.received.filter(p=>p.opcode===35)).toHaveLength(count);
+  expect(t.peer.received.some(p=>[63,29,5,62,65].includes(p.opcode))).toBe(false);expect(t.s.status).toBe('playing');
+ }finally{remote?.close();await t.close();}
+});

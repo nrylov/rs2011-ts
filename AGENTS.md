@@ -61,3 +61,5 @@ Record outcomes and next steps in the character's `lab_log.md`.
 For long travel use `await bot.walkTo(x, y, {timeout: 180000, tolerance: 2})`; do not manually break same-floor travel into arbitrary local waypoints. `sdk.planRoute(x, y)` inspects the route and its doors without moving. Automatic door handling obeys tutorial/quest refusals. Stairs, ladders and other floor/transit changes are still explicit actions. Use an MCP execution timeout longer than the requested walk. Cancellation stops subsequent walking legs, while a leg already accepted by the game may finish.
 
 See `mcp/README.md`, the main README, `docs/production.md` and `docs/gateway.md` for current APIs and limitations.
+
+For NPCs in enclosed rooms, use `await sdk.planNpcInteraction(npcOrName)` to inspect approach tiles and required doors without moving. `await bot.talkTo(npcOrName, 30000)` performs that approach and surfaces fresh server refusals. Geometric arrival tolerance does not prove interaction reachability across a wall.

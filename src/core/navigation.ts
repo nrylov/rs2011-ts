@@ -9,11 +9,14 @@ import {plainText} from './dialogue.ts';
 
 export interface RouteOptions {
  tolerance?:number;openDoors?:boolean;level?:number;maxVisited?:number;maxRegions?:number;
+ /** Approach a square target footprint through an unblocked interaction edge. */
+ interactionSize?:number;
 }
 export interface WalkOptions extends RouteOptions {timeout?:number;}
 export interface DoorStep {index:number;object:MapObject;from:Point;to:Point;}
 export interface RoutePlan {
  path:Point[];doors:DoorStep[];level:number;destination:Point;tolerance:number;visited:number;regions:number;
+ interactionSize?:number;
 }
 const tile=(x:number,y:number)=>x*16384+y;
 const point=(id:number):Point=>({x:Math.floor(id/16384),y:id%16384});
@@ -35,7 +38,7 @@ class Heap {
  pop(){const a=this.nodes;if(!a.length)return;const first=a[0],last=a.pop()!;if(a.length){let i=0;while(i*2+1<a.length){let c=i*2+1;if(c+1<a.length&&this.before(a[c+1],a[c]))c++;if(!this.before(a[c],last))break;a[i]=a[c];i=c;}a[i]=last;}return first;}
 }
 function integer(value:number,name:string,min:number,max:number){if(!Number.isInteger(value)||value<min||value>max)throw new Error(`${name} must be an integer from ${min} to ${max}`);return value;}
-function limits(options:RouteOptions){if(!options||typeof options!=='object'||Array.isArray(options))throw new Error('Pass a routing options object');if(options.openDoors!==undefined&&typeof options.openDoors!=='boolean')throw new Error('openDoors must be boolean');return {tolerance:integer(options.tolerance??0,'Tolerance',0,10),maxVisited:integer(options.maxVisited??100000,'Search budget',100,250000),maxRegions:integer(options.maxRegions??128,'Region budget',1,256)};}
+function limits(options:RouteOptions){if(!options||typeof options!=='object'||Array.isArray(options))throw new Error('Pass a routing options object');if(options.openDoors!==undefined&&typeof options.openDoors!=='boolean')throw new Error('openDoors must be boolean');if(options.interactionSize!==undefined){integer(options.interactionSize,'Interaction size',1,64);if(options.tolerance)throw new Error('Interaction approaches cannot use arrival tolerance');}return {tolerance:integer(options.tolerance??0,'Tolerance',0,10),maxVisited:integer(options.maxVisited??100000,'Search budget',100,250000),maxRegions:integer(options.maxRegions??128,'Region budget',1,256)};}
 /** Route over revision-634 cache terrain; only door crossings are treated as executable transitions. */
 export class NavigationService {
  private walkGuard?:()=>void;
@@ -67,14 +70,28 @@ export class NavigationService {
   // Adjacent chunks contribute walls and object footprints that cross region boundaries.
   const ensure=async(p:Point)=>{const rx=p.x>>>6,ry=p.y>>>6,key=`${rx}:${ry}`;if(neighbourhoods.has(key))return;const jobs:Promise<void>[]=[];for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)jobs.push(Promise.resolve().then(()=>load(rx+dx,ry+dy)));await Promise.all(jobs);neighbourhoods.add(key);};
   const crossing=(a:Point,b:Point)=>[...(wallDoors.get(edge(a,b))??[]),...areaDoors.filter(o=>!inside(a,o)&&inside(b,o))];
-  const heuristic=(p:Point)=>{const dx=Math.max(0,Math.abs(x-p.x)-tolerance),dy=Math.max(0,Math.abs(y-p.y)-tolerance);return 10*Math.max(dx,dy);};
+  const crossesDoor=(a:Point,b:Point)=>crossing(a,b).length>0||(a.x!==b.x&&a.y!==b.y&&[crossing(a,{x:b.x,y:a.y}),crossing(a,{x:a.x,y:b.y}),crossing({x:b.x,y:a.y},b),crossing({x:a.x,y:b.y},b)].some(v=>v.length));
+  const size=options.interactionSize;
+  const reached=(p:Point)=>{
+   if(size===undefined)return distance(p,target)<=tolerance;
+   if(p.x>=x&&p.x<x+size&&p.y>=y&&p.y<y+size)return true;
+   // Geometric adjacency alone is insufficient: a wall or closed door can lie
+   // between the player and the NPC, including either side of a diagonal.
+   for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){
+    const q={x:p.x+dx,y:p.y+dy};
+    if(q.x>=x&&q.x<x+size&&q.y>=y&&q.y<y+size&&collision.canStep(p,q)&&!crossesDoor(p,q))return true;
+   }
+   return false;
+  };
+  const heuristic=(p:Point)=>{const dx=size===undefined?Math.max(0,Math.abs(x-p.x)-tolerance):Math.max(0,x-p.x-1,p.x-(x+size)),dy=size===undefined?Math.max(0,Math.abs(y-p.y)-tolerance):Math.max(0,y-p.y-1,p.y-(y+size));return 10*Math.max(dx,dy);};
   const open=new Heap(),scores=new Map<number,number>(),parents=new Map<number,number>(),startId=tile(start.x,start.y);scores.set(startId,0);open.push({id:startId,g:0,h:heuristic(start),tie:Math.abs(x-start.x)+Math.abs(y-start.y)});
   let visited=0,node:Node|undefined;
   while((node=open.pop())){
    if(scores.get(node.id)!==node.g)continue;check();const p=point(node.id);
-   if(distance(p,target)<=tolerance){const path:Point[]=[];let id=node.id;while(true){path.push(point(id));if(id===startId)break;id=parents.get(id)!;}path.reverse();const doors:DoorStep[]=[];
+   if(size!==undefined)await ensure(p);
+   if(reached(p)){const path:Point[]=[];let id=node.id;while(true){path.push(point(id));if(id===startId)break;id=parents.get(id)!;}path.reverse();const doors:DoorStep[]=[];
     for(let i=1;i<path.length;i++)for(const object of crossing(path[i-1],path[i]))doors.push({index:i,object,from:path[i-1],to:path[i]});
-    return {path,doors,level,destination:target,tolerance,visited,regions:loaded.size};
+    return {path,doors,level,destination:target,tolerance,visited,regions:loaded.size,...(size===undefined?{}:{interactionSize:size})};
    }
    if(++visited>maxVisited)throw new Error(`Route exceeded its ${maxVisited}-tile search budget`);
    if(visited%512===0)await new Promise(resolve=>setTimeout(resolve,0));
@@ -108,8 +125,9 @@ export class NavigationService {
   const refusal=(sequence:number)=>{const w=this.sdk.getState();for(const m of w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length))){if(w.messageSequence<=sequence)break;if(![0,4,109].includes(m.type))continue;const text=plainText(m.text);if(/^(?:You (?:can't|cannot|don't|do not|need|must|should)|I (?:can't|cannot) reach|This (?:door|gate)|The (?:door|gate).*locked)/i.test(text))return text;}return null;};
   if(!this.sdk.getState().playerUpdateAt)await this.sdk.session.waitFor(w=>w.playerUpdateAt>0,Math.max(1,Math.min(5000,end-Date.now())));
   check();if(!this.healthVarbit&&this.sdk.getState().skills.has(3)&&typeof this.sdk.data.varbit==='function')this.healthVarbit=await bounded(Promise.resolve(this.sdk.data.varbit(7198)));
-  while(true){check();const p=this.sdk.getState().player!;if(distance(p,{x,y})<=(options.tolerance??0))return {x:p.x,y:p.y,level,arrived:true as const,steps,doorsOpened};
+  while(true){check();const p=this.sdk.getState().player!;if(options.interactionSize===undefined&&distance(p,{x,y})<=(options.tolerance??0))return {x:p.x,y:p.y,level,arrived:true as const,steps,doorsOpened};
    const plan=await bounded(this.plan(x,y,options,check));check();if(!plan)throw new Error(lastProblem?`No route after ${lastProblem}`:'No walking route through known terrain; a locked passage, missing region or floor transition may block the destination');
+   if(plan.path.length===1)return {x:p.x,y:p.y,level,arrived:true as const,steps,doorsOpened};
    let restart=false;
    for(let at=0;at<plan.path.length-1;){check();const current=this.sdk.getState().player!;
     if(current.x!==plan.path[at].x||current.y!==plan.path[at].y){restart=true;break;}
