@@ -36,9 +36,17 @@ test('drop waits for inventory evidence instead of treating dispatch as completi
 });
 test('game tab discovery respects hidden ancestors and dispatches the current cache component',async()=>{
  const {s,sent,sdk}=setup();try{
-  s.world.windowId=548;const components=[{id:10,parent:-1,hidden:false,options:[]},{id:132,parent:10,hidden:false,options:['Inventory']},{id:102,parent:10,hidden:false,options:['Options']}].map(c=>({...c,type:0,text:'',setting:1}));sdk.data.interface=()=>components;
+  sdk.getDialog=async()=>null;s.world.windowId=548;const components=[{id:10,parent:-1,hidden:false,options:[]},{id:132,parent:10,hidden:false,options:['Inventory']},{id:102,parent:10,hidden:false,options:['Options']}].map(c=>({...c,type:0,text:'',setting:1}));sdk.data.interface=()=>components;
   s.world.hidden.set((548<<16)|132,true);expect((await sdk.getGameTabs()).map(t=>t.label)).toEqual(['Options']);await expect(sdk.selectGameTab('Inventory')).rejects.toThrow('not currently available');await sdk.selectGameTab('Options');expect(sent.at(-1)?.op).toBe(23);expect(new Reader(sent.at(-1)!.body).i32()).toBe((548<<16)|102);
   s.world.hidden.set((548<<16)|10,true);expect(await sdk.getGameTabs()).toEqual([]);
  }finally{s.close();}
 });
 test('new action timeouts are validated before dispatch',async()=>{const {s,sent,sdk}=setup(),bot=new BotActions(sdk);try{const [source,target]=sdk.getInventory();await expect(bot.useItemOnItem(source,target,NaN)).rejects.toThrow('positive');await expect(bot.dropItem(target,0)).rejects.toThrow('positive');expect(sent).toEqual([]);}finally{s.close();}});
+
+test('empty tutorial tabs explain the current instruction rather than suggesting a modal or unknown ID',async()=>{
+ const {s,sent,sdk}=setup();try{ s.world.windowId=548;sdk.data.interface=()=>[];
+  sdk.getDialog=async()=>({kind:'instruction',lines:['Getting started','Talk to the RuneScape Guide.']}) as never;
+  expect((await sdk.getGameTabStatus()).reason).toContain('Talk to the RuneScape Guide');await expect(sdk.selectGameTab('Inventory')).rejects.toThrow('Tutorial tabs are locked');expect(sent.length).toBe(0);
+  s.world.windowId=1028;expect((await sdk.getGameTabStatus()).reason).toContain('window 1028');
+ }finally{s.close();}
+});

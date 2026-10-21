@@ -125,9 +125,10 @@ export class Controls {
   }));
  }
  private async renderInterfaces(revision:number){
-  const tabs=await this.sdk.getGameTabs();if(revision!==this.renderRevision)return;
+  const status=await this.sdk.getGameTabStatus(),tabs=status.tabs;if(revision!==this.renderRevision)return;
   (get('open-inventory') as HTMLButtonElement).disabled=!tabs.some(t=>t.label==='Inventory');
   get('game-tabs').replaceChildren(...tabs.map(tab=>{const b=el('button',tab.label);b.onclick=()=>{void this.sdk.selectGameTab(tab.label).then(()=>this.report(`${tab.label} tab selected.`)).catch(e=>this.report(String(e)));};return b;}));
+  if(status.reason){const message=el('p',status.reason);message.className='sync-status';get('game-tabs').append(message);}
   const controls:HTMLElement[]=[];
   if(this.sdk.isOpen(1028)){
    controls.push(el('h2','Create character'),el('p','Choose your character and use its current appearance. The full client offers an appearance preview.'));

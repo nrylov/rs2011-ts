@@ -145,3 +145,8 @@ An isolated tutorial character progressed normally through Guide dialogue, the O
 The developer console executes local, explicitly entered JavaScript against the connected SDK/actions, supports awaited expressions and multiline returns, captures logs/results/errors, and serializes runs. Tests cover expression and statement execution, awaited SDK/bot calls, syntax/runtime errors, disconnected/empty/overlapping commands, and map/set/bigint/circular-value formatting. Console output uses `textContent`, not HTML. The implementation was checked against rs-sdk's item-use/drop guards and evidence-based firemaking helper; revision-634 packet layouts remain source-specific.
 
 Final validation including the console: **63 tests passed**, two opt-in live tests skipped, TypeScript checks and browser build passed with the prepared cache enabled.
+
+
+## Empty tab diagnostics — 2026-10-20
+
+A stage-zero tutorial session legitimately has no visible tabs. `getGameTabStatus()` now distinguishes the current window, visible tabs and tutorial instruction; failed tab selections include that context. The lightweight Game tabs panel displays the explanation rather than an empty area, and the command console offers a tab-status example. The SDK still uses revision-634 cache action components and server visibility updates. Regression coverage verifies stage-zero instructions, unsupported windows and no dispatch when a tab is unavailable. Prepared-cache suite: 64 passed, two opt-in live tests skipped; TypeScript and browser build passed.

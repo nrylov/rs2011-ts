@@ -34,7 +34,18 @@ export class BotSDK {
   const components=await this.data.interface(w.windowId),labels=new Set(['Combat Styles','Task System','Stats','Quest Journals','Inventory','Worn Equipment','Prayer List','Magic Spellbook','Friends List','Ignore List','Clan Chat','Options','Emotes','Music Player','Notes']);
   return components.flatMap(c=>{const option=c.options.findIndex(o=>labels.has(o));if(option<0)return [];let current:Component|undefined=c;const seen=new Set<number>();while(current){if(seen.has(current.id))return [];seen.add(current.id);if(w.hidden.get((w.windowId<<16)|current.id)??current.hidden)return [];current=components.find(p=>p.id===current!.parent);}return [{interfaceId:w.windowId,component:c.id,option,label:c.options[option]}];});
  }
- async selectGameTab(label:string){const tab=(await this.getGameTabs()).find(t=>match(t.label,label));if(!tab)throw new Error('That game tab is not currently available');this.session.clickInterface(tab.interfaceId,tab.component,tab.option);}
+ async getGameTabStatus(){
+  const windowId=this.getState().windowId,tabs=await this.getGameTabs(),dialog=await this.getDialog();
+  const instruction=dialog?.kind==='instruction'?dialog.lines:[];
+  const reason=![548,746].includes(windowId)?`Game tabs are unavailable in window ${windowId}.`:!tabs.length&&instruction.length?`Tutorial tabs are locked. ${instruction.join(' ')}`:!tabs.length?'No game tabs are currently visible.':null;
+  return {windowId,tabs,reason,instruction};
+ }
+ async selectGameTab(label:string){
+  const status=await this.getGameTabStatus(),tab=status.tabs.find(t=>match(t.label,label));
+  if(!tab)throw new Error(status.reason??`${label} tab is not currently available.${status.instruction.length?' Follow the current tutorial instruction: '+status.instruction.join(' '):' Available tabs: '+status.tabs.map(t=>t.label).join(', ')}`);
+  if(this.getState().windowId!==tab.interfaceId)throw new Error('Game window changed; query the current tabs again');
+  this.session.clickInterface(tab.interfaceId,tab.component,tab.option);
+ }
  sendDropItem(item:Item|number){this.sendItemOption(this.inventoryItem(item),7);}
  inventoryActionError(){
   if(this.isOpen(762)||this.isOpen(11))return 'Close the bank or deposit box before using inventory items.';

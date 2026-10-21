@@ -1,5 +1,6 @@
 import {CommandRunner,formatCommandValue,type CommandContext} from './command-runtime.ts';
 const examples:[string,string][]=[
+ ['Inspect tab availability','await sdk.getGameTabStatus()'],
  ['List available tabs','await sdk.getGameTabs()'],
  ['Open Inventory tab',"await sdk.selectGameTab('Inventory')"],
  ['Open Stats tab',"await sdk.selectGameTab('Stats')"],
