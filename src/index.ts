@@ -11,3 +11,7 @@ export {CollisionMap,type Point} from './core/routing.ts';
 export type {ItemType,NpcType,Component} from './cache/definitions.ts';
 
 export type {Dialog,DialogButton,DialogPattern,DialogWaitOptions} from './core/dialogue.ts';
+
+export {connectGateway,runGatewayScript,listGatewayBots,GatewaySDK,type GatewayConnectionOptions,type RemoteBotActions} from './gateway/remote.ts';
+export {attachGatewayClient} from './gateway/endpoint.ts';
+export type {GatewayConfig,WorldSnapshot,PublishedState} from './gateway/protocol.ts';

@@ -12,7 +12,10 @@
     "check": "bun run typecheck && bun test && bun run build",
     "example:woodcut-bank": "bun examples/woodcut-bank.ts",
     "example:dialogue": "bun examples/npc-dialogue.ts",
-    "build:login-sync": "bun scripts/build-void-login-sync.ts"
+    "build:login-sync": "bun scripts/build-void-login-sync.ts",
+    "gateway": "bun src/gateway/main.ts",
+    "client:gateway": "bun src/gateway/runner.ts",
+    "gateway:cli": "bun src/gateway/cli.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.3.0",

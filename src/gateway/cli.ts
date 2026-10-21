@@ -1,0 +1,4 @@
+import {connectGateway,listGatewayBots} from './remote.ts';
+const url=process.env.GATEWAY_URL??'ws://127.0.0.1:7780/gateway',command=process.argv[2]??'status';
+if(command==='list'){if(!process.env.GATEWAY_MONITOR_TOKEN)throw new Error('Set GATEWAY_MONITOR_TOKEN');console.log(JSON.stringify(await listGatewayBots(url,process.env.GATEWAY_MONITOR_TOKEN),null,2));}
+else{const name=process.env.BOT_NAME,token=process.env.GATEWAY_TOKEN;if(!name||!token)throw new Error('Set BOT_NAME and GATEWAY_TOKEN (observer token)');const sdk=await connectGateway({url,name,token,mode:'observe'});try{const value=command==='inventory'?sdk.getInventory():command==='dialog'?await sdk.getDialog():{online:sdk.isClientOnline(),stateAgeMs:sdk.getStateAge(),state:sdk.getState()};console.log(JSON.stringify(value,null,2));}finally{sdk.close();}}

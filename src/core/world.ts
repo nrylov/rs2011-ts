@@ -284,7 +284,7 @@ export class World {
     return { name: this.name, index: this.index, tick: this.tick, player: this.player,
       region: this.region, runEnergy: this.runEnergy, players: [...this.players.values()], npcs: [...this.npcs.values()],
       containers: Object.fromEntries(this.containers), containerSync:Object.fromEntries(this.containerSync), skills: [...this.skills.values()],
-      interfaceTexts: Object.fromEntries(this.texts), interfaces: Object.fromEntries(this.interfaces),
+      windowId:this.windowId,hidden:Object.fromEntries(this.hidden),varps:Object.fromEntries(this.varps),varbits:Object.fromEntries(this.varbits),interfaceTexts: Object.fromEntries(this.texts), interfaces: Object.fromEntries(this.interfaces),
       messages: this.messages, groundItems:[...this.groundItems.values()], objectChanges:[...this.objectChanges.values()], packets: this.packets, unhandled: this.unhandled, visualBlocksSkipped: this.visualBlocksSkipped };
   }
 }

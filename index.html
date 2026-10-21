@@ -19,6 +19,7 @@
     </section>
     <aside>
       <section><h2>Character</h2><form id="login"><label>Username<input name="username" autocomplete="username" maxlength="12" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button id="connect">Connect</button></form><button id="disconnect" hidden>Disconnect</button><p id="error" role="alert"></p><p id="target" class="muted"></p></section>
+      <details class="gateway-panel"><summary>Publish this client to a gateway</summary><p>Attach agents to this session using gateway role tokens.</p><form id="gateway-form"><label>Gateway URL<input id="gateway-url" type="url" required></label><label>Client token<input id="gateway-token" type="password" autocomplete="off" required></label><button id="gateway-attach" disabled>Attach gateway</button></form><button id="gateway-detach" type="button" hidden>Detach gateway</button><p id="gateway-status" role="status">Gateway detached.</p></details>
       <section><h2>Game tabs</h2><div id="game-tabs" class="game-tabs"></div></section>
 <section><h2>Nearby objects</h2><label for="object-filter">Filter objects</label><input id="object-filter" type="search" placeholder="Door, tree, ladder…"><div id="nearby-objects" class="nearby-npcs">Connect to see nearby objects.</div></section>
       <section><h2>Nearby NPCs</h2><div id="nearby-npcs" class="nearby-npcs">Connect to see nearby characters.</div></section>

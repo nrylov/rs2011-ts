@@ -1,3 +1,4 @@
+import {GatewayControls} from './gateway-controls.ts';
 import {DeveloperConsole} from './developer-console.ts';
 import {BotSDK,BotActions,plainText} from '../core/sdk.ts';
 import {browserData} from './data.ts';
@@ -10,6 +11,7 @@ const canvas = get<HTMLCanvasElement>('map');
 const form = get<HTMLFormElement>('login');
 let session: Session | undefined, ws: WebSocket | undefined, controls:Controls|undefined;
 const data=browserData();
+const gatewayControls=new GatewayControls(()=>controls&&session?.status==='playing'?{sdk:controls.sdk,bot:controls.bot}:null);
 const developerConsole=new DeveloperConsole(()=>controls&&session?.status==='playing'?{sdk:controls.sdk,bot:controls.bot}:null);
 
 const SKILLS = ['Attack','Defence','Strength','Constitution','Ranged','Prayer','Magic','Cooking','Woodcutting','Fletching','Fishing','Firemaking','Crafting','Smithing','Mining','Herblore','Agility','Thieving','Slayer','Farming','Runecrafting','Hunter','Construction','Summoning','Dungeoneering'];
@@ -27,7 +29,7 @@ get('map-zoom-out').onclick=()=>map.zoom(.8);
 get<HTMLInputElement>('map-grid').onchange=e=>{map.grid=(e.target as HTMLInputElement).checked;map.draw(session?.world);};
 get<HTMLSelectElement>('map-floor').onchange=e=>{const value=(e.target as HTMLSelectElement).value;map.floor=value==='auto'?null:Number(value);map.draw(session?.world);};
 function render() {
-  developerConsole.render();
+  developerConsole.render();gatewayControls.render();
   const w = session?.world;
   get('status').textContent = session ? ({handshake:'Connecting…',login:'Logging in…',playing:'Connected',closed:'Disconnected',error:'Connection failed'}[session.status]) : 'Disconnected';
   get('error').textContent = session?.error ?? '';

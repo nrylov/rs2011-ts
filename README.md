@@ -183,3 +183,10 @@ The optional [Void compatibility overlay](compat/void/README.md) also supports a
 
 
 Firemaking on path tiles uses the optional Void fire-placement fix described in the compatibility guide. The original server rejected nonblocking floor decorations as though they were solid objects. The fix retains existing-fire and doorway restrictions. The lightweight client's tinderbox/log combination now uses the firemaking helper so it waits for XP, and displays server refusal messages beside the inventory. Generic item use no longer treats a tutorial-instruction redraw as successful recipe progress. Inventory buttons stay mounted through unrelated world updates, avoiding clicks being lost while entities update.
+
+
+## Gateway: hosted clients, local agents
+
+A dedicated gateway now supports persistent remote clients with local SDK controllers and read-only observers. Start `bun run gateway`, run each bot with `bun run client:gateway`, and connect locally with `connectGateway` or `runGatewayScript`. Game passwords and cache stay on the game-client host. Browser clients can publish from the **Publish this client to a gateway** panel. The authenticated fleet listing provides status/positions for dashboard work.
+
+See [remote setup, role tokens, API differences and remaining rs-sdk parity](docs/gateway.md). Generate private per-role credentials with `bun scripts/create-gateway-config.ts botname`; the gateway binds to loopback by default. [examples/remote-bot.ts](examples/remote-bot.ts) demonstrates local scripts attached to a hosted session.
