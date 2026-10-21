@@ -111,7 +111,7 @@ export class World {
       }
       case 90: {const item=r.le16(),packed=r.inverse32()>>>0,amount=r.i32()>>>0;this.interfaceItems.set(packed,{id:item===65535?-1:item,amount});this.interfaceVersions.set(packed>>>16,++this.uiRevision);break;}
       case 10: { const id = r.le32() >>> 0; this.texts.set(id, r.text());this.interfaceVersions.set(id>>>16,++this.uiRevision); break; }
-      case 102: { r.neg8();this.windowId=r.add16();this.interfaces.clear();this.interfaceMounts.clear();this.uiRevision++;this.interfaceRevision++;break; }
+      case 102: { const mode=r.neg8();this.windowId=r.add16();if(mode===2){this.interfaces.clear();this.interfaceMounts.clear();}this.uiRevision++;this.interfaceRevision++;break; }
       case 108: { const hide=!!r.add8();const packed=r.le32()>>>0;this.hidden.set(packed,hide);this.interfaceVersions.set(packed>>>16,++this.uiRevision);break; }
       case 8: {
         const types=r.text(),args:(number|string)[]=Array(types.length);

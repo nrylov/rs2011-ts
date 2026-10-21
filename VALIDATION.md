@@ -215,3 +215,10 @@ Validation: strict TypeScript, browser assets and 203 tests passed (four optiona
 ## Shared quest-completion message formatting — 2026-10-21
 
 The shared game-message entry point normalizes quest completion chat before encoding: it resolves canonical names through QuestDefinitions, retains markup and appends one full stop. Six existing quest handlers use the recognized completion prefix. JVM checks passed for Cook's Assistant, Tears of Guthix, Jungle Potion, The Blood Pact, Imp Catcher and Rune Mysteries, including apostrophes, colour tags, repeated normalization, canonical name lookup, unrelated messages and unchanged public chat. The overlay builder and its ASM entry-point patch compiled against the release server; bytecode inspection confirmed normalization precedes encoding. A merged pending overlay retains all pre-existing patch entries and the identical script registry. It is staged for the next stopped-server deployment; the current game was not restarted or patched in place.
+
+### Interface layout refresh and named open checks
+
+- Corrected top-level interface handling to match the native revision-634 decoder: mode 0 refreshes preserve child mounts; explicit mode 2 resets clear them. Explicit child closes still remove mounts.
+- Added validated interface names for `isOpen`, including Inventory and bank, in both local and gateway SDKs.
+- Full TypeScript check: 206 passed, 4 skipped; typecheck and browser build passed.
+- On a copied game server, switched fixed → resizable → fullscreen → fixed → resizable through Graphics Options, checking root IDs, Inventory availability and tab selection at each step. The active game server/client were not restarted.

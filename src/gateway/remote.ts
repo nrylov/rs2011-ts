@@ -1,3 +1,4 @@
+import{interfaceId}from'../core/interface-names.ts';
 import type {BotSDK,BotActions,Dialog,DialogWaitOptions} from '../core/sdk.ts';
 import {botKey,deadline,encode,botActions,queryMethods,sdkActions,type Mode,type PublishedState,type WorldSnapshot} from './protocol.ts';
 export interface GatewayConnectionOptions {url:string;name:string;token:string;mode?:Mode;takeover?:boolean;timeout?:number;label?:string;}
@@ -22,7 +23,7 @@ export class GatewaySDK {
  getState(){return this.state?.world??null;}
  getStateAge(){return this.age+Date.now()-this.received;}
  isClientOnline(){return this.online&&!this.closed&&this.state?.status==='playing';}
- isOpen(id:number){const w=this.getState();return !!w&&(w.windowId===id||Object.values(w.interfaces).includes(id));}
+ isOpen(value:number|string){const id=interfaceId(value);const w=this.getState();return !!w&&(w.windowId===id||Object.values(w.interfaces).includes(id));}
  getInventory(){return this.getState()?.containers['93:0']??[];}
  getEquipment(){return this.getState()?.containers['94:0']??[];}
  getBank(){return this.getState()?.containers['95:0']??[];}

@@ -16,9 +16,9 @@ test('cache menus retain empty slots and suppress hidden actions',()=>{
  const n=decodeNpc(1,new Writer().u8(2).text('Banker').u8(32).text('Bank').u8(0).finish());expect(n.options).toEqual([null,null,'Bank',null,null]);
  const i=decodeItem(1,new Writer().u8(36).text('Wield').u8(0).finish());expect(i.options).toEqual([null,'Wield',null,null,'Drop']);
 });
-test('window changes discard old mounts; dialogue scripts and visibility are decoded',()=>{
+test('explicit window reset discards old mounts; dialogue scripts and visibility are decoded',()=>{
  const w=new World();w.apply(37,new Writer().le16(762).le32(42).add8(0).finish());expect(w.interfaces.get(42)).toBe(762);
- w.apply(102,new Writer().neg8(0).add16(548).finish());expect(w.windowId).toBe(548);expect(w.interfaces.size).toBe(0);
+ w.apply(102,new Writer().neg8(2).add16(548).finish());expect(w.windowId).toBe(548);expect(w.interfaces.size).toBe(0);
  w.apply(8,new Writer().text('is').text('Amount?').i32(7).i32(108).finish());expect(w.scripts[0]).toEqual({id:108,args:[7,'Amount?']});
  w.apply(108,new Writer().add8(1).le32(123).finish());expect(w.hidden.get(123)).toBe(true);
 });

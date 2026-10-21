@@ -1,3 +1,4 @@
+import{interfaceId}from'./interface-names.ts';
 import {NavigationService,type RouteOptions,type WalkOptions} from './navigation.ts';
 export type {RouteOptions,WalkOptions,RoutePlan,DoorStep} from './navigation.ts';
 import {SpellService,type SpellTarget} from './spells.ts';
@@ -61,7 +62,7 @@ export class BotSDK {
  getEquipment(){return this.getState().containers.get('94:0')??[];}
  getBank(){return this.getState().containers.get('95:0')??[];}
  count(id:number,container='93:0'){return (this.getState().containers.get(container)??[]).reduce((n,i)=>n+(i.id===id?i.amount:0),0);}
- isOpen(id:number){return this.getState().windowId===id||[...this.getState().interfaces.values()].includes(id);}
+ isOpen(value:number|string){const id=interfaceId(value);return this.getState().windowId===id||[...this.getState().interfaces.values()].includes(id);}
  async getGameTabs(){
   const w=this.getState();if(![548,746].includes(w.windowId))return [];
   const components=await this.data.interface(w.windowId),labels=new Set(['Combat Styles','Task System','Stats','Quest Journals','Inventory','Worn Equipment','Prayer List','Magic Spellbook','Friends List','Ignore List','Clan Chat','Options','Emotes','Music Player','Notes']);
