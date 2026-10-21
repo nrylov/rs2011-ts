@@ -2,7 +2,7 @@ import {timingSafeEqual} from 'node:crypto';
 import {botKey,deadline,decode,methods,type GatewayConfig,type PublishedState,type Mode} from './protocol.ts';
 interface Peer {socket:Bun.ServerWebSocket<Peer>;role?:'client'|'agent';bot?:string;mode?:Mode;seen:number;authTimer?:ReturnType<typeof setTimeout>;}
 interface Bot {client?:Peer;controller?:Peer;agents:Set<Peer>;state?:PublishedState;updatedAt:number;awaitingState?:boolean;busy?:string;}
-interface Pending {bot:string;peer:Peer;id:string;mutation:boolean;expired:boolean;timer:ReturnType<typeof setTimeout>;}
+interface Pending {bot:string;peer:Peer;id:string;method:string;mutation:boolean;expired:boolean;timer:ReturnType<typeof setTimeout>;}
 const equal=(a:unknown,b:string)=>typeof a==='string'&&Buffer.byteLength(a)===Buffer.byteLength(b)&&timingSafeEqual(Buffer.from(a),Buffer.from(b));
 export function validateConfig(input:GatewayConfig){
  const bots:GatewayConfig['bots']=Object.create(null);if(!input?.bots||!Object.keys(input.bots).length)throw new Error('Configure at least one bot');
@@ -38,10 +38,10 @@ export function startGateway(options:{config:GatewayConfig;port?:number;hostname
     if(m.type!=='call')throw new Error('Invalid agent message');if(typeof m.id!=='string'||m.id.length>80)throw new Error('Invalid request id');
     try{
      if([...pending.values()].some(j=>j.peer===p&&j.id===m.id))throw new Error('Duplicate request id');const mutation=methods.get(m.method);if(mutation===undefined)throw new Error('Unsupported gateway method');if(mutation&&(p.mode!=='control'||b.controller!==p))throw new Error('Observer connections cannot control the game');if(!b.client||b.awaitingState||b.state?.status!=='playing')throw new Error('No playing game client is attached');if(Date.now()-b.updatedAt>15000)throw new Error('Game client state is stale');if(mutation&&b.busy)throw new Error('A game action is still running; wait for it to finish');if([...pending.values()].filter(j=>j.peer===p).length>=16)throw new Error('Too many pending calls');if(!Array.isArray(m.args)||JSON.stringify(m.args).length>65536)throw new Error('Invalid call arguments');decode(m.args);const timeout=deadline(m.timeoutMs),key=crypto.randomUUID();
-     const job:Pending={bot:p.bot!,peer:p,id:m.id,mutation,expired:false,timer:setTimeout(()=>{const j=pending.get(key);if(!j)return;send(p,{type:'result',id:m.id,error:'Gateway request timed out; the game action may still be running'});if(j.mutation)j.expired=true;else pending.delete(key);},timeout)};pending.set(key,job);if(mutation)b.busy=key;send(b.client,{type:'call',id:key,method:m.method,args:m.args,expiresAt:Date.now()+timeout});
+     const job:Pending={bot:p.bot!,peer:p,id:m.id,method:m.method,mutation,expired:false,timer:setTimeout(()=>{const j=pending.get(key);if(!j)return;send(p,{type:'result',id:m.id,error:'Gateway request timed out; the game action may still be running'});if(j.mutation){j.expired=true;if(j.method==='bot.walkTo'&&b.client)send(b.client,{type:'cancel',id:key});}else pending.delete(key);},timeout)};pending.set(key,job);if(mutation)b.busy=key;send(b.client,{type:'call',id:key,method:m.method,args:m.args,expiresAt:Date.now()+timeout});
     }catch(e){send(p,{type:'result',id:m.id,error:e instanceof Error?e.message:String(e)});}
    }catch(e){send(p,{type:'error',error:e instanceof Error?e.message:'Invalid gateway message'});ws.close(1008,'Gateway protocol error');}},
-   close(ws){const p=ws.data;clearTimeout(p.authTimer);peers.delete(p);if(!p.bot)return;const b=bots.get(p.bot)!;if(b.client===p)failClient(b);b.agents.delete(p);if(b.controller===p)b.controller=undefined;for(const [key,j]of pending)if(j.peer===p&&!j.mutation){clearTimeout(j.timer);pending.delete(key);}},
+   close(ws){const p=ws.data;clearTimeout(p.authTimer);peers.delete(p);if(!p.bot)return;const b=bots.get(p.bot)!;if(b.client===p)failClient(b);b.agents.delete(p);if(b.controller===p)b.controller=undefined;for(const [key,j]of pending)if(j.peer===p){if(j.method==='bot.walkTo'&&b.client)send(b.client,{type:'cancel',id:key});if(!j.mutation){clearTimeout(j.timer);pending.delete(key);}}},
   },
  });
  const heartbeat=setInterval(()=>{for(const p of peers)if(Date.now()-p.seen>60000)p.socket.close(1001,'Heartbeat expired');},10000);

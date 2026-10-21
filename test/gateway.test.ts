@@ -99,3 +99,36 @@ test('remote NPC options dispatch Net, reject stale targets and respect observer
   await expect(observer.sendNpcOption(npc,'Net')).rejects.toThrow('Observer');
  }finally{remote?.close();observer?.close();await t.close();}
 });
+
+
+test('remote controllers walk beyond the local window and observers can inspect routes',async()=>{
+ const t=await setup();let remote,observer;
+ try{remote=await connectGateway(options(t.gateway.url));observer=await connectGateway(options(t.gateway.url,'observe'));const p=remote.getState()!.player!;
+ const route=await observer.planRoute(p.x+80,p.y,{tolerance:1});expect(route?.path.at(-1)?.x).toBe(p.x+79);
+ expect((await observer.routeTo(p.x+80,p.y))?.at(-1)?.x).toBe(p.x+80);
+ await expect(observer.bot.walkTo(p.x+80,p.y)).rejects.toThrow('Observer');
+ expect(await remote.bot.walkTo(p.x+80,p.y,{timeout:10000,tolerance:1})).toMatchObject({x:p.x+79,y:p.y,arrived:true});
+ expect(t.peer.received.filter(p=>p.opcode===35).length).toBeGreaterThan(1);
+ }finally{remote?.close();observer?.close();await t.close();}
+});
+
+
+test('disconnecting the controller cancels later walking legs without closing the game client',async()=>{
+ const t=await setup();let remote;
+ try{remote=await connectGateway(options(t.gateway.url));const p=remote.getState()!.player!;const pending=remote.bot.walkTo(p.x+80,p.y,{timeout:10000}).catch(e=>e);
+ const until=Date.now()+2000;while(!t.peer.received.some(p=>p.opcode===35)&&Date.now()<until)await Bun.sleep(5);
+ expect(t.peer.received.some(p=>p.opcode===35)).toBe(true);remote.close();await pending;await Bun.sleep(350);
+ const count=t.peer.received.filter(p=>p.opcode===35).length;await Bun.sleep(250);expect(t.peer.received.filter(p=>p.opcode===35).length).toBe(count);
+ expect(count).toBeLessThanOrEqual(2);expect(t.s.status).toBe('playing');expect((await listGatewayBots(t.gateway.url,config.monitorToken))[0].busy).toBe(false);
+ }finally{remote?.close();await t.close();}
+});
+
+
+test('an expired walking RPC cancels later legs and releases its action lock',async()=>{
+ const t=await setup();let remote;
+ try{remote=await connectGateway(options(t.gateway.url));await t.s.waitFor(w=>w.tick>=1,1000);const p=remote.getState()!.player!;
+ const error=await remote.call('bot.walkTo',[p.x+80,p.y,{timeout:10000}],100).catch(e=>e);expect(error.message).toContain('timed out');
+ await Bun.sleep(300);const count=t.peer.received.filter(p=>p.opcode===35).length;await Bun.sleep(250);expect(t.peer.received.filter(p=>p.opcode===35).length).toBe(count);
+ expect((await listGatewayBots(t.gateway.url,config.monitorToken))[0].busy).toBe(false);expect(t.s.status).toBe('playing');
+ }finally{remote?.close();await t.close();}
+});

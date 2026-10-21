@@ -19,7 +19,7 @@ For the current local development runtime, the game port is `43597` and prepared
 
 Browser controls:
 
-- Click an open tile to walk along an observed local route. Click an object/NPC or right-click a tile for actions. Doors and gates have square markers on their actual wall edges: amber when closed, green when open. Click the marker or its Door/Gate label for **Open** or **Close**, including on rotated doors and either half of a double gate. Hover and right-click use the same target. Tutorial progression checks still apply.
+- Click an open tile to walk along an observed route with automatic door handling. Click an object/NPC or right-click a tile for actions. Doors and gates have square markers on their actual wall edges: amber when closed, green when open. Click the marker or its Door/Gate label for **Open** or **Close**, including on rotated doors and either half of a double gate. Hover and right-click use the same target. Tutorial progression checks still apply.
 - Drag to pan; scroll or use +/− to zoom; use **Follow character**, floor, grid and collision controls. Player and NPC names appear above their dots.
 - Click named inventory/equipment items for actions. Bank windows expose deposit/withdraw menus and a deposit-inventory button.
 - First-login character creation offers sex selection and confirmation of the current appearance; the full client provides the visual appearance editor. Tutorial instruction text is displayed when open.
@@ -66,7 +66,7 @@ try {
 }
 ```
 
-`BotSDK` provides inventory/equipment/bank queries, item/NPC/object names and options, nearby searches, dialogue buttons, collision and local routes. Cache-backed queries are asynchronous. `BotActions` provides observed walking, object/NPC interaction with an explicit effect predicate, woodcutting, equipment, banking, modal closing and simple dialogue dismissal. Actions on one `BotActions` instance are serialized by rejecting overlapping calls. They time out or reject on disconnect rather than declaring dispatches successful.
+`BotSDK` provides inventory/equipment/bank queries, item/NPC/object names and options, nearby searches, dialogue buttons, collision and cache-backed multi-region routes. Cache-backed queries are asynchronous. `BotActions` provides observed walking, object/NPC interaction with an explicit effect predicate, woodcutting, equipment, banking, modal closing and simple dialogue dismissal. Actions on one `BotActions` instance are serialized by rejecting overlapping calls. They time out or reject on disconnect rather than declaring dispatches successful.
 
 Use `Session` for raw packets. NPC/object option numbers are **zero-based cache slots**, including empty slots; interface options are zero-based 0–9. Inventory cache options have a separate revision-specific mapping, handled by the SDK/UI.
 
@@ -100,7 +100,7 @@ See [the dialogue guide](docs/dialogue.md) for snapshots, `continueDialog`, choi
 
 ## Implemented and remaining work
 
-Implemented: RSA/XTEA/ISAAC login; fragmented framing; static-region/player/NPC movement; player names; containers/skills/messages; live object replacement; read-only JS5 archives, terrain, object/item/NPC definitions; IF3 text/actions; NPC variable-selected forms; window/mount/visibility updates; all five NPC/object options; equipment and common dialogue/bank controls; collision-aware single-tile local routing; shared browser/headless helpers.
+Implemented: RSA/XTEA/ISAAC login; fragmented framing; static-region/player/NPC movement; player names; containers/skills/messages; live object replacement; read-only JS5 archives, terrain, object/item/NPC definitions; IF3 text/actions; NPC variable-selected forms; window/mount/visibility updates; all five NPC/object options; equipment and common dialogue/bank controls; collision-aware multi-region walking with door handling; shared browser/headless helpers.
 
 Routing uses terrain flags, rotated footprints, directional walls, bridges and live object overrides. Unknown tiles are blocked and diagonal corner cutting is prevented. Paths are previews; the server remains authoritative. Routes span a local 52-tile window and use short, observed waypoints. Doors require explicit interaction. Dynamic object morphs and mobile entity occupancy are not yet fully modelled.
 
@@ -314,3 +314,17 @@ The MCP server provides `create_bot`, `execute_code`, `list_bots` and `disconnec
 
 
 The lightweight client's **SDK action log** card records recent agent, developer-console and page-control calls to public SDK/bot action methods. Expand an entry to see its arguments, return value or error and duration. It keeps at most 200 entries in memory, supports clearing, and resets on refresh. Queries and direct `session.*` packet calls are not recorded. “Returned” describes method completion; raw dispatch receipts still require observing the game effect. Existing browser sessions need a later refresh to load this feature.
+
+
+Long-distance walking uses the revision 634 cache and the attached game session:
+
+```ts
+const route = await sdk.planRoute(3212, 3428, {tolerance: 2}); // Read-only; includes doors.
+await bot.walkTo(3212, 3428, {timeout: 180000, tolerance: 2}); // Varrock, same floor.
+```
+
+`bot.walkTo(x, y, timeoutMs)` remains supported. The options form accepts `timeout` (default 120 seconds, maximum 595 seconds), `tolerance` (default 0), `openDoors` (default true), an optional expected `level`, and planning budgets. It follows short walking legs, observes server arrival, opens named doors/gates along the route and replans after scene changes. A refused door is temporarily excluded; an instructor/tutorial requirement is reported without trying to skip it. Queries and movement both work through the gateway. The gateway gives walking calls their requested duration plus a short response allowance, up to ten minutes; other calls keep their configured timeout.
+
+`planRoute` returns a complete path to within the requested tolerance, with approach/crossing metadata for doors; it never reports a partial path as arrival. `routeTo` returns only the path and keeps closed doors blocked unless `{openDoors:true}` is passed. Unknown cache regions remain blocked. Routes cover up to 1024 tiles of displacement, with bounded search (100,000 visited tiles and 128 region loads by default; configurable up to 250,000/256). Larger detours may need intermediate destinations. This version walks on the current floor: stairs, ladders, boats, quest passages and teleports still require explicit interactions. It does not automatically enable run or select a safe route around hostile NPCs.
+
+Walking stops on stale player state, a detected death, unexpected teleportation/floor changes, repeated lack of progress or its deadline. Gateway controller disconnect/takeover, command expiry and loss of the gateway link stop subsequent walking legs. An already accepted movement leg can finish. Other previously accepted high-level actions retain their documented cancellation behavior. Existing browser clients and the gateway must be updated/restarted after the current run to activate this version; no live session is reloaded automatically.

@@ -1,3 +1,5 @@
+import {NavigationService,type RouteOptions,type WalkOptions} from './navigation.ts';
+export type {RouteOptions,WalkOptions,RoutePlan,DoorStep} from './navigation.ts';
 import {SpellService,type SpellTarget} from './spells.ts';
 import {MagicService} from './magic.ts';
 import {PrayerService} from './prayer.ts';
@@ -33,8 +35,9 @@ export class BotSDK {
  readonly prayers:PrayerService;
  readonly combat:CombatService;
  readonly creation:CreationService;
+ readonly navigation:NavigationService;
  private changingRun=false;
- constructor(readonly session:Session,readonly data:GameData){this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);this.combat=new CombatService(this);this.prayers=new PrayerService(this);this.magic=new MagicService(this);this.spells=new SpellService(this);}
+ constructor(readonly session:Session,readonly data:GameData){this.navigation=new NavigationService(this);this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);this.combat=new CombatService(this);this.prayers=new PrayerService(this);this.magic=new MagicService(this);this.spells=new SpellService(this);}
  getState(){return this.session.world;}
  getSpells(){return this.spells.list();}
  castSpell(spell:string|RegExp,target?:SpellTarget,option?:string){return this.spells.cast(spell,target,option);}
@@ -193,11 +196,8 @@ export class BotSDK {
   for(const o of w.objectChanges.values())if(o.id!==null&&!defs.has(o.id))defs.set(o.id,await this.data.object(o.id));
   return new CollisionMap(regions,sceneObjects(regions,w,id=>defs.get(id)),p.level);
  }
- async routeTo(x:number,y:number){
-  const p=this.getState().player;if(!p)throw new Error('No player state');
-  if(Math.max(Math.abs(x-p.x),Math.abs(y-p.y))>52)throw new Error('Destination is outside the local routing window');
-  return (await this.collisionMap()).route(p,{x,y});
- }
+ planRoute(x:number,y:number,options:RouteOptions={}){return this.navigation.plan(x,y,options);}
+ async routeTo(x:number,y:number,options:RouteOptions={}){return (await this.navigation.plan(x,y,{...options,openDoors:options.openDoors??false}))?.path??null;}
  async selectRecipeQuantity(amount:1|5|10|'all'){
   if(![1,5,10,'all'].includes(amount))throw new Error('Recipe quantity must be 1, 5, 10 or all');
   if(!this.isOpen(905)||!this.isOpen(916))throw new Error('No recipe quantity interface is open');
@@ -223,14 +223,8 @@ export class BotActions {
 
  constructor(readonly sdk:BotSDK){}
  private async exclusive<T>(fn:()=>Promise<T>):Promise<T>{if(this.busy)throw new Error('Another bot action is already running');this.busy=true;try{return await fn();}finally{this.busy=false;}}
- async walkTo(x:number,y:number,timeout=60_000){return this.exclusive(async()=>{
-  await this.dismissCurrentDialog();
-  const deadline=Date.now()+timeout,level=this.sdk.getState().player?.level;
-  const path=await this.sdk.routeTo(x,y);if(!path)throw new Error('No local route; a door or unknown tile may block the way');
-  // Send short waypoints, observe arrival, and re-evaluate collision before the next leg.
-  let p=this.sdk.getState().player!;let attempts=0;
-  while(p.x!==x||p.y!==y){if(Date.now()>=deadline)throw new Error('Routed movement timed out');if(p.level!==level)throw new Error('Player changed floor during movement');if(++attempts>100)throw new Error('Route did not converge');const route=await this.sdk.routeTo(x,y);if(!route)throw new Error('Route became blocked');const target=route[Math.min(10,route.length-1)];await this.sdk.session.walkTo(target.x,target.y,Math.max(1,Math.min(15000,deadline-Date.now())));p=this.sdk.getState().player!;}
-  return {x:p.x,y:p.y};
+ async walkTo(x:number,y:number,timeoutOrOptions:number|WalkOptions=120000,options:RouteOptions={}){return this.exclusive(async()=>{
+  await this.dismissCurrentDialog();return this.sdk.navigation.walk(x,y,timeoutOrOptions,options);
  });}
  private async advanceDialog(selection:DialogPattern|number|null,expected?:Dialog,timeout=15_000):Promise<Dialog|null>{
   if(!Number.isFinite(timeout)||timeout<=0)throw new Error('Dialogue timeout must be positive');

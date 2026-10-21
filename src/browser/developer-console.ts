@@ -1,5 +1,7 @@
 import {CommandRunner,formatCommandValue,type CommandContext} from './command-runtime.ts';
 const examples:[string,string][]=[
+ ['Plan a route to Lumbridge',"await sdk.planRoute(3222, 3218, {tolerance: 2})"],
+ ['Walk to Lumbridge',"await bot.walkTo(3222, 3218, {timeout: 120000, tolerance: 2})"],
  ['Inspect tab availability','await sdk.getGameTabStatus()'],
  ['List available tabs','await sdk.getGameTabs()'],
  ['Open Inventory tab',"await sdk.selectGameTab('Inventory')"],

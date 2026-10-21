@@ -4,7 +4,7 @@ export type Mode='control'|'observe';
 export interface BotCredentials {clientToken:string;controlToken:string;observeToken:string;}
 export interface GatewayConfig {bots:Record<string,BotCredentials>;monitorToken:string;}
 export interface PublishedState {world:WorldSnapshot;status:string;error:string|null;}
-export const queryMethods=['getSpells','getCombatSpells','getPrayerState','getPrayers','getHealth','getCombatState','getCombatStyles','getEquipmentStats','getCreationMenu','getNumberInput','getEmotes','getRunState','getInventory','getEquipment','getBank','getInventoryStatus','getEquipmentStatus','count','isOpen','findInventoryItem','nearbyObjects','findNearbyObject','nearbyNpcs','findNearbyNpc','npcDefinition','routeTo','getDialog','getGameTabs','getGameTabStatus','getGroundItems','findGroundItem'] as const;
+export const queryMethods=['getSpells','getCombatSpells','getPrayerState','getPrayers','getHealth','getCombatState','getCombatStyles','getEquipmentStats','getCreationMenu','getNumberInput','getEmotes','getRunState','getInventory','getEquipment','getBank','getInventoryStatus','getEquipmentStatus','count','isOpen','findInventoryItem','nearbyObjects','findNearbyObject','nearbyNpcs','findNearbyNpc','npcDefinition','planRoute','routeTo','getDialog','getGameTabs','getGameTabStatus','getGroundItems','findGroundItem'] as const;
 export const sdkActions=['castSpell','homeTeleport','castSpellOnNpc','openPrayerList','setPrayer','selectCombatStyle','openEquipmentStats','closeEquipmentStats','selectCreationProduct','selectCreationControl','submitNumber','performEmote','setRunning','selectRecipeQuantity','selectGameTab','sendItemOption','sendUseItemOnItem','sendUseItemOnObject','sendDropItem','sendTakeGroundItem','sendObjectOption','sendNpcOption','sendClickDialog','clickDialogByText'] as const;
 export const botActions=['create','walkTo','talkTo','continueDialog','chooseDialogOption','navigateDialog','dismissDialog','chopTree','openBank','confirmAppearance','closeInterface','depositItem','withdrawItem','equipItem','unequipItem','useItemOnItem','useItemOnObject','burnLogs','dropItem','pickupItem'] as const;
 export const methods=new Map<string,boolean>([...queryMethods.map(m=>[`sdk.${m}`,false] as const),...sdkActions.map(m=>[`sdk.${m}`,true] as const),...botActions.map(m=>[`bot.${m}`,true] as const)]);
@@ -30,4 +30,4 @@ export function decode(value:unknown,depth=0):any{
  }
  throw new Error('Invalid arguments');
 }
-export function deadline(value:unknown=70_000){if(typeof value!=='number'||!Number.isFinite(value)||value<100||value>120_000)throw new Error('Timeout must be 100–120000 ms');return value;}
+export function deadline(value:unknown=70_000){if(typeof value!=='number'||!Number.isFinite(value)||value<100||value>600_000)throw new Error('Timeout must be 100–600000 ms');return value;}

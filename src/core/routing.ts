@@ -5,7 +5,10 @@ const key=(x:number,y:number)=>`${x},${y}`;
 /** Local, single-tile routing. Unknown terrain is blocked; doors require interaction. */
 export class CollisionMap {
  readonly known=new Set<string>();readonly blocked=new Set<string>();private edges=new Set<string>();
- constructor(regions:MapRegion[],objects:MapObject[],readonly level:number){
+ constructor(regions:MapRegion[],objects:MapObject[],readonly level:number){this.add(regions,objects);}
+ /** Append cache chunks to a route-local map; never invent walkable unknown terrain. */
+ add(regions:MapRegion[],objects:MapObject[]){
+  const level=this.level;
   for(const r of regions)for(let x=0;x<64;x++)for(let y=0;y<64;y++){
    const wx=r.x*64+x,wy=r.y*64+y;this.known.add(key(wx,wy));
    const bridge=!!(r.terrain.flags[tileIndex(x,y,1)]&2);
