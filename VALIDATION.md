@@ -185,3 +185,12 @@ Real Void check on isolated game port 43598 and gateway 17780: the persistent ts
 The guide documents SSH/WSS deployment, role distribution, browser origins, supported APIs and remaining rs-sdk parity. Remote infrastructure was not provisioned. Automatic game login recovery, a fleet-map GUI and MCP tooling remain separate work. Browser publisher UI has build/type coverage and transport tests, but has not received hands-on browser validation in this iteration.
 
 Final gateway validation: **79 tests passed**, two opt-in live tests skipped; strict TypeScript, browser build and whitespace checks passed.
+
+
+## Regular-client SDK tab visibility — 2026-10-21
+
+SDK game-tab packets now enter the regular client's native widget action handler for fixed/resizable game windows (548/746). The handler executes local on-op scripts and queues the action once; non-tab SDK packets retain raw dispatch. Routing checks the packet opcode/length, root window, empty item/slot selectors and actual widget action label.
+
+Strict TypeScript, browser assets and all 194 tests passed (four optional tests skipped). The Kotlin/JS development bundle compiled successfully. In a separate diagnostic browser against a copied Void server on port 43599, a real gateway controller selected Stats, Inventory, Worn Equipment, Options, Emotes and Inventory again. Captured frames confirmed the visible Skills, Equipment and other panels changed. A diagnostic-only outgoing-queue counter confirmed exactly one interface-button packet per selection. That instrumentation was excluded from the installed bundle. The live check exercised the resizable layout; fixed-layout handling shares the native handler but was not visually tested.
+
+The rebuilt bundle is installed in the gitignored local runtime. Existing browser sessions need a reload to load it; no running game server, regular-client relay or gateway restart is required.

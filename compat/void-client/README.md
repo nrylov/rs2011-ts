@@ -1,6 +1,6 @@
 # Regular rendered-client SDK bridge
 
-The bridge lets the TypeScript SDK observe and control the regular Void Kotlin/JS client's existing session. SDK actions enter its normal outgoing packet queue using its current ISAAC cipher. Mouse and keyboard controls remain available. There is no second game login or handoff dialog. The gateway routes agent calls to the same BotSDK used by the lightweight client.
+The bridge lets the TypeScript SDK observe and control the regular Void Kotlin/JS client's existing session. SDK actions enter its normal outgoing packet queue using its current ISAAC cipher. SDK game-tab selections also run the regular client’s normal widget handler, updating the visible panel while dispatching the action once. Other SDK packet sends retain their existing behavior. Mouse and keyboard controls remain available. There is no second game login or handoff dialog. The gateway routes agent calls to the same BotSDK used by the lightweight client.
 
 ## Local use
 
