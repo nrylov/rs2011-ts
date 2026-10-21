@@ -230,3 +230,11 @@ The shared game-message entry point normalizes quest completion chat before enco
 - Native bridge walking now sets the destination coordinates and schedules the same marker update as the native walk sender, after queuing exactly one packet. Separate Kotlin/JS compilation passed; a diagnostic regular browser verified SDK walking updates the native minimap destination to the requested world tile.
 - Blank spinning menu reproduced independently: SDK and native varc 755 both contain Ball of wool (1759), yet the rendered product area is empty. This remains a separate rendering/script investigation; no claim that layout refreshes fix it.
 - No live game server, gateway or user browser restarted. Native bridge changes require rebuilding/loading a client bundle before becoming visible.
+
+### Production menu default-variable synchronization
+
+- Reproduced the blank wool-on-spinning-wheel menu in the copied server and an unmodified native client. Native varc 755 had Ball of wool (1759), but native varc 754 remained -1; the server skipped its unchanged default Make=0. Supplying 754=0 rebuilt the product icon immediately.
+- Optional `VOID_CREATION_MENU_FIX=1` compiles the matching MakeAmount replacement. It explicitly sends the current creation type after product and quantity variables. JVM overlay compilation passed.
+- Copied-server integration using the real patched overlay and the original regular client passed: open spinning via SDK, inspect the visible Ball of wool icon, hover/click the native product button and observe wool converted into Ball of wool. The diagnostic save and overlay were restored afterward.
+- Prepared `dev/server/void-login-sync.pending.jar`, preserving all earlier pending entries and the exact script registry. The active server overlay was untouched. Prepared a clean `dev/client/void-client.pending.js` for the separate native minimap fix, with temporary diagnostic APIs removed; the served bundle was untouched.
+- Separately checked deposit-all on the copied server: `bot.depositItem(coins, 'all')` deposited a 25-coin stack and returned `{amount:25}` without timeout. The report needs its exact failing arguments/item to distinguish invalid amounts, session versions or another item-specific defect.

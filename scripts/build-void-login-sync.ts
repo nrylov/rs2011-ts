@@ -12,6 +12,7 @@ try{
  if(process.env.VOID_TUTORIAL_INSTRUCTION_FIX==='1')sources.push(join(root,'compat/void/TutorialInstructionRecovery.kt'));
  if(process.env.VOID_MINING_DEPLETION_FIX==='1')sources.push(join(root,'compat/void/Mining.kt'));
  if(process.env.VOID_TUTORIAL_FEEDBACK_FIX==='1')sources.push(join(root,'compat/void/QuestCompletionMessages.kt'),join(root,'compat/void/GameMessageFeedback.kt'),join(root,'compat/void/TutorialFeedback.kt'));
+ if(process.env.VOID_CREATION_MENU_FIX==='1')sources.push(join(root,'compat/void/MakeAmount.kt'));
  const compile=Bun.spawn([java,'-cp',compiler,'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler',...(process.env.VOID_MINING_DEPLETION_FIX==='1'?['-Xwhen-guards']:[]),'-no-stdlib','-no-reflect','-Xskip-metadata-version-check','-Xskip-prerelease-check','-Xallow-unstable-dependencies','-jvm-target','21','-classpath',resolve(server),'-d',classes,...sources],{stdout:'inherit',stderr:'inherit'});
  if(await compile.exited)throw new Error('Login-state listener compilation failed');
  if(process.env.VOID_TUTORIAL_FEEDBACK_FIX==='1'){

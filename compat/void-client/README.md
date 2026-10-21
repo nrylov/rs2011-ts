@@ -48,3 +48,5 @@ The helper validates known source anchors, refuses an existing output directory 
 ## Validation
 
 Checks cover attached-session packet decoding/dispatch, local provisioning restrictions, account configuration persistence, and source preparation. Real-client validation uses a copied game server with independent saves and a dedicated headless browser profile. It checks normal login, automatic publication, agent control, shared interface state, manual mouse interaction, companion geometry and generated account login without accessing user browser profiles.
+
+A clean local minimap-marker build is prepared at `dev/client/void-client.pending.js`; it has not replaced the bundle being served. When ready to update clients, back up `dev/client/void-client.js`, copy the pending bundle into that filename and reload the regular client. Reloading ends that browser's current game session, so do this between agent runs. The server-side production-menu patch is activated separately through its pending server overlay; see `compat/void/README.md`.
