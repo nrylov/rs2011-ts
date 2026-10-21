@@ -2,8 +2,8 @@
 package content.area.misthalin.tutorial_island
 
 import content.entity.obj.ObjectTeleports
+import content.entity.player.dialogue.type.statement
 import content.entity.obj.door.enterDoor
-import content.entity.obj.door.openDoor
 import world.gregs.voidps.engine.Script
 import world.gregs.voidps.engine.client.message
 import world.gregs.voidps.engine.entity.character.player.Player
@@ -71,10 +71,10 @@ class TutorialObjects(val teleports: ObjectTeleports) : Script {
             if (!allowed(stage, target)) {
                 return@objectOperate
             }
-            // Advance first: opening a double door replaces both halves, and despawning the
-            // object being interacted with cancels this coroutine before it could resume.
+            // Keep collision closed for everyone else, including both halves of double gates.
+            // Advance before the temporary replacement cancels the object's interaction.
             advanceTutorial(stage)
-            openDoor(target)
+            enterDoor(target)
         }
     }
 
@@ -88,11 +88,15 @@ class TutorialObjects(val teleports: ObjectTeleports) : Script {
         }
     }
 
-    private fun Player.allowed(stage: Int, target: GameObject): Boolean {
+    private suspend fun Player.allowed(stage: Int, target: GameObject): Boolean {
         if (!inTutorial || tutorialStage >= stage) {
             return true
         }
-        message("You should talk to your instructor before going through the ${target.def.name.lowercase()}.")
+        val text = "You should talk to your instructor before going through the ${target.def.name.lowercase()}."
+        message(text)
+        // Tutorial instructions occupy the chat box and hide ordinary chat-history lines.
+        // Use the standard statement interface too, so both clients show the refusal.
+        statement(text)
         return false
     }
 }

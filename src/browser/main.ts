@@ -11,6 +11,7 @@ const canvas = get<HTMLCanvasElement>('map');
 const form = get<HTMLFormElement>('login');
 let session: Session | undefined, ws: WebSocket | undefined, controls:Controls|undefined;
 const data=browserData();
+let renderedMessages:Session|undefined,renderedMessageSequence=-1;
 const gatewayControls=new GatewayControls(()=>controls&&session?.status==='playing'?{sdk:controls.sdk,bot:controls.bot}:null);
 const developerConsole=new DeveloperConsole(()=>controls&&session?.status==='playing'?{sdk:controls.sdk,bot:controls.bot}:null);
 
@@ -46,7 +47,12 @@ function render() {
     const el=document.createElement('div');el.textContent=SKILLS[s.index] ?? `Skill ${s.index}`;
     const level=document.createElement('b');level.textContent=String(s.level);el.append(level);el.title=`${s.xp} XP`;return el;
   }));
-  if(w?.messages.length) get('messages').replaceChildren(...w.messages.slice(-30).map(m=>{const el=document.createElement('div');el.textContent=(m.name?m.name+': ':'')+plainText(m.text);return el;}));
+  if(w&&(renderedMessages!==session||renderedMessageSequence!==w.messageSequence)){
+    const messages=get('messages'),follow=renderedMessages!==session||messages.scrollHeight-messages.scrollTop-messages.clientHeight<32;
+    messages.replaceChildren(...w.messages.slice(-30).map(m=>{const el=document.createElement('div');el.textContent=(m.name?m.name+': ':'')+plainText(m.text);return el;}));
+    if(follow)messages.scrollTop=messages.scrollHeight;
+    renderedMessages=session;renderedMessageSequence=w.messageSequence;
+  }
   if(w) get('debug').textContent=JSON.stringify({interfaces:Object.fromEntries(w.interfaces),texts:Object.fromEntries(w.texts),packets:w.packets,unhandled:w.unhandled,visualBlocksSkipped:w.visualBlocksSkipped},null,2);
 }
 form.addEventListener('submit', event => {

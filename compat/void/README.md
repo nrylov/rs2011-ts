@@ -21,11 +21,25 @@ java -cp /path/to/rs2011-ts/dist/void-login-sync.jar:/path/to/void-server.jar Ma
 The overlay includes the original JAR's script registry plus the new listener. Keep it paired with the exact JAR used to build it, and rebuild it after server upgrades. The original server JAR is untouched. This local development overlay was checked against Void 2.11.0; its compiler requires the full Kotlin standard library, not just the release JAR's minimized runtime.
 
 
-## Optional tutorial starting-room door fix
+## Optional tutorial door and gate fix
 
-`TutorialObjects.kt` is a scoped replacement for Void 2.11.0's existing tutorial object handler. The first Guide-room door previously used the ordinary five-minute shared opening, allowing another account to follow without completing the Guide steps. The replacement uses the existing pass-through-door helper: the door opens briefly, keeps shared collision blocked, and only the approved player walks through. Outward passage requires tutorial stage 3 and advances to stage 4. An early-stage account already outside can return to the Guide without advancing. Other tutorial doors and gates retain their existing behavior.
+`TutorialObjects.kt` is a scoped replacement for Void 2.11.0's existing tutorial object handler. The first Guide-room door previously used the ordinary five-minute shared opening, allowing another account to follow without completing the Guide steps. The replacement uses the existing pass-through-door helper: the door opens briefly, keeps shared collision blocked, and only the approved player walks through. Outward passage requires tutorial stage 3 and advances to stage 4. An early-stage account already outside can return to the Guide without advancing. The same pass-through rule also applies to every stage-gated door and gate listed by the tutorial object handler. Each keeps its existing stage check and advances only from that exact stage; revisiting an earlier gate does not skip later steps.
 
-For a source build, replace `game/src/main/kotlin/content/area/misthalin/tutorial_island/TutorialObjects.kt` with this file. Copy `tests/TutorialStartingDoorTest.kt` to the matching test package and run that test alongside the existing tutorial tests.
+| Passage | Closed object IDs | Required stage |
+| --- | --- | --- |
+| Survival Expert exit | 3015, 3016 | 13 |
+| Cooking house entrance | 3017 | 14 |
+| Cooking house exit | 3018 | 19 |
+| Quest Guide entrance | 3019 | 23 |
+| Mining/smithing exit | 3020, 3021 | 38 |
+| Rat pit entrance | 3022, 3023 | 46 |
+| Bank exit | 3024 | 53 |
+| Financial Advisor exit | 3025 | 55 |
+| Prayer area exit | 3026 | 62 |
+
+Double gates open briefly together, retaining closed collision on both halves so an early-stage player cannot follow an eligible account through. The two tutorial ladders keep their existing teleport behavior. A refusal keeps the existing message wording and also opens the standard statement dialogue, because the tutorial instruction panel covers ordinary chat history in the full client. The lightweight client displays that same dialogue and fresh server refusals beside the map. This is scoped to the tutorial handler's known transitions; it does not change ordinary doors elsewhere in the game.
+
+For a source build, replace `game/src/main/kotlin/content/area/misthalin/tutorial_island/TutorialObjects.kt` and `TutorialSkills.kt` with the corresponding files here. `TutorialSkills.kt` requires an actual XP increase before completing an XP-driven step; unchanged skill updates at login or interface refresh cannot skip Firemaking, combat or Magic steps. Copy `tests/TutorialStartingDoorTest.kt` and `tests/TutorialPassageTest.kt` / `tests/TutorialSkillProgressTest.kt` to the matching test package and run those tests alongside the existing tutorial tests. The passage test covers both halves of each gate and both directions through all listed doors.
 
 For the optional binary overlay, add `VOID_TUTORIAL_DOOR_FIX=1` to the build command above. The resulting overlay includes both the read-only login listener and this gameplay fix. The default build remains login synchronization only. This replacement is tied to the inspected Void 2.11.0 API; review it against updated source before enabling it for another release. The original server JAR remains untouched.
 

@@ -5,9 +5,11 @@ import type { MapObject } from '../cache/terrain.ts';
 import type { MapView } from './map.ts';
 import type { ItemType } from '../cache/definitions.ts';
 import {isFire,hasObjectMenu} from './object-display.ts';
+import {refusalFeedback} from './message-feedback.ts';
 const el=(tag:string,text:string)=>{const e=document.createElement(tag);e.textContent=text;return e;};
 const get=(id:string)=>document.getElementById(id)!;
 export class Controls {
+ private messageSequence=0;
  private containerKeys=new Map<string,string>();private objectKey='';private objectRequest=0;private selectedItem:Item|null=null;private items=new Map<number,ItemType>();private pending=new Set<number>();private missing=new Set<number>();private renderRevision=0;private collisionKey='';private collisionRequest=0;private dialogToken='';private dialogPending=false;private currentDialog:Dialog|null=null;private npcSignature='';
  constructor(readonly sdk:BotSDK,readonly bot:BotActions,readonly map:MapView){
   map.onMenu=(x,y,cx,cy)=>{void this.mapMenu(x,y,cx,cy).catch(e=>this.report(String(e)));};
@@ -79,6 +81,8 @@ export class Controls {
   void this.sdk.collisionMap().then(c=>{if(request!==this.collisionRequest)return;this.map.blocked=[...c.blocked].map(k=>{const [x,y]=k.split(',').map(Number);return{x,y};});this.map.draw(w);}).catch(e=>{this.collisionKey='';this.report(String(e));});
  }
  render(){
+  const w=this.sdk.getState(),feedback=refusalFeedback(w.messages,w.messageSequence,this.messageSequence);this.messageSequence=w.messageSequence;
+  if(feedback)this.report(feedback);
   this.updateCollision();
   if(this.selectedItem&&(this.sdk.session.status!=='playing'||this.sdk.inventoryActionError()||!this.sdk.getInventory().some(i=>i.slot===this.selectedItem!.slot&&i.id===this.selectedItem!.id)))this.selectedItem=null;
   this.map.itemSelected=!!this.selectedItem;
