@@ -187,6 +187,8 @@ All four methods are also available through the remote gateway; await remote que
 
 ## Nearby objects
 
+Transit objects have cyan diamond markers on the map: ladders, stairs, trapdoors/hatches, cave entrances, portals, gangplanks, pullable levers and other objects with travel or shortcut actions. One-way ladders/stairs show an up/down arrow and direction label. Click a marker or its label to choose the object's cache-defined action, including **Climb-down** on the Tutorial Island basement ladder. Closed trapdoors offer Open; live object updates switch the menu to the opened object's actions. Markers use the current floor and respect bridge levels. Doors and gates retain their amber/green markers. Labels appear when zoomed in; icons remain clickable when zoomed out.
+
 The lightweight **Nearby objects** panel lists interactive objects within 16 tiles, nearest first. Filter by name and choose **Actions** for the cache-defined menu. Map menus expose the same actions. The SDK can query a wider local area and dispatch the named action:
 
 ```js
