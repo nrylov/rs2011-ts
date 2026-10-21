@@ -11,7 +11,7 @@ Tools:
 - `list_bots({})`: list configured accounts, client status, position and MCP execution status without taking control.
 - `disconnect_bot({name})`: cancel the program and stop a client owned by this MCP process. External clients remain running.
 
-On first execution, MCP uses an attached gateway client. If none is attached, a local gateway and lightweight game client can start automatically using `bot.env`. Remote gateways require their client to be started on its host; the agent machine needs only role tokens. Auto-start currently uses the headless lightweight client. Browser clients can publish through their gateway panel. The separate regular Kotlin browser client does not yet have the SDK bridge; that is the next integration.
+On first execution, MCP uses an attached gateway client. If none is attached, a local gateway and lightweight game client can start automatically using `bot.env`. Remote gateways require their client to be started on its host; the agent machine needs only role tokens. Auto-start currently uses the headless lightweight client. Local browser clients automatically publish configured accounts after login. A bridge-enabled regular Kotlin/JS client can publish the same SDK session; see [regular-client setup](../compat/void-client/README.md). Log into the regular client (`bun run dev:full`, or `/full/` on the lightweight web server) and wait for SDK: Available before executing code; MCP then reuses it. Automatic regular-browser launch is not yet implemented.
 
 Each account gets:
 

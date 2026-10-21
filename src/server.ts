@@ -1,3 +1,4 @@
+import {createBrowserAccount} from './gateway/browser-account.ts';
 import {browserBootstrap} from './gateway/browser-bootstrap.ts';
 import { connect, type Socket } from 'node:net';
 import { resolve } from 'node:path';
@@ -9,6 +10,7 @@ const host=process.env.VOID_HOST??'127.0.0.1', gamePort=Number(process.env.VOID_
 const output=await Bun.build({entrypoints:[resolve(root,'src/browser/main.ts')],target:'browser',minify:false,sourcemap:'inline'});
 if(!output.success){console.error(output.logs);process.exit(1);}
 const script=await output.outputs[0].text();
+const regularBuild=await Bun.build({entrypoints:[resolve(root,'src/browser/regular-bridge.ts')],target:'browser',minify:false,sourcemap:'inline'});if(!regularBuild.success)throw new Error('Regular SDK bridge build failed');const regularScript=await regularBuild.outputs[0].text();
 let mapCache: DiskCache | undefined;
 const cachePath=process.env.VOID_CACHE_PATH;
 
@@ -16,6 +18,7 @@ type Relay={socket?:Socket};
 const server=Bun.serve<Relay, never>({
   hostname:'127.0.0.1',port:Number(process.env.PORT??8082),
   async fetch(request,server){
+    if(new URL(request.url).pathname==='/gateway/create-account')return createBrowserAccount(request,{enabled:process.env.BROWSER_GATEWAY_AUTO_ATTACH==='1',address:server.requestIP(request)?.address??null,root,configPath:process.env.GATEWAY_CONFIG??resolve(root,'gateway.config.json'),host,port:gamePort,cachePath,gatewayUrl:process.env.GATEWAY_URL??'ws://127.0.0.1:7780/gateway'});
     if(new URL(request.url).pathname==='/gateway/bootstrap')return browserBootstrap(request,{enabled:process.env.BROWSER_GATEWAY_AUTO_ATTACH==='1',address:server.requestIP(request)?.address??null,configPath:process.env.GATEWAY_CONFIG??resolve(root,'gateway.config.json'),gatewayUrl:process.env.GATEWAY_URL??'ws://127.0.0.1:7780/gateway'});
     const url=new URL(request.url);
     if(url.pathname==='/game'){
@@ -47,6 +50,10 @@ const server=Bun.serve<Relay, never>({
         return Response.json(region,{headers:{'Cache-Control':'private, max-age=3600'}});
       }catch(e){console.error('Map cache:',String(e));return Response.json({error:e instanceof Error?e.message:String(e)},{status:503});}
     }
+    if(url.pathname==='/regular.css')return new Response(Bun.file(resolve(root,'regular.css')),{headers:{'Content-Type':'text/css'}});
+    if(url.pathname==='/full/'||url.pathname==='/full'||url.pathname==='/'&&process.env.REGULAR_CLIENT_ONLY==='1'){if(!process.env.VOID_FULL_CLIENT_BUNDLE)return new Response('Set VOID_FULL_CLIENT_BUNDLE to a bridge-enabled Kotlin/JS bundle. See compat/void-client/README.md',{status:503});return new Response(Bun.file(resolve(root,'regular.html')),{headers:{'Content-Type':'text/html'}});}
+    if(url.pathname==='/full-client.js'){const path=process.env.VOID_FULL_CLIENT_BUNDLE;if(!path)return new Response('Regular client not configured',{status:503});return new Response(Bun.file(resolve(path)),{headers:{'Content-Type':'text/javascript','Cache-Control':'no-store'}});}
+    if(url.pathname==='/regular-bridge.js')return new Response(regularScript,{headers:{'Content-Type':'text/javascript','Cache-Control':'no-store'}});
     if(url.pathname==='/config')return Response.json({target:`${host}:${gamePort}`,modulus:process.env.VOID_RSA_MODULUS??DEFAULT_MODULUS});
     if(url.pathname==='/client.js')return new Response(script,{headers:{'Content-Type':'text/javascript','Cache-Control':'no-store'}});
     if(url.pathname==='/'||url.pathname==='/style.css')return new Response(Bun.file(resolve(root,url.pathname==='/'?'index.html':'style.css')));

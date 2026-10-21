@@ -9,6 +9,8 @@ Git. The maintained service launchers are `scripts/dev.ts` and
 dev/
   java/                  Java 21 runtime (bin/java)
   cache/                 Prepared revision 634 cache
+  client/void-client.js  Bridge-enabled regular Kotlin/JS bundle
+  client-source/         Optional copied/patched regular-client build source
   server/                Void distribution, game.properties and data/saves/
     void-server-2.11.0.jar
     void-login-sync.jar  Compatibility overlay containing our server fixes
@@ -31,7 +33,7 @@ The local `dev/run-*.sh` scripts provide equivalent commands and work from any
 working directory. Use Ctrl+C to stop each service. For orderly game shutdown,
 log players out or stop the client services first, then stop the game server.
 The agent's configured MCP starts automatically when the agent is opened.
-The lightweight browser automatically registers configured accounts after login. Its header and favicon distinguish gateway availability from an attached controller. Manual attachment and detach remain in the SDK gateway panel.
+Both browsers automatically register configured accounts after login. Its header and favicon distinguish gateway availability from an attached controller. Manual attachment and detach remain in the SDK gateway panel.
 
 Check that required local files exist without starting services:
 
@@ -48,7 +50,7 @@ root `gateway.config.json`; retain it to preserve existing role tokens.
 `VOID_JAVA` can override the bundled Java executable,
 `VOID_FULL_CLIENT_BUNDLE` can override the regular client bundle, and
 `FULL_CLIENT_PORT` overrides its HTTP port. Gateway origin defaults allow the
-lightweight client on localhost/127.0.0.1 port 8082; override
+clients on localhost/127.0.0.1 ports 8082 and 8083; override
 `GATEWAY_ALLOWED_ORIGINS` if using another origin.
 
 The game server runs with `dev/server/` as its working directory. Its local
@@ -62,6 +64,10 @@ before starting the game. Copying `dev/` is also a way to preserve this machine'
 local setup. Back up `dev/server/data/saves/`, `.env`, `gateway.config.json`, and
 private bot credentials; Git does not back them up.
 
-`dev:lite` enables trusted localhost automatic gateway provisioning. Set
+`dev:lite` and `dev:full` enable trusted localhost automatic gateway provisioning. Set
 `BROWSER_GATEWAY_AUTO_ATTACH=0` to disable it. See [gateway setup](gateway.md)
 for origin restrictions and public-hosting requirements.
+
+The regular client has a header and collapsible companion panel outside the
+game canvas. See [regular-client bridge setup](../compat/void-client/README.md)
+for native bundle preparation, account generation and SDK tools.

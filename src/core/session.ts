@@ -24,15 +24,25 @@ export class Session {
   readonly ready: Promise<void>;
   private stoppedResolve!: () => void;
   readonly stopped: Promise<void>;
-  constructor(private transport: Transport, private credentials: Credentials, private keys = Array.from(crypto.getRandomValues(new Int32Array(4)))) {
+  constructor(private transport: Transport, private credentials: Credentials, private keys = Array.from(crypto.getRandomValues(new Int32Array(4))), private external?:{index:number;name:string;send:(opcode:number,body:Uint8Array)=>void}) {
     // Validate before connecting; login bytes never appear in diagnostics.
-    this.loginBytes = loginPacket(credentials, keys);
+    this.loginBytes = external?new Uint8Array(0):loginPacket(credentials, keys);
     this.out = new Isaac(keys);
     this.ready = new Promise((resolve, reject) => { this.readyResolve = resolve; this.readyReject = reject; });
     this.ready.catch(() => {}); // Callers may observe errors through status before awaiting ready.
     this.stopped = new Promise(resolve => { this.stoppedResolve = resolve; });
+    if(external){this.status='playing';this.world.index=external.index;this.world.name=external.name;this.readyResolve();return;}
     this.deadline = setTimeout(() => this.fail('Login timed out after 15 seconds'), 15_000);
     transport.send(Uint8Array.of(14));
+  }
+  /** Attach to a rendered client's existing decoded packet stream; no second login or cipher. */
+  static attach(index:number,name:string,send:(opcode:number,body:Uint8Array)=>void,detach=()=>{}){
+    if(!Number.isInteger(index)||index<1||index>=2048)throw new Error('Invalid attached player index');
+    return new Session({send:()=>{},close:detach},{username:name||'external',password:''},[0,0,0,0],{index,name,send});
+  }
+  feedPacket(opcode:number,body:Uint8Array){
+    if(!this.external)throw new Error('Decoded packet input is only available for attached clients');if(this.ended)return;this.lastReceived=Date.now();
+    try{if(this.world.apply(opcode,body)==='logout')this.close();this.notify();}catch(e){this.fail(e instanceof Error?e.message:String(e));}
   }
   private loginBytes: Uint8Array;
   subscribe(callback: () => void) { this.listeners.add(callback); return () => { this.listeners.delete(callback); }; }
@@ -96,7 +106,7 @@ export class Session {
   send(opcode: number, payload = new Uint8Array(0)) {
     if (this.status !== 'playing' || this.ended) throw new Error('Character is not connected');
     if (Date.now() - this.lastReceived > 30_000) throw new Error('Character state is stale');
-    try { this.transport.send(new Writer().u8(opcode + this.out.next()).raw(payload).finish()); }
+    try { if(this.external)this.external.send(opcode,payload);else this.transport.send(new Writer().u8(opcode + this.out.next()).raw(payload).finish()); }
     catch (e) { this.fail(`Send failed: ${e}`); throw e; }
   }
   walk(x: number, y: number, forceWalk = false) {

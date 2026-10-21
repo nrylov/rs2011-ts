@@ -18,17 +18,18 @@ switch(mode){
   break;
  }
  case 'lite':
-  Object.assign(env,{BROWSER_GATEWAY_AUTO_ATTACH:process.env.BROWSER_GATEWAY_AUTO_ATTACH??'1'});
+  Object.assign(env,{BROWSER_GATEWAY_AUTO_ATTACH:process.env.BROWSER_GATEWAY_AUTO_ATTACH??'1',VOID_FULL_CLIENT_BUNDLE:process.env.VOID_FULL_CLIENT_BUNDLE??resolve(runtime,'client/void-client.js')});
   required=[env.VOID_CACHE_PATH];
   command=[process.execPath,resolve(root,'src/server.ts')];
   break;
  case 'gateway':
-  Object.assign(env,{GATEWAY_CONFIG:process.env.GATEWAY_CONFIG??resolve(root,'gateway.config.json'),GATEWAY_ALLOWED_ORIGINS:process.env.GATEWAY_ALLOWED_ORIGINS??'http://127.0.0.1:8082,http://localhost:8082'});
+  Object.assign(env,{GATEWAY_CONFIG:process.env.GATEWAY_CONFIG??resolve(root,'gateway.config.json'),GATEWAY_ALLOWED_ORIGINS:process.env.GATEWAY_ALLOWED_ORIGINS??'http://127.0.0.1:8082,http://localhost:8082,http://127.0.0.1:8083,http://localhost:8083'});
   required=[(env as Record<string,string>).GATEWAY_CONFIG];
   command=[process.execPath,resolve(root,'src/gateway/main.ts')];
   break;
  case 'full':
-  required=[process.env.VOID_FULL_CLIENT_BUNDLE??resolve(runtime,'server/data/void-client.js')];
+  Object.assign(env,{VOID_FULL_CLIENT_BUNDLE:process.env.VOID_FULL_CLIENT_BUNDLE??resolve(runtime,'client/void-client.js'),PORT:process.env.FULL_CLIENT_PORT??'8083',REGULAR_CLIENT_ONLY:'1',BROWSER_GATEWAY_AUTO_ATTACH:process.env.BROWSER_GATEWAY_AUTO_ATTACH??'1'});
+  required=[(env as Record<string,string>).VOID_FULL_CLIENT_BUNDLE,env.VOID_CACHE_PATH];
   command=[process.execPath,resolve(root,'scripts/full-client.ts')];
   break;
  default: throw new Error('Usage: bun scripts/dev.ts <game|lite|gateway|full> [--check]');

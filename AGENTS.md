@@ -16,11 +16,11 @@ bun bots/start-client.ts mybot
 
 Setup creates private `bot.env`, a starter `script.ts`, and `lab_log.md`. It registers gateway roles in the private root `gateway.config.json`. The running local gateway accepts additive registrations automatically. No passwords or role tokens belong in source files, command output or commits.
 
-`start-client` starts a lightweight game client and starts a local gateway if needed. Leave it running. One game client owns each account session. Attaching SDK scripts never requires logging the same account into another game client.
+`start-client` starts a lightweight game client and starts a local gateway if needed. Leave it running. One game client owns each account session. Attaching SDK scripts never requires logging the same account into another game client. To watch in the regular rendered client, open `bun run dev:full` at http://127.0.0.1:8083 or the bridge-enabled `/full/` page, log in, and wait for SDK: Available; MCP reuses that automatically registered publisher. See `compat/void-client/README.md`.
 
 ## Browser-owned sessions
 
-A lightweight browser started with `bun run dev:lite` automatically registers a configured account after game login. When its header shows SDK: Available, MCP/scripts attach by character name and operate that same browser session; do not open a second game login. No token needs to be pasted into the page. A green header/favicon identifies the current controller. Closing the agent leaves the game open. If automatic attachment is unavailable, inspect the SDK gateway status before starting a replacement client. See `docs/gateway.md` for local provisioning limits and manual controls.
+A lightweight browser started with `bun run dev:lite`, or a bridge-enabled regular browser started with `bun run dev:full`, automatically registers a configured account after game login. When its header shows SDK: Available, MCP/scripts attach by character name and operate that same browser session; do not open a second game login. No token needs to be pasted into the page. A green header/favicon identifies the current controller. Closing the agent leaves the game open. If automatic attachment is unavailable, inspect the SDK gateway status before starting a replacement client. See `docs/gateway.md` for local provisioning limits and manual controls.
 
 ## MCP
 

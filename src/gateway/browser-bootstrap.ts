@@ -1,14 +1,18 @@
 import {botKey,type GatewayConfig} from './protocol.ts';
 const loopback=(host:string)=>['127.0.0.1','localhost','[::1]','::1','::ffff:127.0.0.1'].includes(host);
+export function localBrowserAccess(request:Request,options:{enabled:boolean;address:string|null}){
+ const url=new URL(request.url),reply=(error:string,status:number)=>Response.json({error},{status,headers:{'Cache-Control':'no-store','Vary':'Origin'}});
+ if(!options.enabled)return reply('Automatic attachment is disabled on this host. Use manual gateway attachment.',404);
+ if(request.method!=='POST')return reply('POST required',405);
+ if(!options.address||!loopback(options.address)||!loopback(url.hostname)||request.headers.get('origin')!==url.origin||request.headers.get('sec-fetch-site')==='cross-site')return reply('Automatic attachment is available only to same-origin localhost requests.',403);
+ if(request.headers.get('content-type')?.split(';')[0].trim()!=='application/json')return reply('JSON required',415);
+ return null;
+}
 /** Explicitly enabled local development provisioning, never public account authentication. */
 export async function browserBootstrap(request:Request,options:{enabled:boolean;address:string|null;configPath:string;gatewayUrl:string}){
  const headers={'Cache-Control':'no-store','Vary':'Origin','Referrer-Policy':'no-referrer'};
  const reply=(body:unknown,status=200)=>Response.json(body,{status,headers});
- const url=new URL(request.url);
- if(!options.enabled)return reply({error:'Automatic attachment is disabled on this host. Use manual gateway attachment.'},404);
- if(request.method!=='POST')return reply({error:'POST required'},405);
- if(!options.address||!loopback(options.address)||!loopback(url.hostname)||request.headers.get('origin')!==url.origin||request.headers.get('sec-fetch-site')==='cross-site')return reply({error:'Automatic attachment is available only to same-origin localhost requests.'},403);
- if(request.headers.get('content-type')?.split(';')[0].trim()!=='application/json')return reply({error:'JSON required'},415);
+ const denied=localBrowserAccess(request,options);if(denied)return denied;
  try{
   const reader=request.body?.getReader();if(!reader)return reply({error:'Missing account name'},400);
   let text='',size=0;const decoder=new TextDecoder();

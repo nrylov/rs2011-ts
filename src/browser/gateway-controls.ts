@@ -9,7 +9,7 @@ export class GatewayControls {
  private owner?:GatewayContext;private pending=false;private epoch=0;private abort?:AbortController;
  private paused=false;private retryAt=0;private state:GatewayDisplayState='offline';private detail='Sign in to make this character available to the SDK.';
  private presence:GatewayPresence={controller:null,observers:0};
- constructor(private context:()=>GatewayContext|null){
+ constructor(private context:()=>GatewayContext|null,private title='Void · TypeScript client'){
   get<HTMLInputElement>('gateway-url').value=location.protocol==='https:'?`wss://${location.host}/gateway`:'ws://127.0.0.1:7780/gateway';
   get('gateway-form').onsubmit=e=>{e.preventDefault();void this.connect(false);};
   get('gateway-detach').onclick=()=>{this.reset();this.paused=true;this.status('detached','Detached from SDK; game session remains open.');this.render();};
@@ -24,7 +24,7 @@ export class GatewayControls {
   badge.textContent=label;badge.dataset.state=this.state;badge.title=this.detail;
   get('gateway-status').textContent=this.detail+(this.presence.observers?` · ${this.presence.observers} observer(s)`:'');
   get<HTMLLinkElement>('sdk-favicon').href=gatewayFavicon(this.state);
-  document.title=`${context?context.name+' · ':''}${this.state==='controlled'?'SDK connected · ':''}Void · TypeScript client`;
+  document.title=`${context?context.name+' · ':''}${this.state==='controlled'?'SDK connected · ':''}${this.title}`;
  }
  render(){
   const context=this.context();

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Void · Regular client</title><link id="sdk-favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E"><link rel="stylesheet" href="/regular.css"></head>
+<body><header class="companion-header"><strong>VOID <small>634</small></strong><span id="sdk-status" class="sdk-status" data-state="offline" role="status" aria-live="polite">SDK: Offline</span><button id="companion-toggle" type="button" aria-expanded="false" aria-controls="companion-panel">Open tools</button></header>
+<div id="workspace" data-tools="closed"><main id="client" aria-label="Regular RuneScape client"></main>
+<aside id="companion-panel" aria-label="Client companion tools" hidden>
+<p id="regular-sdk-status" role="status">Loading the regular client…</p>
+<details class="tool" open><summary>Account</summary><div class="tool-body"><p>Sign in here or use the game's login screen. Both use the same game connection.</p>
+<form id="regular-login"><label>Username<input name="username" autocomplete="username" maxlength="12" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button id="regular-sign-in" type="submit" disabled>Log in</button></form>
+<button id="generate-account" type="button">Generate bot account</button><p id="account-status" role="status"></p></div></details>
+<details class="tool"><summary>SDK gateway</summary><div class="tool-body"><p>This session registers automatically with the local gateway. Agents attach by character name; mouse and keyboard controls remain available.</p><button id="gateway-auto" type="button" disabled>Reconnect automatically</button><form id="gateway-form"><label>Gateway URL<input id="gateway-url" type="url" required></label><label>Client token<input id="gateway-token" type="password" autocomplete="off" required></label><button id="gateway-attach" disabled>Attach gateway</button></form><button id="gateway-detach" type="button" hidden>Detach gateway</button><p id="gateway-status" role="status">Sign in to register this client.</p></div></details>
+<details id="developer-console" class="control-card developer-console control-card-wide"><summary>Developer command console</summary><div class="control-content">
+        <p>Run JavaScript with <code>sdk</code>, <code>bot</code>, <code>console.log</code>, and top-level <code>await</code>. Commands act on the connected character.</p>
+        <form id="command-form"><label for="command-example">Example</label><select id="command-example"><option value="">Choose an example…</option></select><label for="command-code">Command</label><textarea id="command-code" rows="5" spellcheck="false" autocapitalize="off" autocomplete="off">await sdk.getGameTabs()</textarea><div class="command-toolbar"><button id="command-run" type="submit" disabled>Run command</button><button id="command-clear" type="button">Clear output</button><span id="command-status" role="status">Connect to run commands.</span></div></form>
+        <pre id="command-output" role="log" aria-label="Command output" aria-live="polite"></pre>
+      </div></details>
+<details class="tool"><summary>SDK action log <small id="action-log-count">0</small></summary><div class="tool-body"><button id="action-log-clear" type="button">Clear history</button><p>Records SDK commands and results for this browser session.</p><div id="sdk-action-log" class="sdk-action-log" role="log" aria-live="polite"></div></div></details>
+</aside></div>
+<script>window.CONFIG={url:(location.protocol==='https:'?'wss://':'ws://')+location.host+'/game'};</script>
+<script type="module" src="/regular-bridge.js"></script><script defer src="/full-client.js"></script></body></html>
