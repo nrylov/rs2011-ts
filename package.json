@@ -19,7 +19,11 @@
     "mcp": "bun mcp/server.ts",
     "bot:create": "bun bots/create-bot.ts",
     "bot:client": "bun bots/start-client.ts",
-    "bot:state": "bun bots/state.ts"
+    "bot:state": "bun bots/state.ts",
+    "dev:game": "bun scripts/dev.ts game",
+    "dev:lite": "bun scripts/dev.ts lite",
+    "dev:gateway": "bun scripts/dev.ts gateway",
+    "dev:full": "bun scripts/dev.ts full"
   },
   "devDependencies": {
     "@types/bun": "^1.3.0",

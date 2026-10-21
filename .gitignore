@@ -11,3 +11,6 @@ gateway.config.json
 bots/*/bot.env
 gateway.config.json.lock
 gateway.config.json.*.tmp
+
+# Private local game runtime, cache, saves and launch wrappers
+/dev/

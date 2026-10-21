@@ -15,7 +15,16 @@ bun run dev
 
 Open http://127.0.0.1:8082. The relay binds to localhost and connects to the configured TCP game server. `VOID_HOST`, `VOID_PORT`, `PORT`, `VOID_CACHE_PATH` and optional `VOID_RSA_MODULUS` configure it without source changes.
 
-For the current local development runtime, the game port is `43597` and prepared cache is `/private/tmp/void-live-test/prepared-cache`. These temporary files are external to this repository. The separate reference Kotlin browser client remains at http://127.0.0.1:8083.
+The current local runtime lives in the gitignored `dev/` directory, including Java, the server, prepared cache, and player saves. Start each service in a separate terminal:
+
+```sh
+bun run dev:game
+bun run dev:lite
+bun run dev:gateway
+bun run dev:full
+```
+
+The game port is `43597`; lightweight and regular clients are at http://127.0.0.1:8082 and http://127.0.0.1:8083. See [local development setup and shutdown](docs/local-development.md) for layout, configuration, and backups.
 
 Browser controls:
 
