@@ -4,6 +4,7 @@ import type { Item, Entity } from '../core/world.ts';
 import type { MapObject } from '../cache/terrain.ts';
 import type { MapView } from './map.ts';
 import type { ItemType } from '../cache/definitions.ts';
+import {isFire,hasObjectMenu} from './object-display.ts';
 const el=(tag:string,text:string)=>{const e=document.createElement(tag);e.textContent=text;return e;};
 const get=(id:string)=>document.getElementById(id)!;
 export class Controls {
@@ -53,7 +54,7 @@ export class Controls {
   this.menu(name,actions,event.clientX,event.clientY);
  }
  private objectUseActions(target:MapObject){
-  const source=this.selectedItem;if(!source)return [];
+  const source=this.selectedItem;if(!source)return isFire(target)?[{label:`Use an inventory item on ${target.name}…`,run:()=>this.report(`Select Use on an inventory item (such as raw shrimps), then choose Use → ${target.name}.`)}]:[];
   return [{label:`Use ${this.definition(source.id)?.name??source.id} → ${target.name}`,run:()=>{
    this.selectedItem=null;this.render();this.hideMenu();this.report(`Using item on ${target.name}…`);
    void this.bot.useItemOnObject(source,target).then(result=>this.report(result.effect==='dialogue'?'Choose an option in the recipe dialogue.':'Item conversion observed. Check inventory and game messages for the result.')).catch(e=>this.report(e instanceof Error?e.message:String(e)));
@@ -80,6 +81,7 @@ export class Controls {
  render(){
   this.updateCollision();
   if(this.selectedItem&&(this.sdk.session.status!=='playing'||this.sdk.inventoryActionError()||!this.sdk.getInventory().some(i=>i.slot===this.selectedItem!.slot&&i.id===this.selectedItem!.id)))this.selectedItem=null;
+  this.map.itemSelected=!!this.selectedItem;
   const selection=get('item-selection');selection.hidden=!this.selectedItem;selection.replaceChildren();if(this.selectedItem){selection.append(el('span',`Use ${this.definition(this.selectedItem.id)?.name??this.selectedItem.id} on an item or nearby object `));const cancel=el('button','Cancel');cancel.onclick=()=>{this.selectedItem=null;this.render();};selection.append(cancel);}
   const ground=this.sdk.getGroundItems();get('ground-items').replaceChildren(...(ground.length?ground.map(i=>{const def=this.definition(i.id),row=el('div','');row.className='nearby-npc';row.append(el('span',`${def?.name??'Item '+i.id}${i.amount>1?' × '+i.amount:''} · ${i.x}, ${i.y}`));const take=el('button','Take');take.onclick=()=>this.run(`Take ${def?.name??'item'}`,()=>this.bot.pickupItem(i));row.append(take);return row;}):[el('p','No visible ground items.')]));
   get('inventory-access').textContent=this.sdk.inventoryActionError()??'';
@@ -138,7 +140,7 @@ export class Controls {
   const key=JSON.stringify([p.x,p.y,p.level,filter,this.selectedItem,[...w.objectChanges.values()]]);if(key===this.objectKey)return;this.objectKey=key;const request=++this.objectRequest;
   void this.sdk.nearbyObjects(16).then(objects=>{
    if(request!==this.objectRequest)return;
-   const matches=objects.filter(o=>(this.selectedItem||o.options.some(Boolean))&&(!filter||o.name.toLowerCase().includes(filter))),rows=matches.slice(0,30).map(o=>{
+   const matches=objects.filter(o=>hasObjectMenu(o,!!this.selectedItem)&&(!filter||o.name.toLowerCase().includes(filter))),rows=matches.slice(0,30).map(o=>{
     const row=el('div','');row.className='nearby-npc';row.append(el('span',`${o.name} · ${o.x}, ${o.y}`));const actions=el('button','Actions');actions.setAttribute('aria-label',`Actions for ${o.name} at ${o.x}, ${o.y}`);actions.onclick=e=>this.menu(o.name,[...this.objectUseActions(o),...o.options.flatMap((option,index)=>option?[{label:option,run:()=>{this.sdk.sendObjectOption(o,index);this.report(`${option} ${o.name}: sent to game.`);}}]:[])],e.clientX,e.clientY);row.append(actions);return row;
    });get('nearby-objects').replaceChildren(...(rows.length?rows:[el('p','No matching interactive objects within 16 tiles.')]));if(matches.length>30)get('nearby-objects').append(el('small',`Showing 30 of ${matches.length}; filter by name for more.`));
   }).catch(e=>{if(request!==this.objectRequest)return;this.objectKey='';get('nearby-objects').textContent=`Objects unavailable: ${e}`;});

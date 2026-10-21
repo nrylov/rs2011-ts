@@ -193,7 +193,7 @@ See [remote setup, role tokens, API differences and remaining rs-sdk parity](doc
 
 ## Cooking and item-on-object use
 
-In the lightweight client, select **Use Raw shrimps…** from the inventory menu, then click the fire on the map and choose **Use Raw shrimps → Fire**. Alternatively, filter Nearby objects by `Fire`, open **Actions**, and choose the same interaction. Escape cancels the selected item. The server approaches the object and applies the normal cooking rules; a burnt shrimp is a possible result.
+In the lightweight client, select **Use Raw shrimps…** from the inventory menu, then click the fire on the map and choose **Use Raw shrimps → Fire**. Alternatively, filter Nearby objects by `Fire`, open **Actions**, and choose the same interaction. Fires appear as orange flame markers labelled **Fire**, and remain listed in Nearby objects even though their cache definitions have no normal menu actions. Clicking a fire without a selected item explains how to use an inventory item on it. Escape cancels the selected item. The server approaches the object and applies the normal cooking rules; a burnt shrimp is a possible result.
 
 ```js
 const shrimp = await sdk.findInventoryItem(/^raw shrimps$/i);

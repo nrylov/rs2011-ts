@@ -5,12 +5,15 @@ import type { World } from '../core/world.ts';
 import { objectKey } from '../core/objects.ts';
 import type { ObjectType } from '../cache/format.ts';
 
+import {isFire,hasObjectMenu} from './object-display.ts';
+
 const hex = (rgb: number) => '#'+(rgb&0xffffff).toString(16).padStart(6,'0');
 /** Original terrain colours and placements, rendered schematically rather than as 3D assets. */
 export class MapView {
   readonly projection = new MapProjection();
   readonly store: RegionStore;
   onMenu?: (x:number,y:number,clientX:number,clientY:number)=>void;
+  itemSelected=false;
   route:Point[]=[];
   blocked:Point[]=[];
   follow = true; grid = false; floor: number | null = null;
@@ -54,7 +57,7 @@ export class MapView {
       if(this.floor!==null&&this.floor!==this.current.player.level){this.hover('Viewing another floor — return to Auto to walk.');return;}
       const r=canvas.getBoundingClientRect(),tile=this.projection.world(e.clientX-r.left,e.clientY-r.top);
       const x=Math.round(tile.x),y=Math.round(tile.y);
-      if(this.onMenu&&(this.objectsAt(x,y).some(o=>o.options.some(Boolean))||[...this.current.groundItems.values()].some(i=>i.x===x&&i.y===y&&i.level===this.current!.player!.level)||[...this.current.npcs.values()].some(n=>n.x===x&&n.y===y&&n.level===this.current!.player!.level)))this.onMenu(x,y,e.clientX,e.clientY);
+      if(this.onMenu&&(this.objectsAt(x,y).some(o=>hasObjectMenu(o,this.itemSelected))||[...this.current.groundItems.values()].some(i=>i.x===x&&i.y===y&&i.level===this.current!.player!.level)||[...this.current.npcs.values()].some(n=>n.x===x&&n.y===y&&n.level===this.current!.player!.level)))this.onMenu(x,y,e.clientX,e.clientY);
       else this.pick(x,y);
     });
     canvas.addEventListener('contextmenu',e=>{e.preventDefault();if(!this.current?.player||this.floor!==null&&this.floor!==this.current.player.level)return;const r=canvas.getBoundingClientRect(),t=this.projection.world(e.clientX-r.left,e.clientY-r.top);this.onMenu?.(Math.round(t.x),Math.round(t.y),e.clientX,e.clientY);});
@@ -111,6 +114,18 @@ export class MapView {
     const p=this.projection,s=p.scale,c=this.ctx,at=p.screen(o.x-.5,o.y-.5);
     const w=o.rotation&1?o.height:o.width,h=o.rotation&1?o.width:o.height;
     if(at.x+s*w<0||at.x>p.width||at.y<0||at.y-s*h>p.height)return;
+    if(isFire(o)){
+      // Non-solid fires have no cache actions, but remain visible item-use targets.
+      const center=p.screen(o.x,o.y),radius=Math.max(5,s*.45);
+      c.save();c.translate(center.x,center.y);
+      c.fillStyle='#ff963e';c.strokeStyle='#542c18';c.lineWidth=1.5;
+      c.beginPath();c.moveTo(0,-radius);c.quadraticCurveTo(radius*.2,-radius*.1,radius*.75,0);
+      c.quadraticCurveTo(radius,radius*.9,0,radius*.7);c.quadraticCurveTo(-radius,radius*.9,-radius*.65,0);
+      c.quadraticCurveTo(-radius*.15,-radius*.1,0,-radius);c.fill();c.stroke();
+      c.fillStyle='#ffe38a';c.beginPath();c.arc(0,radius*.25,radius*.3,0,Math.PI*2);c.fill();
+      c.font='11px monospace';c.textAlign='center';c.lineWidth=3;c.strokeStyle='#17221e';
+      c.strokeText(o.name,0,radius+13);c.fillText(o.name,0,radius+13);c.restore();return;
+    }
     if(o.shape<=3){
       const line=(rot:number)=>{
         const x=at.x,y=at.y;const edges=[[x,y,x,y-s],[x,y-s,x+s,y-s],[x+s,y-s,x+s,y],[x+s,y,x,y]][rot&3];
