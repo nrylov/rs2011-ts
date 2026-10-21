@@ -39,6 +39,11 @@ export class GatewaySDK {
  findNearbyObject(...args:Parameters<BotSDK['findNearbyObject']>){return this.query.findNearbyObject(...args);}
  nearbyNpcs(){return this.query.nearbyNpcs();}
  findNearbyNpc(...args:Parameters<BotSDK['findNearbyNpc']>){return this.query.findNearbyNpc(...args);}
+ getCreationMenu(){return this.query.getCreationMenu();}
+ getNumberInput(){return this.query.getNumberInput();}
+ selectCreationProduct(...args:Parameters<BotSDK['selectCreationProduct']>){return this.send.selectCreationProduct(...args);}
+ selectCreationControl(...args:Parameters<BotSDK['selectCreationControl']>){return this.send.selectCreationControl(...args);}
+ submitNumber(...args:Parameters<BotSDK['submitNumber']>){return this.send.submitNumber(...args);}
  getDialog(){return this.query.getDialog();}
  getEmotes(){return this.query.getEmotes();}
  getRunState(){return this.query.getRunState();}

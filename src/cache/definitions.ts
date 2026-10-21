@@ -1,8 +1,8 @@
 import { Reader } from '../core/binary.ts';
 export type Options = (string | null)[];
 export interface NpcType {id:number;name:string;size:number;combat:number;options:Options;varbit?:number;varp?:number;transforms?:number[];}
-export interface ItemType {id:number;name:string;stackable:boolean;options:Options;floorOptions:Options;noteId:number;noteTemplate:number;lendId:number;lendTemplate:number;}
-const params=(r:Reader)=>{for(let n=r.u8();n--;){const text=r.u8();r.take(3);text?r.text():r.i32();}};
+export interface ItemType {id:number;name:string;stackable:boolean;options:Options;floorOptions:Options;noteId:number;noteTemplate:number;lendId:number;lendTemplate:number;params?:Record<number,number|string>;}
+const params=(r:Reader)=>{const values:Record<number,number|string>={};for(let n=r.u8();n--;){const text=r.u8(),key=(r.u8()<<16)|(r.u8()<<8)|r.u8();values[key]=text?r.text():r.i32();}return values;};
 export function decodeNpc(id:number,data:Uint8Array):NpcType{
  const r=new Reader(data),d:NpcType={id,name:'',size:1,combat:0,options:Array(5).fill(null)};
  for(;;){const op=r.u8();if(!op)return d;
@@ -31,7 +31,7 @@ export function decodeItem(id:number,data:Uint8Array):ItemType{
  else if(op===40||op===41)r.take(r.u8()*4);else if(op===42)r.take(r.u8());
  else if([96,113,114,115,134].includes(op))r.u8();else if(op>=100&&op<=109)r.take(4);
  else if([125,126,127,128,129,130].includes(op))r.take(3);else if(op===132)r.take(r.u8()*2);
- else if(op===249)params(r);else throw new Error(`Item ${id}: unknown opcode ${op}`);
+ else if(op===249)d.params=params(r);else throw new Error(`Item ${id}: unknown opcode ${op}`);
  }
 }
 export interface Component {id:number;type:number;parent:number;hidden:boolean;text:string;options:string[];setting:number;}

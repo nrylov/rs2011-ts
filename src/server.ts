@@ -23,10 +23,10 @@ const server=Bun.serve<Relay, never>({
     }
     const mapMatch=/^\/map\/region\/(\d{1,3})\/(\d{1,3})$/.exec(url.pathname);
     const objectMatch=/^\/map\/object\/(\d{1,5})$/.exec(url.pathname);
-    const definitionMatch=/^\/definitions\/(item|npc|interface|varbit|animation)\/(\d{1,5})$/.exec(url.pathname);
+    const definitionMatch=/^\/definitions\/(item|npc|interface|varbit|animation|enum)\/(\d{1,5})$/.exec(url.pathname);
     if(definitionMatch){
       if(!cachePath)return Response.json({error:'Cache is not configured'},{status:503});
-      try{mapCache??=new DiskCache(resolve(cachePath));const kind=definitionMatch[1] as 'item'|'npc'|'interface'|'varbit'|'animation';return Response.json(mapCache[kind](Number(definitionMatch[2])),{headers:{'Cache-Control':'private, max-age=3600'}});}
+      try{mapCache??=new DiskCache(resolve(cachePath));const kind=definitionMatch[1] as 'item'|'npc'|'interface'|'varbit'|'animation'|'enum';return Response.json(mapCache[kind](Number(definitionMatch[2])),{headers:{'Cache-Control':'private, max-age=3600'}});}
       catch(e){return Response.json({error:String(e)},{status:404});}
     }
     if(objectMatch){

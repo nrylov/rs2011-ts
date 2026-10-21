@@ -236,3 +236,7 @@ The separate Kotlin browser client advances animated movement through a paced ga
 
 
 Tutorial Island hides the normal chat history under its instruction panel. The optional [general tutorial feedback fix](compat/void/README.md#optional-general-tutorial-feedback) mirrors common action refusals into a standard click-to-continue statement, including an insufficient Woodcutting level and `Nothing interesting happens.` from invalid item combinations. Both clients display this server dialogue. The SDK and lightweight action status also recognize Engine message type 4; item-use and object helpers reject fresh server refusals instead of treating the popup as a successful recipe dialogue. Outside Tutorial Island these messages remain chat-only.
+
+## Production across skills
+
+The lightweight **Production** panel and shared SDK now handle named products and quantities beyond cooking, including anvil smithing, smelting, fletching, crafting, jewellery, tanning and dedicated production menus. Use a bronze bar on an anvil while carrying a hammer, then choose **Bronze dagger**. In scripts, open the menu normally, inspect `await sdk.getCreationMenu()`, and call `await bot.create('Bronze dagger', 1)`. Make X prompts have a visible amount form and SDK access. See [production API, interface coverage and limitations](docs/production.md).

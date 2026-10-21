@@ -1,3 +1,5 @@
+import {CreationService,type CreationAmount,type CreationMenu} from './creation.ts';
+import type {EnumType} from '../cache/enums.ts';
 import { DialogueService, plainText, type Dialog, type DialogPattern, type DialogWaitOptions } from './dialogue.ts';
 export {plainText,type Dialog,type DialogButton,type DialogPattern,type DialogWaitOptions} from './dialogue.ts';
 import { Session } from './session.ts';
@@ -9,6 +11,7 @@ import {objectKey} from './objects.ts';
 import { sceneObjects } from './scene.ts';
 import { CollisionMap } from './routing.ts';
 export interface GameData {
+ enum?(id:number):EnumType|Promise<EnumType>;
  varbit(id:number):VarbitType|Promise<VarbitType>;
  region(x:number,y:number):MapRegion|null|Promise<MapRegion|null>;
  object(id:number):ObjectType|Promise<ObjectType>;
@@ -21,8 +24,9 @@ export const inventoryOption=(slot:number)=>[0,1,2,6,7][slot];
 export const equipmentComponents:Record<number,number>={0:8,1:11,2:14,3:17,4:20,5:23,7:26,9:29,10:32,12:35,13:38};
 export class BotSDK {
  readonly dialogue:DialogueService;
+ readonly creation:CreationService;
  private changingRun=false;
- constructor(readonly session:Session,readonly data:GameData){this.dialogue=new DialogueService(session,id=>data.interface(id));}
+ constructor(readonly session:Session,readonly data:GameData){this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);}
  getState(){return this.session.world;}
  getInventoryStatus(){return this.getState().containerSync.get('93:0')??'unknown';}
  getEquipmentStatus(){return this.getState().containerSync.get('94:0')??'unknown';}
@@ -161,6 +165,11 @@ export class BotSDK {
   if(!this.isOpen(905)||!this.isOpen(916))throw new Error('No recipe quantity interface is open');
   this.session.clickInterface(916,amount==='all'?8:({1:5,5:6,10:7}[amount]),0);
  }
+ getCreationMenu(){return this.creation.read();}
+ selectCreationProduct(product:string|RegExp,amount:CreationAmount=1,expected?:CreationMenu){return this.creation.select(product,amount,expected);}
+ selectCreationControl(label:string,expected?:CreationMenu){return this.creation.control(label,expected);}
+ getNumberInput(){return this.getState().numberInput;}
+ submitNumber(value:number,expectedSequence?:number){const input=this.getNumberInput();if(!input)throw new Error('No number input is currently requested');if(expectedSequence!==undefined&&input.sequence!==expectedSequence)throw new Error('Number input changed; read the current prompt again');this.session.enterNumber(value);}
  getDialog(){return this.dialogue.read();}
  waitForDialog(options:DialogWaitOptions={}){return this.dialogue.wait(options);}
  async clickDialogByText(pattern:DialogPattern,expected?:Dialog){const d=await this.getDialog();if(!d)throw new Error('No dialogue is open');if(expected&&expected.token!==d.token)throw new Error('Dialogue changed; read the current options before choosing');this.dialogue.press(d,this.dialogue.select(d,pattern));}
@@ -225,7 +234,7 @@ export class BotActions {
  async chopTree(target:MapObject,timeout=30_000){const logIds:Record<string,number>={Tree:1511,'Dead tree':1511,Oak:1521,Willow:1519,'Maple tree':1517,'Yew tree':1515,'Magic tree':1513,Teak:6333,Mahogany:6332};const logId=logIds[target.name];if(logId===undefined)throw new Error('Log type is not mapped for this tree; use interactObject with an explicit effect');const before=this.sdk.count(logId),xp=this.sdk.getState().skills.get(8)?.xp??0;await this.interactObject(target,/^chop/i,w=>this.sdk.count(logId)>before&&(w.skills.get(8)?.xp??0)>xp,timeout);return {logs:this.sdk.count(logId)-before,xp:(this.sdk.getState().skills.get(8)?.xp??0)-xp};}
  async openBank(target?:MapObject|Entity){if(this.sdk.isOpen(762))return;const t=target??await this.sdk.findNearbyNpc(/^banker$/i)??await this.sdk.findNearbyObject(/^bank booth$/i);if(!t)throw new Error('No nearby banker or bank booth');if('index'in t)await this.interactNpc(t,/^bank$/i,()=>this.sdk.isOpen(762));else await this.interactObject(t,/use-quickly|bank/i,()=>this.sdk.isOpen(762));}
  async confirmAppearance(){return this.exclusive(async()=>{if(!this.sdk.isOpen(1028))throw new Error('Character creation is not open');this.sdk.session.clickInterface(1028,117);await this.sdk.session.waitFor(()=>!this.sdk.isOpen(1028),5000);});}
- async closeInterface(){return this.exclusive(async()=>{const ids=[762,11];const open=ids.filter(id=>this.sdk.isOpen(id));if(!open.length)return;this.sdk.session.closeInterface();await this.sdk.session.waitFor(()=>open.every(id=>!this.sdk.isOpen(id)),5000);});}
+ async closeInterface(){return this.exclusive(async()=>{const creation=await this.sdk.getCreationMenu(),ids=[762,11,...(creation?[creation.id,...(creation.id===905?[916]:[])]:[])];const open=ids.filter(id=>this.sdk.isOpen(id));if(!open.length)return;this.sdk.session.closeInterface();await this.sdk.session.waitFor(()=>open.every(id=>!this.sdk.isOpen(id)),5000);});}
  async depositItem(item:Item,amount:1|5|10|'all'=1){return this.exclusive(async()=>{
   if(!this.sdk.isOpen(762)&&!this.sdk.isOpen(11))throw new Error('Bank is not open');
   this.requireItem(item);
@@ -240,21 +249,36 @@ export class BotActions {
   this.sdk.session.clickInterface(762,93,amount==='all'?5:({1:0,5:1,10:2}[amount]),item.id,item.slot);
   await this.sdk.session.waitFor(()=>this.sdk.count(item.id)>=inv+n&&this.sdk.count(item.id,'95:0')<=bank-n);return {amount:n};
  });}
+ /** Select an open production recipe and observe its first conversion, input prompt or next menu. */
+ async create(product:string|RegExp,amount:CreationAmount=1,timeout=20_000,expected?:CreationMenu){return this.exclusive(async()=>{
+  this.timeout(timeout);const inventory=this.sdk.getInventory(),before=JSON.stringify(inventory),counts=new Map<number,number>(),xp=new Map([...this.sdk.getState().skills].map(([id,s])=>[id,s.xp]));for(const item of inventory)counts.set(item.id,(counts.get(item.id)??0)+item.amount);const sequence=this.sdk.getState().messageSequence,inputSequence=this.sdk.getState().scriptSequence;
+  const result=await this.sdk.selectCreationProduct(product,amount,expected),deadline=Date.now()+timeout;
+  while(Date.now()<deadline){
+   const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);
+   const itemId=result.product.itemId,changed=JSON.stringify(this.sdk.getInventory())!==before,productChanged=itemId!==undefined&&this.sdk.count(itemId)!==(counts.get(itemId)??0),gainedXp=[...this.sdk.getState().skills].some(([id,s])=>xp.has(id)&&s.xp>xp.get(id)!);
+   if(changed&&(itemId===undefined||productChanged||gainedXp))return {...result,effect:'inventory' as const};
+   if(result.needsAmount&&(this.sdk.getNumberInput()?.sequence??0)>inputSequence)return {...result,effect:'input' as const,input:this.sdk.getNumberInput()};
+   const menu=await this.sdk.getCreationMenu();if(menu&&menu.id!==result.menu.id)return {...result,effect:'menu' as const,nextMenu:menu};
+   if(this.sdk.session.status!=='playing')throw new Error('Game connection closed');
+   await new Promise(r=>setTimeout(r,50));
+  }
+  throw new Error('No production conversion was observed. Check game messages, ingredients, tools and skill requirements.');
+ });}
  /** Resolves after inventory contents or the active dialogue change. Dispatch is not proof that a recipe completed. */
  async useItemOnItem(source:Item,target:Item,timeout=15_000){return this.exclusive(async()=>{
-  this.timeout(timeout);this.requireItem(source);this.requireItem(target);const relevant=()=>JSON.stringify(this.sdk.getInventory().filter(i=>i.slot===source.slot||i.slot===target.slot)),before=relevant(),dialog=await this.sdk.getDialog(),sequence=this.sdk.getState().messageSequence;this.sdk.sendUseItemOnItem(source,target);
-  const deadline=Date.now()+timeout;while(Date.now()<deadline){if(relevant()!==before)return {effect:'inventory' as const};const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);const next=await this.sdk.getDialog();if(next&&next.kind!=='instruction'&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};if(this.sdk.session.status!=='playing')throw new Error('Game connection closed');await new Promise(r=>setTimeout(r,50));}
+  this.timeout(timeout);this.requireItem(source);this.requireItem(target);const relevant=()=>JSON.stringify(this.sdk.getInventory().filter(i=>i.slot===source.slot||i.slot===target.slot)),before=relevant(),dialog=await this.sdk.getDialog(),creation=await this.sdk.getCreationMenu(),sequence=this.sdk.getState().messageSequence;this.sdk.sendUseItemOnItem(source,target);
+  const deadline=Date.now()+timeout;while(Date.now()<deadline){if(relevant()!==before)return {effect:'inventory' as const};const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);const menu=await this.sdk.getCreationMenu();if(menu&&menu.id!==905&&menu.token!==creation?.token)return {effect:'creation' as const,menu};const next=await this.sdk.getDialog();if(next&&next.kind!=='instruction'&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};if(this.sdk.session.status!=='playing')throw new Error('Game connection closed');await new Promise(r=>setTimeout(r,50));}
   throw new Error('No inventory or dialogue change was observed. Check game messages and recipe requirements.');
  });}
  /** Resolves on consumption/conversion of the source item or a new recipe dialogue, not packet dispatch. */
  async useItemOnObject(source:Item,target:MapObject,timeout=20_000){return this.exclusive(async()=>{
   this.timeout(timeout);this.requireItem(source);
-  const relevant=()=>JSON.stringify(this.sdk.getInventory().filter(i=>i.id===source.id||i.slot===source.slot)),before=relevant(),dialog=await this.sdk.getDialog(),sequence=this.sdk.getState().messageSequence;
+  const relevant=()=>JSON.stringify(this.sdk.getInventory().filter(i=>i.id===source.id||i.slot===source.slot)),before=relevant(),dialog=await this.sdk.getDialog(),creation=await this.sdk.getCreationMenu(),sequence=this.sdk.getState().messageSequence;
   this.sdk.sendUseItemOnObject(source,target);
   const deadline=Date.now()+timeout;while(Date.now()<deadline){
    if(relevant()!==before)return {effect:'inventory' as const};
    const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);
-   const next=await this.sdk.getDialog();if(next&&next.kind!=='instruction'&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};
+   const menu=await this.sdk.getCreationMenu();if(menu&&menu.id!==905&&menu.token!==creation?.token)return {effect:'creation' as const,menu};const next=await this.sdk.getDialog();if(next&&next.kind!=='instruction'&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};
    if(this.sdk.session.status!=='playing')throw new Error('Game connection closed');
    await new Promise(r=>setTimeout(r,50));
   }

@@ -1,3 +1,4 @@
+import {decodeEnum} from './enums.ts';
 import {decodeAnimationTiming} from './animation.ts';
 import { decodeVarbit, decodeNpc, decodeItem, decodeComponent, type NpcType, type ItemType } from './definitions.ts';
 import { openSync, readSync, closeSync, fstatSync } from 'node:fs';
@@ -98,6 +99,7 @@ export class DiskCache {
     if(d.lendTemplate!==-1){const base=this.item(d.lendId,seen);d.name=base.name;d.options=[...base.options];d.options[4]='Discard';}
     this.items.set(id,d);return d;
   }
+  enum(id:number){const raw=this.files(17,id>>>8).get(id&255);if(!raw)throw new Error(`Missing enum ${id}`);return decodeEnum(id,raw);}
   animation(id:number){const raw=this.files(20,id>>>7).get(id&127);if(!raw)throw new Error(`Missing animation ${id}`);return decodeAnimationTiming(id,raw);}
   interface(id:number){return [...this.files(3,id)].map(([component,raw])=>decodeComponent(component,raw));}
   private floorColours() {

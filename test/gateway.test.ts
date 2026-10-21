@@ -53,3 +53,14 @@ test('a replacement publisher must send fresh state before the old snapshot can 
 test('remote agents can query emotes and run state, perform an emote and request run state changes',async()=>{
  const t=await setup();let remote;try{const calls:unknown[]=[];t.sdk.getEmotes=async()=>[{name:'Wave',interfaceId:464,component:7,option:0}];t.sdk.performEmote=async name=>{calls.push(name);return {name:'Wave',interfaceId:464,component:7,option:0,dispatched:true};};t.sdk.getRunState=()=>({enabled:false,mode:'walk',energy:88,available:true});t.sdk.setRunning=async enabled=>{calls.push(enabled);return {enabled,mode:enabled?'run':'walk',energy:88,available:true};};remote=await connectGateway(options(t.gateway.url));expect((await remote.getEmotes())[0].name).toBe('Wave');expect(await remote.getRunState()).toMatchObject({enabled:false,energy:88});expect(await remote.performEmote('Wave')).toMatchObject({component:7,dispatched:true});expect(await remote.setRunning(true)).toMatchObject({enabled:true});expect(calls).toEqual(['Wave',true]);}finally{remote?.close();await t.close();}
 });
+test('remote production queries and actions use the hosted SDK and remain unavailable to observers',async()=>{
+ const t=await setup();let remote,observer;try{
+  t.sdk.data.interface=async()=>[{id:17,parent:65535,type:0,hidden:false,text:'',options:[],setting:0},{id:18,parent:17,type:5,hidden:false,text:'',options:[],setting:0},{id:24,parent:17,type:4,hidden:false,text:'',options:['Make 1 Dagger'],setting:2}];
+  t.sdk.data.item=async(id)=>({id,name:id===1205?'Bronze dagger':'Bronze bar'}) as any;
+  t.s.world.interfaces.set(1,300);t.s.world.interfaceItems.set((300<<16)|18,{id:1205,amount:1});
+  remote=await connectGateway(options(t.gateway.url));observer=await connectGateway(options(t.gateway.url,'observe'));
+  const menu=(await remote.getCreationMenu())!;expect(menu.products[0].name).toBe('Bronze dagger');await remote.selectCreationProduct(/^bronze dagger$/i,1,menu);expect(t.peer.received.some(p=>p.opcode===23)).toBe(true);
+  expect((await observer.getCreationMenu())?.id).toBe(300);await expect(observer.selectCreationProduct('Bronze dagger')).rejects.toThrow('Observer');
+  const input={sequence:42,prompt:'Enter amount:'};t.s.world.numberInput=input;expect(await remote.getNumberInput()).toEqual(input);await remote.submitNumber(2,42);expect(t.s.world.numberInput).toBeNull();
+ }finally{remote?.close();observer?.close();await t.close();}
+});

@@ -110,10 +110,12 @@ await sdk.setRunning(false);
 
 `performEmote` opens the Emotes tab and preserves cache option slots. The catalogue is not an unlock list; server rules still apply. Interface clicks can be ignored while an emote animation is running, so do not immediately chain another action after its dispatch result.
 
+Production is shared with the browser client: `await sdk.getCreationMenu()`, `await sdk.selectCreationProduct(product, amount, menu)`, `await sdk.selectCreationControl(label, menu)`, `await sdk.getNumberInput()`, `await sdk.submitNumber(value, sequence)` and `await sdk.bot.create(product, amount)` are routed to the hosted session. See [production API and coverage](production.md). A create result observes the first conversion or an input/menu transition; it does not certify batch completion.
+
 `sdk.bot` currently supports:
 
 - Movement, Talk-to, dialogue continuation/choices/navigation and dismissal.
-- Chopping, log burning and item-on-item use.
+- Chopping, log burning, item-on-item use and shared production menu selection.
 - Drop, pickup, equip and unequip.
 - Open/close bank, deposit and withdraw.
 - Appearance confirmation and closing supported modal interfaces.

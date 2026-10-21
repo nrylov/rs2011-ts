@@ -28,6 +28,8 @@ export class World {
   containerSync=new Map<string,Exclude<ContainerSyncStatus,'unknown'>>();
   skills = new Map<number, Skill>();
   texts = new Map<number, string>();
+  interfaceItems=new Map<number,{id:number;amount:number}>();
+  scriptSequence=0;numberInput:{sequence:number;prompt:string}|null=null;
   interfaces = new Map<number, number>();
   uiRevision=0;interfaceMounts=new Map<number,number>();interfaceVersions=new Map<number,number>();
   windowId=0; hidden=new Map<number,boolean>(); interfaceRevision=0;
@@ -107,20 +109,21 @@ export class World {
         }
         this.containers.set(key, [...items.values()].sort((a,b) => a.slot - b.slot));if(!this.containerSync.has(key))this.containerSync.set(key,'partial'); break;
       }
+      case 90: {const item=r.le16(),packed=r.inverse32()>>>0,amount=r.i32()>>>0;this.interfaceItems.set(packed,{id:item===65535?-1:item,amount});this.interfaceVersions.set(packed>>>16,++this.uiRevision);break;}
       case 10: { const id = r.le32() >>> 0; this.texts.set(id, r.text());this.interfaceVersions.set(id>>>16,++this.uiRevision); break; }
       case 102: { r.neg8();this.windowId=r.add16();this.interfaces.clear();this.interfaceMounts.clear();this.uiRevision++;this.interfaceRevision++;break; }
       case 108: { const hide=!!r.add8();const packed=r.le32()>>>0;this.hidden.set(packed,hide);this.interfaceVersions.set(packed>>>16,++this.uiRevision);break; }
       case 8: {
         const types=r.text(),args:(number|string)[]=Array(types.length);
         for(let i=types.length-1;i>=0;i--)args[i]=types[i]==='s'?r.text():r.i32();
-        this.scripts.push({id:r.i32(),args});if(this.scripts.length>100)this.scripts.shift();break;
+        const id=r.i32();this.scriptSequence++;if(id===571)this.numberInput=null;if(id===108)this.numberInput={sequence:this.scriptSequence,prompt:String(args[0]??'Enter amount:')};this.scripts.push({id,args});if(this.scripts.length>100)this.scripts.shift();break;
       }
       case 3: {const value=signed(r.u8(),8),id=r.addLe16();this.varcs.set(id,value);this.interfaceVersions.set(905,++this.uiRevision);break;}
       case 16: {const value=r.le32(),id=r.le16();this.varcs.set(id,value);this.interfaceVersions.set(905,++this.uiRevision);break;}
       case 92: {const text=r.text(),id=r.add16();this.varcStrings.set(id,text);this.interfaceVersions.set(905,++this.uiRevision);break;}
       case 53: {const id=r.addLe16(),text=r.text();this.varcStrings.set(id,text);this.interfaceVersions.set(905,++this.uiRevision);break;}
       case 44: { const value=r.inverse32();const id=r.add16();this.varps.set(id,value);this.variableUpdates.set(`p${id}`,++this.configRevision);break; }
-      case 37: { const id = r.le16(), parent = r.le32() >>> 0; r.add8(); this.interfaces.set(parent, id);this.interfaceMounts.set(parent,++this.uiRevision);this.interfaceRevision++; break; }
+      case 37: { const id = r.le16(), parent = r.le32() >>> 0; r.add8(); for(const key of this.interfaceItems.keys())if((key>>>16)===id)this.interfaceItems.delete(key);this.interfaces.set(parent, id);this.interfaceMounts.set(parent,++this.uiRevision);this.interfaceRevision++; break; }
       case 112: {const parent=r.i32()>>>0;this.interfaces.delete(parent);this.interfaceMounts.delete(parent);this.uiRevision++;this.interfaceRevision++;break;}
       case 7: { const id = r.u16(); this.varps.set(id, signed(r.u8(), 8));this.variableUpdates.set(`p${id}`,++this.configRevision); break; }
       case 73: { const value=signed(r.add8(),8),id=r.le16();this.varbits.set(id,value);this.variableUpdates.set(`b${id}`,++this.configRevision);break; }
@@ -294,7 +297,7 @@ export class World {
       playerUpdateAt:this.playerUpdateAt,playerLastMoveTick:this.playerLastMoveTick,playerMotion:this.playerMotion,playerAnimation:this.playerAnimation,
       region: this.region, runEnergy: this.runEnergy, players: [...this.players.values()], npcs: [...this.npcs.values()],
       containers: Object.fromEntries(this.containers), containerSync:Object.fromEntries(this.containerSync), skills: [...this.skills.values()],
-      windowId:this.windowId,hidden:Object.fromEntries(this.hidden),varps:Object.fromEntries(this.varps),varbits:Object.fromEntries(this.varbits),interfaceTexts: Object.fromEntries(this.texts), interfaces: Object.fromEntries(this.interfaces),
+      windowId:this.windowId,hidden:Object.fromEntries(this.hidden),varps:Object.fromEntries(this.varps),varbits:Object.fromEntries(this.varbits),interfaceItems:Object.fromEntries(this.interfaceItems),numberInput:this.numberInput,interfaceTexts: Object.fromEntries(this.texts), interfaces: Object.fromEntries(this.interfaces),
       messages: this.messages, groundItems:[...this.groundItems.values()], objectChanges:[...this.objectChanges.values()], packets: this.packets, unhandled: this.unhandled, visualBlocksSkipped: this.visualBlocksSkipped };
   }
 }

@@ -1,3 +1,4 @@
+import {CreationControls} from './creation-controls.ts';
 import { BotSDK, BotActions, inventoryOption, equipmentComponents, plainText } from '../core/sdk.ts';
 import type { Dialog } from '../core/dialogue.ts';
 import type { Item, Entity } from '../core/world.ts';
@@ -9,10 +10,12 @@ import {refusalFeedback} from './message-feedback.ts';
 const el=(tag:string,text:string)=>{const e=document.createElement(tag);e.textContent=text;return e;};
 const get=(id:string)=>document.getElementById(id)!;
 export class Controls {
+ private creationControls:CreationControls;
  private runPending=false;
  private messageSequence=0;
  private containerKeys=new Map<string,string>();private objectKey='';private objectRequest=0;private selectedItem:Item|null=null;private items=new Map<number,ItemType>();private pending=new Set<number>();private missing=new Set<number>();private renderRevision=0;private collisionKey='';private collisionRequest=0;private dialogToken='';private dialogPending=false;private currentDialog:Dialog|null=null;private npcSignature='';
  constructor(readonly sdk:BotSDK,readonly bot:BotActions,readonly map:MapView){
+  this.creationControls=new CreationControls(sdk,bot,message=>this.report(message));
   map.onMenu=(x,y,cx,cy)=>{void this.mapMenu(x,y,cx,cy).catch(e=>this.report(String(e)));};
   get('run-toggle').onclick=()=>{const state=this.sdk.getRunState();if(this.runPending||state.enabled===null)return;this.runPending=true;this.render();this.run(state.enabled?'Disable run':'Enable run',()=>this.sdk.setRunning(!state.enabled).finally(()=>{this.runPending=false;this.render();}));};
   get('object-filter').oninput=()=>{this.objectKey='';this.renderObjects();};
@@ -61,7 +64,7 @@ export class Controls {
   const source=this.selectedItem;if(!source)return isFire(target)?[{label:`Use an inventory item on ${target.name}…`,run:()=>this.report(`Select Use on an inventory item (such as raw shrimps), then choose Use → ${target.name}.`)}]:[];
   return [{label:`Use ${this.definition(source.id)?.name??source.id} → ${target.name}`,run:()=>{
    this.selectedItem=null;this.render();this.hideMenu();this.report(`Using item on ${target.name}…`);
-   void this.bot.useItemOnObject(source,target).then(result=>this.report(result.effect==='dialogue'?'Choose an option in the recipe dialogue.':'Item conversion observed. Check inventory and game messages for the result.')).catch(e=>this.report(e instanceof Error?e.message:String(e)));
+   void this.bot.useItemOnObject(source,target).then(result=>this.report(result.effect==='dialogue'||result.effect==='creation'?'Choose a product in the production panel.':'Item conversion observed. Check inventory and game messages for the result.')).catch(e=>this.report(e instanceof Error?e.message:String(e)));
   }}];
  }
  private useItems(source:Item,target:Item){
@@ -83,6 +86,7 @@ export class Controls {
   void this.sdk.collisionMap().then(c=>{if(request!==this.collisionRequest)return;this.map.blocked=[...c.blocked].map(k=>{const [x,y]=k.split(',').map(Number);return{x,y};});this.map.draw(w);}).catch(e=>{this.collisionKey='';this.report(String(e));});
  }
  render(){
+  this.creationControls.render();
   const running=this.sdk.getRunState(),runButton=get('run-toggle') as HTMLButtonElement;
   runButton.disabled=this.runPending||this.sdk.session.status!=='playing'||!running.available||running.enabled===null;
   runButton.textContent=this.runPending?'Changing run…':running.enabled===null?'Run: '+running.mode:running.enabled?'Disable run':'Enable run';
@@ -116,7 +120,7 @@ export class Controls {
  private renderDialog(d:Dialog|null){
   const key=`${d?.token??'closed'}:${this.dialogPending}:${this.sdk.session.status}:${this.sdk.isOpen(916)}`;this.currentDialog=d;
   if(this.dialogToken===key)return;this.dialogToken=key;
-  const box=get('dialog');box.setAttribute('aria-busy',String(this.dialogPending));box.replaceChildren();box.hidden=!d;if(!d)return;
+  const box=get('dialog');box.setAttribute('aria-busy',String(this.dialogPending));box.replaceChildren();box.hidden=!d||d.id===905;if(!d||d.id===905)return;
   box.dataset.dialogToken=d.token;
   const header=el('div','');header.className='dialog-header';header.append(el('h2',d.speaker??d.title??(d.kind==='instruction'?'Tutorial':'Conversation')));
   const hint=el('span',this.dialogPending?'Waiting for reply…':d.continueButton?'Space to continue':d.options.length?'Choose a response':'');header.append(hint);box.append(header);
