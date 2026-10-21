@@ -7,7 +7,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipFile
 
-/** Preserve the release class's other methods and ABI; only append the feedback callback. */
+/** Preserve the release class's other methods and ABI; normalize quest completion text before encoding and append the feedback callback. */
 object PatchGameMessages {
     @JvmStatic
     fun main(args: Array<String>) {
@@ -22,6 +22,13 @@ object PatchGameMessages {
                 if (method != "message" || descriptor != "(Lworld/gregs/voidps/engine/entity/character/Character;Ljava/lang/String;Lworld/gregs/voidps/engine/entity/character/player/chat/ChatType;ILjava/lang/String;)V") return visitor
                 patched++
                 return object : MethodVisitor(Opcodes.ASM9, visitor) {
+                    override fun visitCode() {
+                        super.visitCode()
+                        visitVarInsn(Opcodes.ALOAD, 1)
+                        visitVarInsn(Opcodes.ALOAD, 2)
+                        visitMethodInsn(Opcodes.INVOKESTATIC, "world/gregs/voidps/engine/client/GameMessageFeedback", "normalize", "(Ljava/lang/String;Lworld/gregs/voidps/engine/entity/character/player/chat/ChatType;)Ljava/lang/String;", false)
+                        visitVarInsn(Opcodes.ASTORE, 1)
+                    }
                     override fun visitInsn(opcode: Int) {
                         if (opcode == Opcodes.RETURN) {
                             visitVarInsn(Opcodes.ALOAD, 0)
