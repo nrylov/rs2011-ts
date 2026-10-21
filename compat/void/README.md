@@ -64,3 +64,13 @@ For a source build, apply the one-line `GameMessageFeedback.emit(this, text, typ
 Some rock definitions, including Tutorial Island copper and tin, derive a depleted identifier absent from the server's object definitions. The empty definition has id -1, so mining removes the rock instead of showing depleted stone. `Mining.kt` preserves existing valid depleted mappings and falls back to the cache-backed `depleted_rocks_old_1` (object 450) for missing references. Original population-scaled respawn timing, ore yields, XP and non-depleting resources are unchanged. The generic fallback may differ visually from a missing area's intended stone variant.
 
 Add `VOID_MINING_DEPLETION_FIX=1` to the overlay build command to include the replacement mining script. This source uses Kotlin when guards; the builder enables `-Xwhen-guards` for Kotlin 2.0.21. Keep all other previously enabled fixes enabled when rebuilding the overlay. Restart the server to load it. `MiningTest.kt` mirrors source regressions for both tutorial ores, restoration, and preservation of an existing depleted variant. Real-server validation also checks ore yield and both tutorial respawns on the isolated test account.
+
+## Tutorial rat aggression fix
+
+Void's `giant_rat_tutorial_island` (NPC 950) has `hunt_mode = "cowardly"`, which hunts lower-level players. Tutorial rats should wait for the player to attack. Apply the scoped data correction to a source checkout or an unpacked server release:
+
+```sh
+bun scripts/fix-void-tutorial-rats.ts /path/to/void
+```
+
+The script sets that definition's hunting mode to an explicit empty string, which the engine treats as no autonomous hunting. It validates the expected NPC ID and clone and preserves other rat definitions, combat stats, retaliation, drops, respawns and tutorial kill handling. It is safe to repeat. Restart the game server to load the data change; no binary overlay rebuild is needed. This definition is also reused by two Lumbridge Swamp spawns, which become passive too. Other rat types retain their existing behavior.
