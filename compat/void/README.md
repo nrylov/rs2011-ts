@@ -74,3 +74,10 @@ bun scripts/fix-void-tutorial-rats.ts /path/to/void
 ```
 
 The script sets that definition's hunting mode to an explicit empty string, which the engine treats as no autonomous hunting. It validates the expected NPC ID and clone and preserves other rat definitions, combat stats, retaliation, drops, respawns and tutorial kill handling. It is safe to repeat. Restart the game server to load the data change; no binary overlay rebuild is needed. This definition is also reused by two Lumbridge Swamp spawns, which become passive too. Other rat types retain their existing behavior.
+
+
+## Optional tutorial instruction recovery
+
+`VOID_TUTORIAL_INSTRUCTION_FIX=1` adds `TutorialInstructionRecovery.kt`. Every five game ticks while a valid tutorial stage is active, it reasserts the current instruction interface (372). This also repairs a client-only closure, such as the regular client's developer console dismissing the chat-box prompt without a server event. Active dialogue and character creation take precedence, and the timer stops after leaving the tutorial. An already-mounted instruction box is refreshed rather than closed/reopened, preserving delayed skill actions. This adds a small periodic interface/text update during Tutorial Island.
+
+For a source build, copy the script to `game/src/main/kotlin/content/area/misthalin/tutorial_island/` and its regression test to the matching test package. Rebuild script metadata normally. For a published JAR, enable the flag alongside any existing compatibility flags when building the overlay, then restart the server. This fixes recovery server-side for both clients; it does not change the regular client's console keyboard handling. Live validation repeatedly removes the client-side instruction mount, observes automatic restoration within five ticks, and holds an instructor conversation beyond the recovery interval to check that it is not overwritten.

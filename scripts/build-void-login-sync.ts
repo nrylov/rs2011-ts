@@ -9,6 +9,7 @@ const temporary=await mkdtemp(join(tmpdir(),'void-login-sync-'));
 try{
  const classes=join(temporary,'classes');
  const sources=[join(root,'compat/void/LoginStateSync.kt')];if(process.env.VOID_TUTORIAL_DOOR_FIX==='1')sources.push(join(root,'compat/void/TutorialObjects.kt'),join(root,'compat/void/TutorialSkills.kt'));if(process.env.VOID_FIREMAKING_FIX==='1')sources.push(join(root,'compat/void/Firemaking.kt'));
+ if(process.env.VOID_TUTORIAL_INSTRUCTION_FIX==='1')sources.push(join(root,'compat/void/TutorialInstructionRecovery.kt'));
  if(process.env.VOID_MINING_DEPLETION_FIX==='1')sources.push(join(root,'compat/void/Mining.kt'));
  if(process.env.VOID_TUTORIAL_FEEDBACK_FIX==='1')sources.push(join(root,'compat/void/GameMessageFeedback.kt'),join(root,'compat/void/TutorialFeedback.kt'));
  const compile=Bun.spawn([java,'-cp',compiler,'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler',...(process.env.VOID_MINING_DEPLETION_FIX==='1'?['-Xwhen-guards']:[]),'-no-stdlib','-no-reflect','-Xskip-metadata-version-check','-Xskip-prerelease-check','-Xallow-unstable-dependencies','-jvm-target','21','-classpath',resolve(server),'-d',classes,...sources],{stdout:'inherit',stderr:'inherit'});
@@ -24,18 +25,19 @@ try{
  await mkdir(resolve(out,'..'),{recursive:true});
  const pack=Bun.spawn(['python3','-c',`
 import pathlib,zipfile,hashlib,sys
-server,classes,output,feedback=sys.argv[1:]
+server,classes,output,feedback,instructions=sys.argv[1:]
 with zipfile.ZipFile(server) as original:
     registry=original.read('scripts.txt').decode()
 name='content.sdk.LoginStateSync'
 if name not in [line.split('|')[-1] for line in registry.splitlines()]:registry=registry.rstrip()+'\\n'+name+'\\n'
 if feedback=='1' and 'content.area.misthalin.tutorial_island.TutorialFeedback' not in registry.splitlines():registry=registry.rstrip()+'\\ncontent.area.misthalin.tutorial_island.TutorialFeedback\\n'
+if instructions=='1' and 'content.area.misthalin.tutorial_island.TutorialInstructionRecovery' not in registry.splitlines():registry=registry.rstrip()+'\\ncontent.area.misthalin.tutorial_island.TutorialInstructionRecovery\\n'
 with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED) as overlay:
     overlay.writestr('scripts.txt',registry)
     overlay.writestr('server-sha256.txt',hashlib.sha256(pathlib.Path(server).read_bytes()).hexdigest()+'\\n')
     for file in pathlib.Path(classes).rglob('*'):
         if file.is_file():overlay.write(file,file.relative_to(classes).as_posix())
-`,resolve(server),classes,out,process.env.VOID_TUTORIAL_FEEDBACK_FIX??'0'],{stdout:'inherit',stderr:'inherit'});
+`,resolve(server),classes,out,process.env.VOID_TUTORIAL_FEEDBACK_FIX??'0',process.env.VOID_TUTORIAL_INSTRUCTION_FIX??'0'],{stdout:'inherit',stderr:'inherit'});
  if(await pack.exited)throw new Error('Login-state overlay packaging failed');
  console.log(`Built ${out}\nRun Java with this overlay first on the classpath, followed by the matching server JAR.`);
 }finally{await rm(temporary,{recursive:true,force:true});}
