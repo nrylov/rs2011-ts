@@ -19,7 +19,7 @@ For the current local development runtime, the game port is `43597` and prepared
 
 Browser controls:
 
-- Click an open tile to walk along an observed local route. Click an object/NPC or right-click a tile for actions.
+- Click an open tile to walk along an observed local route. Click an object/NPC or right-click a tile for actions. Doors and gates have square markers on their actual wall edges: amber when closed, green when open. Click the marker or its Door/Gate label for **Open** or **Close**, including on rotated doors and either half of a double gate. Hover and right-click use the same target. Tutorial progression checks still apply.
 - Drag to pan; scroll or use +/− to zoom; use **Follow character**, floor, grid and collision controls. Player and NPC names appear above their dots.
 - Click named inventory/equipment items for actions. Bank windows expose deposit/withdraw menus and a deposit-inventory button.
 - First-login character creation offers sex selection and confirmation of the current appearance; the full client provides the visual appearance editor. Tutorial instruction text is displayed when open.

@@ -5,7 +5,7 @@ import type { World } from '../core/world.ts';
 import { objectKey } from '../core/objects.ts';
 import type { ObjectType } from '../cache/format.ts';
 
-import {isFire,hasObjectMenu} from './object-display.ts';
+import {isFire,hasObjectMenu,isDoor,doorPosition} from './object-display.ts';
 
 const hex = (rgb: number) => '#'+(rgb&0xffffff).toString(16).padStart(6,'0');
 /** Original terrain colours and placements, rendered schematically rather than as 3D assets. */
@@ -55,12 +55,11 @@ export class MapView {
       const drag=this.dragging;this.dragging=undefined;
       if(!drag||drag.moved||!this.current?.player)return;
       if(this.floor!==null&&this.floor!==this.current.player.level){this.hover('Viewing another floor — return to Auto to walk.');return;}
-      const r=canvas.getBoundingClientRect(),tile=this.projection.world(e.clientX-r.left,e.clientY-r.top);
-      const x=Math.round(tile.x),y=Math.round(tile.y);
+      const {x,y}=this.menuTile(e.clientX,e.clientY);
       if(this.onMenu&&(this.objectsAt(x,y).some(o=>hasObjectMenu(o,this.itemSelected))||[...this.current.groundItems.values()].some(i=>i.x===x&&i.y===y&&i.level===this.current!.player!.level)||[...this.current.npcs.values()].some(n=>n.x===x&&n.y===y&&n.level===this.current!.player!.level)))this.onMenu(x,y,e.clientX,e.clientY);
       else this.pick(x,y);
     });
-    canvas.addEventListener('contextmenu',e=>{e.preventDefault();if(!this.current?.player||this.floor!==null&&this.floor!==this.current.player.level)return;const r=canvas.getBoundingClientRect(),t=this.projection.world(e.clientX-r.left,e.clientY-r.top);this.onMenu?.(Math.round(t.x),Math.round(t.y),e.clientX,e.clientY);});
+    canvas.addEventListener('contextmenu',e=>{e.preventDefault();if(!this.current?.player||this.floor!==null&&this.floor!==this.current.player.level)return;const tile=this.menuTile(e.clientX,e.clientY);this.onMenu?.(tile.x,tile.y,e.clientX,e.clientY);});
     canvas.addEventListener('pointercancel',()=>{this.dragging=undefined;});
     canvas.addEventListener('pointerleave',()=>this.hover('Drag to pan · scroll to zoom · click a tile to walk'));
   }
@@ -155,8 +154,32 @@ export class MapView {
       if(this.effectiveLevel(o,region)===plane&&x>=o.x&&x<o.x+w&&y>=o.y&&y<o.y+h&&o.name)objects.push({...o,level:plane});
     }return objects;
   }
+  private menuTile(clientX:number,clientY:number){
+    const rect=this.canvas.getBoundingClientRect(),sx=clientX-rect.left,sy=clientY-rect.top,p=this.projection,tile=p.world(sx,sy),plane=this.floor??this.current?.player?.level??0;
+    let closest:MapObject|undefined,distance=Infinity;
+    for(const region of this.store.regions.values())if(region)for(const o of this.objectsIn(region)){
+      if(!isDoor(o)||!hasObjectMenu(o,this.itemSelected)||this.effectiveLevel(o,region)!==plane)continue;
+      const point=doorPosition(o),at=p.screen(point.x,point.y),d=Math.hypot(at.x-sx,at.y-sy);
+      const label=/gate/i.test(o.name)?'Gate':'Door';
+      const overLabel=p.scale>=8&&Math.abs(at.x-sx)<=label.length*3+3&&sy-at.y>=8&&sy-at.y<=20;
+      const score=d<=8?d:overLabel?8+Math.abs(at.x-sx):Infinity;
+      if(score<distance){distance=score;closest=o;}
+    }
+    return closest?{x:closest.x,y:closest.y}:{x:Math.round(tile.x),y:Math.round(tile.y)};
+  }
+  private drawDoorMarker(o:MapObject,region:MapRegion,plane:number){
+    if(!isDoor(o)||this.effectiveLevel(o,region)!==plane)return;
+    const p=this.projection,c=this.ctx,point=doorPosition(o),at=p.screen(point.x,point.y),r=5;
+    if(at.x< -24||at.x>p.width+24||at.y< -24||at.y>p.height+24)return;
+    const open=o.options.some(option=>/^close$/i.test(option??''));
+    c.save();c.fillStyle='#17221e';c.strokeStyle=open?'#8bd0ba':'#edb66b';c.lineWidth=2;
+    c.fillRect(at.x-r,at.y-r,r*2,r*2);c.strokeRect(at.x-r,at.y-r,r*2,r*2);
+    c.beginPath();c.moveTo(at.x-2,at.y+3);c.lineTo(at.x-2,at.y-3);c.lineTo(at.x+2,at.y-3);c.lineTo(at.x+(open?0:2),at.y+3);c.stroke();
+    if(p.scale>=8){c.font='10px monospace';c.textAlign='center';c.lineWidth=3;c.strokeStyle='#17221e';c.fillStyle=open?'#8bd0ba':'#edb66b';const label=/gate/i.test(o.name)?'Gate':'Door';c.strokeText(label,at.x,at.y+17);c.fillText(label,at.x,at.y+17);}
+    c.restore();
+  }
   private showHover(clientX:number,clientY:number){
-    const rect=this.canvas.getBoundingClientRect(),t=this.projection.world(clientX-rect.left,clientY-rect.top),x=Math.round(t.x),y=Math.round(t.y),plane=this.floor??this.current?.player?.level??0;
+    const {x,y}=this.menuTile(clientX,clientY),plane=this.floor??this.current?.player?.level??0;
     const objects=this.objectsAt(x,y);
     this.hover(`${x}, ${y} · plane ${plane}${objects.length?' · '+objects.slice(0,3).map(o=>`${o.name} (${o.id})`).join(', '):''}`);
   }
@@ -190,6 +213,8 @@ export class MapView {
       for(let x=Math.floor(min.x);x<=max.x;x++){const s=p.screen(x-.5,0);c.beginPath();c.moveTo(s.x,0);c.lineTo(s.x,height);c.stroke();}
       for(let y=Math.floor(min.y);y<=max.y;y++){const s=p.screen(0,y-.5);c.beginPath();c.moveTo(0,s.y);c.lineTo(width,s.y);c.stroke();}
     }
+    // Keep markers above terrain, wall footprints and route/collision overlays.
+    for(const region of this.store.regions.values())if(region)for(const object of this.objectsIn(region))this.drawDoorMarker(object,region,plane);
     const labels:{x:number;y:number;text:string;colour:string}[]=[];
     const dot=(x:number,y:number,colour:string,radius:number,label?:string)=>{
       const at=p.screen(x,y);c.fillStyle=colour;c.strokeStyle='#17221e';c.lineWidth=2;c.beginPath();c.arc(at.x,at.y,radius,0,Math.PI*2);c.fill();c.stroke();

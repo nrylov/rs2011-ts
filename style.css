@@ -19,3 +19,5 @@
 .game-tabs{display:flex;flex-wrap:wrap;gap:5px}.game-tabs button{padding:5px 8px;font-size:12px}
 
 .developer-console{margin:16px 0;padding:12px;border:1px solid #526353;border-radius:8px;min-width:0}.developer-console p{font-size:12px;line-height:1.5}.developer-console textarea{display:block;box-sizing:border-box;width:100%;max-width:100%;resize:vertical;background:#101914;color:#e4ebde;border:1px solid #526353;padding:10px;font:13px/1.5 monospace}.developer-console select{max-width:100%;margin:6px 0 10px}.developer-console label{display:block;font-size:12px}.command-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0}.command-toolbar button{width:auto}.command-toolbar span{font-size:12px}#command-output{max-height:320px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:#101914;padding:10px;min-height:32px}
+
+.legend .door-marker{width:10px;height:10px;border-radius:0;border:2px solid #edb66b;background:#17221e}
