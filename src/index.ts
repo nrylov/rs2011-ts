@@ -19,3 +19,7 @@ export type {GatewayConfig,WorldSnapshot,PublishedState} from './gateway/protoco
 export type {CreationMenu,CreationProduct,CreationAction,CreationAmount} from './core/creation.ts';
 
 export type {Health,CombatState,CombatStyle,EquipmentStat} from './core/combat.ts';
+
+export type {PrayerBook,PrayerEntry,PrayerState} from './core/prayer.ts';
+
+export type {CombatSpell} from './core/magic.ts';

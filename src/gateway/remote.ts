@@ -39,6 +39,12 @@ export class GatewaySDK {
  findNearbyObject(...args:Parameters<BotSDK['findNearbyObject']>){return this.query.findNearbyObject(...args);}
  nearbyNpcs(){return this.query.nearbyNpcs();}
  findNearbyNpc(...args:Parameters<BotSDK['findNearbyNpc']>){return this.query.findNearbyNpc(...args);}
+ getCombatSpells(){return this.query.getCombatSpells();}
+ castSpellOnNpc(...args:Parameters<BotSDK['castSpellOnNpc']>){return this.send.castSpellOnNpc(...args);}
+ getPrayerState(){return this.query.getPrayerState();}
+ getPrayers(){return this.query.getPrayers();}
+ openPrayerList(...args:Parameters<BotSDK['openPrayerList']>){return this.send.openPrayerList(...args);}
+ setPrayer(...args:Parameters<BotSDK['setPrayer']>){return this.send.setPrayer(...args);}
  getHealth(){return this.query.getHealth();}
  getCombatState(){return this.query.getCombatState();}
  getCombatStyles(){return this.query.getCombatStyles();}

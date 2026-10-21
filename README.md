@@ -258,3 +258,24 @@ await sdk.closeEquipmentStats();
 ```
 
 These methods also work through the remote gateway. Styles accept a label, mode, RegExp or zero-based index; ambiguous modes reject with the available choices. Selection opens Combat Styles and waits for the authoritative style update, rejecting weapon changes during confirmation. `getCombatState()` includes weapon, selected index, availability and a reason when unavailable. Unknown health or unsynchronized values remain `null`. Maximum HP comes from the base Constitution XP level; current HP can exceed that maximum when boosted. Equipment bonuses preserve server text, including percentages, and remain unknown until received. These controls cover physical attack styles; spell selection and autocasting are separate future work.
+
+## Prayers and tutorial spell casting
+
+Use **Game tabs → Prayer List** for the tutorial's prayer-interface step. SDK and gateway controllers can also open it and activate/deactivate named prayers:
+
+```ts
+await sdk.openPrayerList();
+console.log(await sdk.getPrayerState()); // book, points, base maximum, available prayers
+await sdk.setPrayer('Thick Skin', true);
+await sdk.setPrayer('Thick Skin', false);
+```
+
+`getPrayers()` lists the active book's prayers/curses, required levels, membership flags and active states. `setPrayer(nameOrIdOrRegExpOrIndex, enabled, timeout?)` is idempotent, selects Prayer List and waits for the active-state packet. Numeric indices are zero-based button slots, which differ from active-state bit positions. Server updates also reflect incompatible prayers being removed and points running out. Active lists start empty on a fresh Void login; unknown book and skill values stay unknown. Level and point checks are local hints; server rules remain authoritative. Individual activation rejects quick-prayer selection mode. Quick-prayer presets and changing books at an altar are separate controls.
+
+To finish the tutorial's spell step, ask Terrova for runes, then use the developer console preset **Cast Air Strike on a chicken**, or run:
+
+```ts
+await sdk.castSpellOnNpc('Air Strike', /^chicken$/i);
+```
+
+Revision 634 calls this **Wind Strike**; both names and `wind_strike` are accepted. `getCombatSpells()` lists supported named spells (initially Wind Strike). Casting opens Magic Spellbook, validates the current NPC and spell component, and sends the real spell-on-NPC request. A result observes Magic XP (`effect: 'magic-xp'`) or mind-rune consumption (`effect: 'runes-consumed'`); it does not promise damage or tutorial completion. On this Void server a miss consumes runes without awarding combat XP. Allow the cast animation/cooldown to finish and try again if the tutorial still asks you to cast. Missing runes and other fresh server refusals are reported. Both prayer and casting methods are available through the remote gateway; observers can query but cannot cast or toggle prayers.

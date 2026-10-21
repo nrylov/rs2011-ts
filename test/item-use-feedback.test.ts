@@ -20,7 +20,7 @@ test('firemaking promptly explains a blocked tile instead of waiting for its who
 });
 test('engine no-interest feedback rejects item use even when its statement popup arrives',async()=>{
  const t=await setup();try{let popup=false;t.sdk.getDialog=async()=>popup?({kind:'continue',token:'refusal',lines:['Nothing interesting happens.']}) as never:null;
- const action=t.bot.useItemOnItem(t.sdk.getInventory()[0],t.sdk.getInventory()[1],1000);const caught=action.catch(e=>e as Error);await Bun.sleep(20);popup=true;t.peer.emit(52,new Writer().smart(4).i32(0).u8(0).text('Nothing interesting happens.').finish());expect((await caught as Error).message).toBe('Nothing interesting happens.');
+ const action=t.bot.useItemOnItem(t.sdk.getInventory()[0],t.sdk.getInventory()[1],1000);const caught=action.catch(e=>e as Error);await Bun.sleep(20);popup=true;t.s.world.apply(52,new Writer().smart(4).i32(0).u8(0).text('Nothing interesting happens.').finish());expect((await caught as Error).message).toBe('Nothing interesting happens.');
  }finally{await t.close();}
 });
 test('object helpers surface level refusals rather than waiting for their whole timeout',async()=>{

@@ -152,3 +152,7 @@ This establishes remote session ownership, authenticated control/observation, ac
 Use rs-sdk as a design reference for these features, and verify all IDs and wire formats against the revision 634 source.
 
 Item-on-object interactions are exposed as `sdk.sendUseItemOnObject(itemOrSlot, object)` and `bot.useItemOnObject(item, object, timeout?)`. For example, use raw shrimps on a nearby fire. If the helper returns `effect: 'dialogue'`, use `sdk.selectRecipeQuantity(1 | 5 | 10 | 'all')` followed by `bot.chooseDialogOption(/shrimps/i, {expected: result.dialog})`. These calls use the same inventory/object freshness guards and recipe state as the browser client. A helper returning a dialogue means the recipe is awaiting a choice; an inventory change can represent cooked or burnt food.
+
+Prayer queries: `await sdk.getPrayerState()` and `await sdk.getPrayers()`. Controller actions: `await sdk.openPrayerList()` and `await sdk.setPrayer('Thick Skin', true | false)`. Standard prayers and curses follow the current book and server active-state variables.
+
+Named combat casting starts with `await sdk.castSpellOnNpc('Air Strike', /^chicken$/i)`. `await sdk.getCombatSpells()` lists supported spells. The result reports observed XP or rune consumption; a cast can miss, and the tutorial needs a successful hit. Run these actions sequentially and allow spell cooldowns between casts. See the main README for result semantics and limitations.
