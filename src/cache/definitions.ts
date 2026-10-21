@@ -1,7 +1,7 @@
 import { Reader } from '../core/binary.ts';
 export type Options = (string | null)[];
 export interface NpcType {id:number;name:string;size:number;combat:number;options:Options;varbit?:number;varp?:number;transforms?:number[];}
-export interface ItemType {id:number;name:string;stackable:boolean;options:Options;noteId:number;noteTemplate:number;lendId:number;lendTemplate:number;}
+export interface ItemType {id:number;name:string;stackable:boolean;options:Options;floorOptions:Options;noteId:number;noteTemplate:number;lendId:number;lendTemplate:number;}
 const params=(r:Reader)=>{for(let n=r.u8();n--;){const text=r.u8();r.take(3);text?r.text():r.i32();}};
 export function decodeNpc(id:number,data:Uint8Array):NpcType{
  const r=new Reader(data),d:NpcType={id,name:'',size:1,combat:0,options:Array(5).fill(null)};
@@ -21,10 +21,10 @@ export function decodeNpc(id:number,data:Uint8Array):NpcType{
  }
 }
 export function decodeItem(id:number,data:Uint8Array):ItemType{
- const r=new Reader(data),d:ItemType={id,name:'',stackable:false,options:[null,null,null,null,'Drop'],noteId:-1,noteTemplate:-1,lendId:-1,lendTemplate:-1};
+ const r=new Reader(data),d:ItemType={id,name:'',stackable:false,options:[null,null,null,null,'Drop'],floorOptions:[null,null,'Take',null,null],noteId:-1,noteTemplate:-1,lendId:-1,lendTemplate:-1};
  for(;;){const op=r.u8();if(!op)return d;
  if(op===2)d.name=r.text();else if(op===11)d.stackable=true;
- else if(op>=30&&op<=34)r.text();else if(op>=35&&op<=39){const s=r.text();d.options[op-35]=s.toLowerCase()==='hidden'?null:s;}
+ else if(op>=30&&op<=34){const s=r.text();d.floorOptions[op-30]=s.toLowerCase()==='hidden'?null:s;}else if(op>=35&&op<=39){const s=r.text();d.options[op-35]=s.toLowerCase()==='hidden'?null:s;}
  else if(op===97)d.noteId=r.u16();else if(op===98)d.noteTemplate=r.u16();else if(op===121)d.lendId=r.u16();else if(op===122)d.lendTemplate=r.u16();
  else if([16,65].includes(op)){}else if(op===12)r.i32();
  else if([1,4,5,6,7,8,18,23,24,25,26,78,79,90,91,92,93,95,110,111,112,139,140].includes(op))r.take(2);

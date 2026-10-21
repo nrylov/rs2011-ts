@@ -78,6 +78,12 @@ VOID_USERNAME=mytest VOID_PASSWORD=localpassword bun run example:woodcut-bank
 
 Finish the tutorial first, or use a separate test server configured for mainland starts. The example leaves the character at Lumbridge bank with one log in inventory. It can descend the castle stairs on a later run. It reports missing/depleted trees or blocked routes explicitly.
 
+## Initial inventory synchronization
+
+`getInventoryStatus()` and `getEquipmentStatus()` return `unknown`, `partial`, or `complete`. An empty item array before a complete snapshot does not establish that a character has no items. The lightweight UI now displays that distinction.
+
+Void can omit pre-login inventory and skills while Tutorial Island's sidebar tabs are locked, even though later item updates arrive. The optional [read-only login-state listener](compat/void/README.md) sends the ordinary inventory/equipment/skill snapshots at login without unlocking tabs or changing tutorial progress. Use it when the SDK needs complete state at every tutorial stage. The original server JAR and character saves are not modified by the overlay.
+
 ## NPC dialogue
 
 The lightweight client has a visible conversation panel, nearby **Talk** buttons, labelled choices and Space/number shortcuts. The SDK exposes observed conversation helpers:
@@ -98,7 +104,7 @@ Implemented: RSA/XTEA/ISAAC login; fragmented framing; static-region/player/NPC 
 
 Routing uses terrain flags, rotated footprints, directional walls, bridges and live object overrides. Unknown tiles are blocked and diagonal corner cutting is prevented. Paths are previews; the server remains authoritative. Routes span a local 52-tile window and use short, observed waypoints. Doors require explicit interaction. Dynamic object morphs and mobile entity occupancy are not yet fully modelled.
 
-Remaining: 3D models/animation/textures, original interface layout and ClientScript VM, item icons/audio, ground items, combat state, NPC transform masks, broad crafting/shop/quest helpers, automatic recovery/reconnection and instanced regions. Instanced regions fail explicitly rather than publishing wrong coordinates. NPC names currently use initial type IDs, which can be stale after transforms. The amount form sends requested inputs but does not implement the general ClientScript input UI. This is an initial SDK, with a smaller API than rs-sdk.
+Remaining: 3D models/animation/textures, original interface layout and ClientScript VM, item icons/audio, combat state, NPC transform masks, broad crafting/shop/quest helpers, automatic recovery/reconnection and instanced regions. Instanced regions fail explicitly rather than publishing wrong coordinates. NPC names currently use initial type IDs, which can be stale after transforms. The amount form sends requested inputs but does not implement the general ClientScript input UI. This is an initial SDK, with a smaller API than rs-sdk.
 
 The schematic map uses actual floor colours and placements; overlay masks and object drawings are approximations. Collision shading marks blocked tiles; walls remain visible as lines. Non-ASCII outbound text is currently rejected. Unsupported framed server packets are counted in `world.unhandled`.
 
@@ -119,3 +125,41 @@ Void’s [installation guide](https://github.com/GregHib/void/blob/master/docs/I
 Source references and BSD notices are in [THIRD_PARTY.md](THIRD_PARTY.md). No server binaries, game cache or credentials are included in this repository.
 
 ![Map and gameplay controls](docs/gameplay.png)
+
+## Inventory use, dropping and ground items
+
+Choose **Use …** on an inventory item, then click a second slot. The selected source is highlighted; Escape or Cancel clears it. Drop waits for inventory removal before reporting success. Nearby ground items show names, quantities and coordinates, with **Take** buttons; purple squares mark their tiles on the map. Map menus also offer pickup. Only items the server exposes to your character are shown.
+
+```ts
+const tinderbox = await sdk.findInventoryItem('Tinderbox');
+const logs = await sdk.findInventoryItem('Logs');
+await bot.useItemOnItem(tinderbox!, logs!); // observes inventory change or a new dialogue
+// Or, for firemaking completion specifically:
+await bot.burnLogs((await sdk.findInventoryItem('Logs'))!); // requires consumption + XP
+await bot.dropItem((await sdk.findInventoryItem('Logs'))!);
+const ground = await sdk.findGroundItem('Logs');
+if (ground) await bot.pickupItem(ground);
+```
+
+`getGroundItems(radius = 24)` returns visible, same-floor stacks sorted by distance; each has a session-local `key`, item `id`, `amount`, `x`, `y`, and `level`. `findGroundItem` resolves cache names. Raw `sendUseItemOnItem(sourceSlotOrItem, targetSlotOrItem)`, `sendDropItem(slotOrItem)` and `sendTakeGroundItem(groundItem)` dispatch without waiting for a game effect. Query fresh items before acting: slot changes and vanished ground stacks are rejected.
+
+Game tabs expose the server-visible controls, including Options, Inventory and Stats. `await sdk.selectGameTab('Inventory')` sends the normal tab click; it does not unlock a tab. On Tutorial Island, follow the Guide dialogue and tab instructions before inventory actions unlock. A missing inventory interface is reported separately from an actual bank/deposit modal. Generic item use confirms a state change, not completion of an entire recipe; use a specific helper or wait for the relevant XP/product evidence.
+
+
+## Developer command console
+
+Expand **Developer command console** below the map. Choose an example or type JavaScript, then Run or Cmd/Ctrl+Enter. The active character is displayed beside the button. The console exposes the current `sdk`, `bot`, top-level `await`, and captured `console.log`/`info`/`warn`/`error`/`table`. A single expression displays its result; multiline commands can use `return`:
+
+```js
+await sdk.selectGameTab('Stats')
+```
+
+```js
+const logs = await sdk.findInventoryItem('Logs');
+if (!logs) throw new Error('No logs in inventory');
+return await bot.dropItem(logs);
+```
+
+Commands run locally in the page on the connected character; no command execution endpoint is exposed by the relay. Runs are serialized, results/errors use plain text, and output is bounded. Variables are local to each run and command history is not persisted. This is JavaScript (no TypeScript type annotations). Use short diagnostic commands; there is no script cancellation control. Disconnecting terminates session-backed waits. Raw `sdk.send*` calls and `selectGameTab` report dispatch, while `bot.*` helpers observe the method-specific evidence documented above.
+
+The **Open Inventory tab** button sits above the inventory. It enables when the server exposes that tab. A locked tutorial inventory shows contextual instructions instead of claiming a modal is open. At the opening tutorial stage, talk to the RuneScape Guide, follow the Options-tab prompt, then the Survival Expert; simply selecting an unavailable Inventory tab cannot unlock it.

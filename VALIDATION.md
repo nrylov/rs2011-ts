@@ -110,3 +110,38 @@ Chromium check (`tsdialog4`): used the Nearby NPC Talk button, clicked two conti
 The dialogue tests cover hidden ancestors, additional dialogue interfaces, generic IF3 actions, stale/ambiguous choices, same-interface text changes, unrelated interface updates, close/open gaps, reopening identical text, explicit branch navigation, stopping at unanswered choices, observed Talk-to, cancellation/disconnect/timeouts, asynchronous metadata races and navigation step limits. The complete suite contains **46 passing tests** with the prepared cache enabled; the separate opt-in live movement test is skipped. Strict TypeScript and browser build passed.
 
 Dialogue completion describes a closed panel after a short settling window, not completion of a quest or other game effect. ClientScript-generated interfaces beyond the decoded dialogue controls still require further implementation; see `docs/dialogue.md`.
+
+
+## Initial inventory synchronization — 2026-10-20
+
+The reported tutorial login issue was reproduced with an isolated persistent-state fixture holding a bronze hatchet, tinderbox and two logs at tutorial stage 0. On the unmodified Void 2.11.0 server, a fresh login received no inventory/equipment snapshots and no skill updates, because the corresponding tutorial tabs were not open. Later inventory deltas do not reconstruct the missing original slots.
+
+Added an optional read-only player-spawn listener in `compat/void/LoginStateSync.kt`. It sends the existing full inventory/equipment packets and all current skill values without changing items, XP, tutorial progress or interface visibility. A classpath overlay was built and tested against the published JAR; the original JAR was not modified.
+
+With the listener enabled, the same fixture received all four original item slots, complete equipment and all 25 skills while inventory interface 149 remained unmounted. The checked-in live regression test then passed across two fresh logins, allowing normal server logout delay. The normal port 43597 server was restarted gracefully with this overlay, and a separate tutorial test character confirmed complete inventory/equipment and 25 skills there as well.
+
+The SDK exposes unknown/partial/complete container synchronization status. The lightweight UI no longer presents an unsynchronized inventory as a confirmed 0/28. Full snapshots replace partial state and later incremental updates preserve completeness. Added unit coverage for these distinctions, preexisting items, sparse slots, large stacks and independent fresh sessions.
+
+Inventory-fix validation before the subsequent item/ground work: 49 tests passed, two opt-in live tests skipped, strict TypeScript and browser build passed. The opt-in live inventory test additionally passed against the isolated patched server. To restart the current local server with the fix, use `/private/tmp/void-live-test/server/void-2.11.0/run-with-login-sync.sh`; the original `java -jar` launcher does not load the optional listener.
+
+
+## Item use, ground items and NPC movement — 2026-10-20
+
+The revision-634 ground-item decoder covers standalone and batched addition, removal, reveal and stack updates. Duplicate non-stackable items retain separate entries; an owner's reveal does not duplicate their private stack. Zone clears and fresh regions discard old ground state. Cache floor-action slots and all five outbound floor-item option layouts are covered by source-derived fixtures.
+
+On isolated Void port 43598, disposable `tsitems` dropped logs, observed inventory removal and the new ground stack at its tile, picked that stack up and observed both inventory restoration and ground removal, then used tinderbox on logs and observed consumption, the server's fire-catches message, and 40 Firemaking XP. No user character was controlled. A separate stage-zero tutorial fixture confirmed that raw inventory clicks are rejected by the server when interface 149 has not unlocked; this is distinct from a modal. The login-state overlay only publishes snapshots and intentionally leaves tutorial rules unchanged.
+
+NPC movement now uses the server's clockwise direction encoding (N, NE, E, SE, S, SW, W, NW) rather than the player walk table. Regression tests exercise every direction, 100 wandering loops, running, crawling, and teleport removal/re-addition. NPC transform visual masks remain unsupported as documented.
+
+The lightweight UI adds a selected-item flow with cancellation and stale-slot checks, mirrored action status beside inventory, nearby ground-item pickup controls, map markers/menu pickup, and visible game-tab buttons. No automated browser interaction was used for this iteration; UI behavior still needs hands-on confirmation. Strict TypeScript, protocol tests and production browser build passed; see the final test count below.
+
+Combined validation before the console: **60 tests passed**, two opt-in live tests skipped, strict TypeScript and browser build passed with the prepared cache enabled. The separate inventory-login live regression and drop/pickup/firemaking live probe also passed.
+
+
+## Tutorial tabs and local developer console — 2026-10-20
+
+An isolated tutorial character progressed normally through Guide dialogue, the Options-tab click, the Guide's second conversation, the starting-room door, and Survival Expert dialogue. The server exposed the Inventory tab at the proper stage; selecting it changed the tutorial instruction to “Cut down a tree”. Drop and pickup then succeeded on that same tutorial character. No user character was controlled or modified.
+
+The developer console executes local, explicitly entered JavaScript against the connected SDK/actions, supports awaited expressions and multiline returns, captures logs/results/errors, and serializes runs. Tests cover expression and statement execution, awaited SDK/bot calls, syntax/runtime errors, disconnected/empty/overlapping commands, and map/set/bigint/circular-value formatting. Console output uses `textContent`, not HTML. The implementation was checked against rs-sdk's item-use/drop guards and evidence-based firemaking helper; revision-634 packet layouts remain source-specific.
+
+Final validation including the console: **63 tests passed**, two opt-in live tests skipped, TypeScript checks and browser build passed with the prepared cache enabled.

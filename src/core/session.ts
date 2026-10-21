@@ -129,6 +129,18 @@ export class Session {
     else p.le16(y).add8(0).addLe16(x).add16(id);
     this.send(op,p.finish());
   }
+  interactGroundItem(id:number,x:number,y:number,option=2){
+    const p=new Writer(),op=[22,16,45,24,26][option];if(op===undefined)throw new Error('Ground item option must be 0–4');
+    if(option===0)p.u16(id).u16(x).u16(y).sub8(0);
+    else if(option===1)p.add16(y).add16(id).le16(x).neg8(0);
+    else if(option===2)p.u16(id).add16(x).u8(0).addLe16(y);
+    else if(option===3)p.sub8(0).add16(x).le16(y).u16(id);
+    else p.u16(y).add16(x).neg8(0).add16(id);
+    this.send(op,p.finish());
+  }
+  useItemOnItem(from:{id:number;slot:number},to:{id:number;slot:number}){
+    this.send(72,new Writer().i32(149<<16).inverse32(149<<16).add16(from.slot).u16(from.id).add16(to.slot).u16(to.id).finish());
+  }
   closeInterface() { this.send(70); }
   enterNumber(value:number){if(!Number.isInteger(value)||value<0||value>2147483647)throw new Error('Invalid amount');this.send(32,new Writer().i32(value).finish());}
   enterText(value:string){const text=new Writer().text(value).finish();if(text.length>255)throw new Error('Input is too long');this.send(1,new Writer().u8(text.length).raw(text).finish());}

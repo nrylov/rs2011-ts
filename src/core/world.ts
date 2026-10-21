@@ -5,10 +5,13 @@ import { PACKET_SIZES } from './protocol.ts';
 
 export interface Tile { x: number; y: number; level: number; }
 export interface Entity extends Tile { index: number; type?: number; name?: string; hidden?:boolean; }
+export type ContainerSyncStatus='unknown'|'partial'|'complete';
 export interface Item { slot: number; id: number; amount: number; }
+export interface GroundItem extends Tile { key:number; id:number; amount:number; }
 export interface Skill { index: number; level: number; xp: number; }
 export interface Message { type: number; name?: string; text: string; }
 const WALK = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+const NPC_STEP = [[0,1],[1,1],[1,0],[1,-1],[0,-1],[-1,-1],[-1,0],[-1,1]];
 const RUN = [[-2,-2],[-1,-2],[0,-2],[1,-2],[2,-2],[-2,-1],[2,-1],[-2,0],[2,0],[-2,1],[2,1],[-2,2],[-1,2],[0,2],[1,2],[2,2]];
 const signed = (v: number, bits: number) => v & (1 << (bits - 1)) ? v - (1 << bits) : v;
 
@@ -19,6 +22,7 @@ export class World {
   players = new Map<number, Entity>();
   npcs = new Map<number, Entity>();
   containers = new Map<string, Item[]>();
+  containerSync=new Map<string,Exclude<ContainerSyncStatus,'unknown'>>();
   skills = new Map<number, Skill>();
   texts = new Map<number, string>();
   interfaces = new Map<number, number>();
@@ -28,6 +32,7 @@ export class World {
   messages: Message[] = [];
   varps = new Map<number, number>();
   varbits=new Map<number,number>();variableUpdates=new Map<string,number>();private configRevision=0;
+  groundItems=new Map<number,GroundItem>();private groundSequence=0;
   objectChanges = new Map<string,ObjectChange>();
   private activeZone: {x:number;y:number;level:number} | null = null;
   packets: Record<number, number> = {};
@@ -51,6 +56,7 @@ export class World {
         if(this.activeZone)for(const [key,o] of this.objectChanges){
           if(o.level===level&&o.x>=this.activeZone.x&&o.x<this.activeZone.x+8&&o.y>=this.activeZone.y&&o.y<this.activeZone.y+8)this.objectChanges.delete(key);
         }
+        if(this.activeZone)for(const [key,i] of this.groundItems)if(i.level===level&&i.x>=this.activeZone.x&&i.x<this.activeZone.x+8&&i.y>=this.activeZone.y&&i.y<this.activeZone.y+8)this.groundItems.delete(key);
         break;
       }
       case 41: { const y=r.neg8(),level=r.add8(),x=r.add8();this.setZone(x,y,level);break; }
@@ -61,11 +67,13 @@ export class World {
           const type=r.u8(),op=opcodes[type];
           if(op===undefined)throw new Error(`Unknown zone batch type ${type}`);
           if(op===82||op===58)this.updateObject(op,r);
+          else if([27,63,109,71].includes(op))this.updateGroundItem(op,r);
           else if(op===46){r.take(8);r.text();}
           else{const size=PACKET_SIZES[op];if(size===undefined||size<0)throw new Error(`Unsupported zone batch opcode ${op}`);r.take(size);}
         }
         break;
       }
+      case 27: case 63: case 109: case 71: this.updateGroundItem(opcode,r);break;
       case 82: case 58: this.updateObject(opcode,r);break;
       case 19: this.loadRegion(body); return 'region';
       case 70: throw new Error('Dynamic/instanced region decoding is not implemented yet; refusing to expose incorrect coordinates');
@@ -83,7 +91,7 @@ export class World {
           let amount = r.add8(); if (amount === 255) amount = r.middle32() >>> 0;
           const item = r.add16() - 1; if (item >= 0) items.push({ slot, id: item, amount });
         }
-        this.containers.set(`${id}:${secondary}`, items); break;
+        this.containers.set(`${id}:${secondary}`, items);this.containerSync.set(`${id}:${secondary}`,'complete'); break;
       }
       case 28: {
         const id = r.u16(), secondary = r.u8(), key = `${id}:${secondary}`;
@@ -93,7 +101,7 @@ export class World {
           let amount = item < 0 ? 0 : r.u8(); if (amount === 255) amount = r.i32() >>> 0;
           if (item < 0) items.delete(slot); else items.set(slot, { slot, id: item, amount });
         }
-        this.containers.set(key, [...items.values()].sort((a,b) => a.slot - b.slot)); break;
+        this.containers.set(key, [...items.values()].sort((a,b) => a.slot - b.slot));if(!this.containerSync.has(key))this.containerSync.set(key,'partial'); break;
       }
       case 10: { const id = r.le32() >>> 0; this.texts.set(id, r.text());this.interfaceVersions.set(id>>>16,++this.uiRevision); break; }
       case 102: { r.neg8();this.windowId=r.add16();this.interfaces.clear();this.interfaceMounts.clear();this.uiRevision++;this.interfaceRevision++;break; }
@@ -136,12 +144,25 @@ export class World {
     const size = [104,120,136,168][mapSize];
     if (!size || r.remaining % 16) throw new Error('Invalid region header/XTEA table');
     this.region = { zoneX, zoneY, size, baseX: (zoneX - (size >>> 4)) * 8, baseY: (zoneY - (size >>> 4)) * 8 };
-    this.objectChanges.clear();this.activeZone=null;
+    this.objectChanges.clear();this.groundItems.clear();this.activeZone=null;
   }
 
   private setZone(x:number,y:number,level:number){
     if(!this.region)throw new Error('Zone update before map region');
     this.activeZone={x:this.region.baseX+x*8,y:this.region.baseY+y*8,level};
+  }
+  private updateGroundItem(op:number,r:Reader){
+    if(!this.activeZone)throw new Error('Ground item update before zone header');
+    let id:number,amount=0,offset:number,old=0,owner=-1;
+    if(op===63){amount=r.le16();id=r.le16();offset=r.u8();}
+    else if(op===27){id=r.addLe16()&32767;offset=r.sub8();}
+    else if(op===109){amount=r.le16();offset=r.u8();id=r.add16();owner=r.add16();}
+    else{offset=r.u8();id=r.u16()&32767;old=r.u16();amount=r.u16();}
+    const tile={x:this.activeZone.x+(offset>>>4&7),y:this.activeZone.y+(offset&7),level:this.activeZone.level};
+    const existing=[...this.groundItems.values()].find(i=>i.id===id&&i.x===tile.x&&i.y===tile.y&&i.level===tile.level&&(op!==71||i.amount===old));
+    if(op===27){if(existing)this.groundItems.delete(existing.key);}
+    else if(op===71){if(existing){if(amount)this.groundItems.set(existing.key,{...existing,amount});else this.groundItems.delete(existing.key);}}
+    else if(op!==109||owner!==this.index){const key=++this.groundSequence;this.groundItems.set(key,{key,id,amount,...tile});}
   }
   private updateObject(opcode:number,r:Reader){
     if(!this.activeZone)throw new Error('Object update before zone header');
@@ -236,7 +257,7 @@ export class World {
     const p = this.player; if (!p) throw new Error('NPC update before initial region');
     const b = new Bits(body), count = b.read(8), next: number[] = [];
     if (count > this.npcOrder.length) throw new Error('NPC count exceeds previous tracking set');
-    const step = (n: Entity) => { const d = WALK[b.read(3)]; n.x += d[0]; n.y += d[1]; };
+    const step = (n: Entity) => { const d = NPC_STEP[b.read(3)]; n.x += d[0]; n.y += d[1]; };
     for (let i = count; i < this.npcOrder.length; i++) this.npcs.delete(this.npcOrder[i]);
     for (let i = 0; i < count; i++) {
       const index = this.npcOrder[i], n = this.npcs.get(index)!;
@@ -262,8 +283,8 @@ export class World {
   snapshot() {
     return { name: this.name, index: this.index, tick: this.tick, player: this.player,
       region: this.region, runEnergy: this.runEnergy, players: [...this.players.values()], npcs: [...this.npcs.values()],
-      containers: Object.fromEntries(this.containers), skills: [...this.skills.values()],
+      containers: Object.fromEntries(this.containers), containerSync:Object.fromEntries(this.containerSync), skills: [...this.skills.values()],
       interfaceTexts: Object.fromEntries(this.texts), interfaces: Object.fromEntries(this.interfaces),
-      messages: this.messages, objectChanges:[...this.objectChanges.values()], packets: this.packets, unhandled: this.unhandled, visualBlocksSkipped: this.visualBlocksSkipped };
+      messages: this.messages, groundItems:[...this.groundItems.values()], objectChanges:[...this.objectChanges.values()], packets: this.packets, unhandled: this.unhandled, visualBlocksSkipped: this.visualBlocksSkipped };
   }
 }

@@ -54,7 +54,7 @@ export class MapView {
       if(this.floor!==null&&this.floor!==this.current.player.level){this.hover('Viewing another floor — return to Auto to walk.');return;}
       const r=canvas.getBoundingClientRect(),tile=this.projection.world(e.clientX-r.left,e.clientY-r.top);
       const x=Math.round(tile.x),y=Math.round(tile.y);
-      if(this.onMenu&&(this.objectsAt(x,y).some(o=>o.options.some(Boolean))||[...this.current.npcs.values()].some(n=>n.x===x&&n.y===y&&n.level===this.current!.player!.level)))this.onMenu(x,y,e.clientX,e.clientY);
+      if(this.onMenu&&(this.objectsAt(x,y).some(o=>o.options.some(Boolean))||[...this.current.groundItems.values()].some(i=>i.x===x&&i.y===y&&i.level===this.current!.player!.level)||[...this.current.npcs.values()].some(n=>n.x===x&&n.y===y&&n.level===this.current!.player!.level)))this.onMenu(x,y,e.clientX,e.clientY);
       else this.pick(x,y);
     });
     canvas.addEventListener('contextmenu',e=>{e.preventDefault();if(!this.current?.player||this.floor!==null&&this.floor!==this.current.player.level)return;const r=canvas.getBoundingClientRect(),t=this.projection.world(e.clientX-r.left,e.clientY-r.top);this.onMenu?.(Math.round(t.x),Math.round(t.y),e.clientX,e.clientY);});
@@ -181,6 +181,7 @@ export class MapView {
       if(label&&at.x>=0&&at.x<=width&&at.y>=0&&at.y<=height)labels.push({x:at.x,y:at.y,text:label,colour});
     };
     if(world&&player){
+      for(const i of world.groundItems.values())if(i.level===plane){const at=p.screen(i.x,i.y);c.fillStyle='#e6a4ed';c.fillRect(at.x-3,at.y-3,6,6);}
       for(const n of world.npcs.values())if(n.level===plane&&!n.hidden)dot(n.x,n.y,'#a3d1a5',4,n.name);
       for(const other of world.players.values())if(other.index!==world.index&&other.level===plane)dot(other.x,other.y,'#8cbbfa',4,other.name??`Player ${other.index}`);
       if(player.level===plane)dot(player.x,player.y,'#ffdc80',5,world.name);

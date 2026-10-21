@@ -39,6 +39,7 @@ export class Writer {
   addLe16(v: number) { return this.add8(v).u8(v >>> 8); }
   i32(v: number) { return this.u16(v >>> 16).u16(v); }
   middle32(v: number) { return this.u8(v >>> 8).u8(v).u8(v >>> 24).u8(v >>> 16); }
+  inverse32(v:number) { return this.u8(v >>> 16).u8(v >>> 24).u8(v).u8(v >>> 8); }
   le32(v: number) { return this.le16(v).le16(v >>> 16); }
   smart(v: number) { return v < 128 ? this.u8(v) : this.u16(v + 32768); }
   text(s: string) {

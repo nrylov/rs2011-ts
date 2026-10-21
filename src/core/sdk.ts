@@ -1,7 +1,7 @@
 import { DialogueService, type Dialog, type DialogPattern, type DialogWaitOptions } from './dialogue.ts';
 export {plainText,type Dialog,type DialogButton,type DialogPattern,type DialogWaitOptions} from './dialogue.ts';
 import { Session } from './session.ts';
-import type { Item, Entity, World } from './world.ts';
+import type { Item, Entity, World, GroundItem } from './world.ts';
 import type { MapRegion, MapObject } from '../cache/terrain.ts';
 import type { ObjectType } from '../cache/format.ts';
 import type { ItemType, NpcType, Component, VarbitType } from '../cache/definitions.ts';
@@ -22,11 +22,30 @@ export class BotSDK {
  readonly dialogue:DialogueService;
  constructor(readonly session:Session,readonly data:GameData){this.dialogue=new DialogueService(session,id=>data.interface(id));}
  getState(){return this.session.world;}
+ getInventoryStatus(){return this.getState().containerSync.get('93:0')??'unknown';}
+ getEquipmentStatus(){return this.getState().containerSync.get('94:0')??'unknown';}
  getInventory(){return this.getState().containers.get('93:0')??[];}
  getEquipment(){return this.getState().containers.get('94:0')??[];}
  getBank(){return this.getState().containers.get('95:0')??[];}
  count(id:number,container='93:0'){return (this.getState().containers.get(container)??[]).reduce((n,i)=>n+(i.id===id?i.amount:0),0);}
  isOpen(id:number){return this.getState().windowId===id||[...this.getState().interfaces.values()].includes(id);}
+ async getGameTabs(){
+  const w=this.getState();if(![548,746].includes(w.windowId))return [];
+  const components=await this.data.interface(w.windowId),labels=new Set(['Combat Styles','Task System','Stats','Quest Journals','Inventory','Worn Equipment','Prayer List','Magic Spellbook','Friends List','Ignore List','Clan Chat','Options','Emotes','Music Player','Notes']);
+  return components.flatMap(c=>{const option=c.options.findIndex(o=>labels.has(o));if(option<0)return [];let current:Component|undefined=c;const seen=new Set<number>();while(current){if(seen.has(current.id))return [];seen.add(current.id);if(w.hidden.get((w.windowId<<16)|current.id)??current.hidden)return [];current=components.find(p=>p.id===current!.parent);}return [{interfaceId:w.windowId,component:c.id,option,label:c.options[option]}];});
+ }
+ async selectGameTab(label:string){const tab=(await this.getGameTabs()).find(t=>match(t.label,label));if(!tab)throw new Error('That game tab is not currently available');this.session.clickInterface(tab.interfaceId,tab.component,tab.option);}
+ sendDropItem(item:Item|number){this.sendItemOption(this.inventoryItem(item),7);}
+ inventoryActionError(){
+  if(this.isOpen(762)||this.isOpen(11))return 'Close the bank or deposit box before using inventory items.';
+  if(!this.isOpen(149))return this.isOpen(372)?'Inventory has not unlocked at this tutorial stage. Follow the current tutorial instructions: the Guide and Survival Expert unlock the Inventory tab.':'Inventory interface is closed. Select Inventory from Game tabs or close the current interface.';
+  return null;
+ }
+ private inventoryItem(item:Item|number){const current=this.getInventory().find(i=>i.slot===(typeof item==='number'?item:item.slot));if(!current||typeof item!=='number'&&current.id!==item.id)throw new Error('Item slot changed; query inventory again');return current;}
+ sendUseItemOnItem(source:Item|number,target:Item|number){const error=this.inventoryActionError();if(error)throw new Error(error);const from=this.inventoryItem(source),to=this.inventoryItem(target);if(from.slot===to.slot)throw new Error('Select two different inventory slots');this.session.useItemOnItem(from,to);}
+ getGroundItems(radius=24){const p=this.getState().player;return p?[...this.getState().groundItems.values()].filter(i=>i.level===p.level&&Math.max(Math.abs(i.x-p.x),Math.abs(i.y-p.y))<=radius).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y)):[];}
+ async findGroundItem(pattern:string|RegExp,radius=24){for(const i of this.getGroundItems(radius))if(match((await this.data.item(i.id)).name,pattern))return i;return null;}
+ sendTakeGroundItem(item:GroundItem){const current=this.getState().groundItems.get(item.key);if(!current||current.id!==item.id||current.level!==this.getState().player?.level)throw new Error('Ground item left view; query nearby items again');this.session.interactGroundItem(current.id,current.x,current.y);}
  async findInventoryItem(pattern:string|RegExp){for(const item of this.getInventory())if(match((await this.data.item(item.id)).name,pattern))return item;return null;}
  async nearbyObjects(radius=24){
   const w=this.getState(),p=w.player;if(!p)return [];
@@ -65,10 +84,11 @@ export class BotSDK {
  async clickDialogByText(pattern:DialogPattern,expected?:Dialog){const d=await this.getDialog();if(!d)throw new Error('No dialogue is open');if(expected&&expected.token!==d.token)throw new Error('Dialogue changed; read the current options before choosing');this.dialogue.press(d,this.dialogue.select(d,pattern));}
  async sendClickDialog(index:number,expected?:Dialog){const d=await this.getDialog();if(!d)throw new Error('No dialogue is open');if(expected&&expected.token!==d.token)throw new Error('Dialogue changed; read the current options before choosing');this.dialogue.press(d,this.dialogue.select(d,index));}
  /** Explicit raw dispatch. Use BotActions for observed effects. */
- sendItemOption(item:Item,option:number){if(!this.isOpen(149))throw new Error('Inventory interface is hidden by a modal');this.session.clickInterface(149,0,option,item.id,item.slot);}
+ sendItemOption(item:Item,option:number){const error=this.inventoryActionError();if(error)throw new Error(error);const current=this.inventoryItem(item);this.session.clickInterface(149,0,option,current.id,current.slot);}
 }
 export class BotActions {
  private busy=false;
+ private timeout(value:number){if(!Number.isFinite(value)||value<=0)throw new Error('Action timeout must be positive');}
  private requireItem(item:Item,container='93:0'){const current=this.sdk.getState().containers.get(container)?.find(i=>i.slot===item.slot);if(!current||current.id!==item.id||current.amount<1)throw new Error('Item slot changed; query the current container before acting');}
 
  constructor(readonly sdk:BotSDK){}
@@ -136,6 +156,24 @@ export class BotActions {
   const inv=this.sdk.count(item.id),bank=this.sdk.count(item.id,'95:0'),n=amount==='all'?bank:Math.min(bank,amount);
   this.sdk.session.clickInterface(762,93,amount==='all'?5:({1:0,5:1,10:2}[amount]),item.id,item.slot);
   await this.sdk.session.waitFor(()=>this.sdk.count(item.id)>=inv+n&&this.sdk.count(item.id,'95:0')<=bank-n);return {amount:n};
+ });}
+ /** Resolves after inventory contents or the active dialogue change. Dispatch is not proof that a recipe completed. */
+ async useItemOnItem(source:Item,target:Item,timeout=15_000){return this.exclusive(async()=>{
+  this.timeout(timeout);this.requireItem(source);this.requireItem(target);const relevant=()=>JSON.stringify(this.sdk.getInventory().filter(i=>i.slot===source.slot||i.slot===target.slot)),before=relevant(),dialog=await this.sdk.getDialog();this.sdk.sendUseItemOnItem(source,target);
+  const deadline=Date.now()+timeout;while(Date.now()<deadline){if(relevant()!==before)return {effect:'inventory' as const};const next=await this.sdk.getDialog();if(next&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};if(this.sdk.session.status!=='playing')throw new Error('Game connection closed');await new Promise(r=>setTimeout(r,50));}
+  throw new Error('No inventory or dialogue change was observed. Check game messages and recipe requirements.');
+ });}
+ async burnLogs(logs:Item,timeout=45_000){return this.exclusive(async()=>{
+  this.timeout(timeout);this.requireItem(logs);const tinderbox=await this.sdk.findInventoryItem(/^tinderbox$/i);if(!tinderbox)throw new Error('No tinderbox in inventory');const count=this.sdk.count(logs.id),xp=this.sdk.getState().skills.get(11)?.xp??0;
+  this.sdk.sendUseItemOnItem(tinderbox,logs);await this.sdk.session.waitFor(w=>this.sdk.count(logs.id)<count&&(w.skills.get(11)?.xp??0)>xp,timeout);return {xp:(this.sdk.getState().skills.get(11)?.xp??0)-xp};
+ });}
+ async dropItem(item:Item,timeout=10_000){return this.exclusive(async()=>{
+  this.timeout(timeout);this.requireItem(item);const before=this.sdk.count(item.id);this.sdk.sendDropItem(item);
+  try{await this.sdk.session.waitFor(()=>this.sdk.count(item.id)<before,timeout);}catch(e){if(this.sdk.session.status!=='playing')throw e;throw new Error('Drop was not observed. Check game messages; the server may block dropping this item here.');}
+  return {amount:before-this.sdk.count(item.id)};
+ });}
+ async pickupItem(item:GroundItem,timeout=20_000){return this.exclusive(async()=>{
+  this.timeout(timeout);const before=this.sdk.count(item.id);this.sdk.sendTakeGroundItem(item);await this.sdk.session.waitFor(()=>this.sdk.count(item.id)>before&&!this.sdk.getState().groundItems.has(item.key),timeout);return {amount:this.sdk.count(item.id)-before};
  });}
  async equipItem(item:Item){return this.exclusive(async()=>{this.requireItem(item);const before=this.sdk.count(item.id,'94:0');this.sdk.sendItemOption(item,1);await this.sdk.session.waitFor(()=>this.sdk.count(item.id,'94:0')>before);});}
  async unequipItem(item:Item){return this.exclusive(async()=>{this.requireItem(item,'94:0');const component=equipmentComponents[item.slot];if(component===undefined)throw new Error('Unknown equipment slot');const before=this.sdk.count(item.id,'94:0');this.sdk.session.clickInterface(387,component,0,item.id,item.slot);await this.sdk.session.waitFor(()=>this.sdk.count(item.id,'94:0')<before);});}
