@@ -1,3 +1,6 @@
+import {ActionLog} from './action-log.ts';
+import {traceActions} from './action-history.ts';
+import {sdkActions,botActions} from '../gateway/protocol.ts';
 import {ActivityIndicator} from './activity.ts';
 import {GatewayControls} from './gateway-controls.ts';
 import {DeveloperConsole} from './developer-console.ts';
@@ -12,6 +15,7 @@ const canvas = get<HTMLCanvasElement>('map');
 const form = get<HTMLFormElement>('login');
 let session: Session | undefined, ws: WebSocket | undefined, controls:Controls|undefined;
 const data=browserData();
+const actionLog=new ActionLog(get('sdk-action-log'));
 const activity=new ActivityIndicator(get('player-activity'),()=>session,async id=>{
  const response=await fetch(`/definitions/animation/${id}`);
  if(!response.ok)throw new Error('Animation timing unavailable');return response.json();
@@ -74,7 +78,8 @@ form.addEventListener('submit', event => {
     clearTimeout(opening);
     try {
       current=session=new Session({send:bytes=>{if(socket.readyState!==WebSocket.OPEN)throw new Error('WebSocket closed');socket.send(bytes);},close:()=>socket.close()}, {username,password,modulus:config.modulus});
-      const sdk=new BotSDK(current,data),bot=new BotActions(sdk);controls=new Controls(sdk,bot,map);
+      const rawSdk=new BotSDK(current,data),rawBot=new BotActions(rawSdk);
+      const sdk=traceActions(rawSdk,'sdk',actionLog.history,sdkActions),bot=traceActions(rawBot,'bot',actionLog.history,botActions);controls=new Controls(sdk,bot,map);
       Object.defineProperty(window,'rs2011',{value:{sdk,bot,map,session:current},configurable:true});
       current.subscribe(render);get<HTMLInputElement>('login').querySelector<HTMLInputElement>('[name=password]')!.value='';render();
     } catch(e) {get('error').textContent=String(e);socket.close();get<HTMLButtonElement>('connect').disabled=false;}

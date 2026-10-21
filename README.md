@@ -311,3 +311,6 @@ bun bots/mybot/script.ts
 ```
 
 The MCP server provides `create_bot`, `execute_code`, `list_bots` and `disconnect_bot`. `execute_code` exposes `sdk` and `bot`, attaches to an existing gateway client, and can start a local lightweight client automatically. Scripts remain in the account's directory. Gateway clients and local agent scripts can run on different machines; game credentials/cache stay on the client host. See [MCP tools, configuration, cancellation and remote setup](mcp/README.md).
+
+
+The lightweight client's **SDK action log** card records recent agent, developer-console and page-control calls to public SDK/bot action methods. Expand an entry to see its arguments, return value or error and duration. It keeps at most 200 entries in memory, supports clearing, and resets on refresh. Queries and direct `session.*` packet calls are not recorded. “Returned” describes method completion; raw dispatch receipts still require observing the game effect. Existing browser sessions need a later refresh to load this feature.
