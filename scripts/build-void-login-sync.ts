@@ -9,8 +9,9 @@ const temporary=await mkdtemp(join(tmpdir(),'void-login-sync-'));
 try{
  const classes=join(temporary,'classes');
  const sources=[join(root,'compat/void/LoginStateSync.kt')];if(process.env.VOID_TUTORIAL_DOOR_FIX==='1')sources.push(join(root,'compat/void/TutorialObjects.kt'),join(root,'compat/void/TutorialSkills.kt'));if(process.env.VOID_FIREMAKING_FIX==='1')sources.push(join(root,'compat/void/Firemaking.kt'));
+ if(process.env.VOID_MINING_DEPLETION_FIX==='1')sources.push(join(root,'compat/void/Mining.kt'));
  if(process.env.VOID_TUTORIAL_FEEDBACK_FIX==='1')sources.push(join(root,'compat/void/GameMessageFeedback.kt'),join(root,'compat/void/TutorialFeedback.kt'));
- const compile=Bun.spawn([java,'-cp',compiler,'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler','-no-stdlib','-no-reflect','-Xskip-metadata-version-check','-Xskip-prerelease-check','-Xallow-unstable-dependencies','-jvm-target','21','-classpath',resolve(server),'-d',classes,...sources],{stdout:'inherit',stderr:'inherit'});
+ const compile=Bun.spawn([java,'-cp',compiler,'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler',...(process.env.VOID_MINING_DEPLETION_FIX==='1'?['-Xwhen-guards']:[]),'-no-stdlib','-no-reflect','-Xskip-metadata-version-check','-Xskip-prerelease-check','-Xallow-unstable-dependencies','-jvm-target','21','-classpath',resolve(server),'-d',classes,...sources],{stdout:'inherit',stderr:'inherit'});
  if(await compile.exited)throw new Error('Login-state listener compilation failed');
  if(process.env.VOID_TUTORIAL_FEEDBACK_FIX==='1'){
   const helper=join(temporary,'patcher');

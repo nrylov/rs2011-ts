@@ -18,6 +18,9 @@ const signed = (v: number, bits: number) => v & (1 << (bits - 1)) ? v - (1 << bi
 /** Shared browser/headless state. Wire positions are authoritative; never predict arrival. */
 export class World {
   index = 0; name = ''; tick = 0; runEnergy = 0;
+  playerUpdateAt=0;playerLastMoveTick=0;
+  playerMotion:'walk'|'run'|'teleport'|null=null;
+  playerAnimation:{ids:number[];delay:number;receivedAt:number;tick:number}|null=null;
   region: { zoneX: number; zoneY: number; size: number; baseX: number; baseY: number } | null = null;
   players = new Map<number, Entity>();
   npcs = new Map<number, Entity>();
@@ -78,7 +81,7 @@ export class World {
       case 82: case 58: this.updateObject(opcode,r);break;
       case 19: this.loadRegion(body); return 'region';
       case 70: throw new Error('Dynamic/instanced region decoding is not implemented yet; refusing to expose incorrect coordinates');
-      case 105: this.updatePlayers(body); this.tick++; break;
+      case 105: this.playerMotion=null;this.updatePlayers(body);this.playerUpdateAt=Date.now();this.tick++;if(this.playerMotion)this.playerLastMoveTick=this.tick;break;
       case 118: this.updateNpcs(body); break;
       case 47: {
         const level = r.sub8(), index = r.neg8(), xp = r.middle32() >>> 0;
@@ -204,7 +207,7 @@ export class World {
     }
     const masks=new Reader(body);masks.pos=b.bit>>>3;
     for(const index of this.maskedPlayers){
-      const name=playerMask(masks);
+      const name=playerMask(masks,(ids,delay)=>{if(index===this.index)this.playerAnimation={ids,delay,receivedAt:Date.now(),tick:this.tick+1};});
       if(name!==undefined){
         this.playerNames.set(index,name);const entity=this.players.get(index);if(entity)entity.name=name;
         if(index===this.index)this.name=name;
@@ -223,6 +226,7 @@ export class World {
       }
       return;
     }
+    if(index===this.index)this.playerMotion=kind===1?'walk':kind===2?'run':'teleport';
     if (kind === 1 || kind === 2) {
       const d = (kind === 1 ? WALK : RUN)[b.read(kind === 1 ? 3 : 4)]; p.x += d[0]; p.y += d[1];
     } else if (!b.read(1)) {
@@ -287,6 +291,7 @@ export class World {
 
   snapshot() {
     return { name: this.name, index: this.index, tick: this.tick, player: this.player,
+      playerUpdateAt:this.playerUpdateAt,playerLastMoveTick:this.playerLastMoveTick,playerMotion:this.playerMotion,playerAnimation:this.playerAnimation,
       region: this.region, runEnergy: this.runEnergy, players: [...this.players.values()], npcs: [...this.npcs.values()],
       containers: Object.fromEntries(this.containers), containerSync:Object.fromEntries(this.containerSync), skills: [...this.skills.values()],
       windowId:this.windowId,hidden:Object.fromEntries(this.hidden),varps:Object.fromEntries(this.varps),varbits:Object.fromEntries(this.varbits),interfaceTexts: Object.fromEntries(this.texts), interfaces: Object.fromEntries(this.interfaces),

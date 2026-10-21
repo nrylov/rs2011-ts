@@ -167,6 +167,10 @@ The **Open Inventory tab** button sits above the inventory. It enables when the 
 If `getGameTabs()` returns `[]`, run `await sdk.getGameTabStatus()` to see the active window, visible tabs, and the current tutorial instruction. At stage 0, every tab is hidden by the server. Start with `await bot.talkTo('RuneScape guide')` and progress the conversation with the dialogue panel or `await bot.navigateDialog()`. Once the Options tab appears, select it when prompted. Inventory unlocks later at the Survival Expert step. A tab click cannot skip these server-side stages.
 
 
+## Player activity
+
+A player activity badge above the map shows Idle, Walking/Running, Animating, In dialogue or Resting. Movement and animation updates come from the server; a clicked command alone does not change the badge. Animation end times are estimated from revision 634 cache timings, including delay and loops. The badge becomes unknown when updates are stale or animation timing cannot be read, and disconnected when the session ends. Hover for details. Idle means no observed movement or active animation; it is not a guarantee that the server has no queued action.
+
 ## Emotes and run mode
 
 The developer console and SDK support named revision 634 emotes and explicit run mode:

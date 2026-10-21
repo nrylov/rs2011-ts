@@ -14,7 +14,7 @@ export function appearanceName(bytes: Uint8Array) {
 }
 
 /** Consume all known player mask fields in wire order to reach every appearance reliably. */
-export function playerMask(r: Reader) {
+export function playerMask(r: Reader,onAnimation?:(ids:number[],delay:number)=>void) {
   let mask=r.u8();if(mask&0x40)mask|=r.u8()<<8;if(mask&0x4000)mask|=r.u8()<<16;
   const known=0x1|0x400|0x1000|0x4|0x2|0x2000|0x200|0x40000|0x80|0x20|0x8|0x10|0x800|0x40|0x4000;
   if(mask&~known)throw new Error(`Unknown player visual mask 0x${mask.toString(16)}`);
@@ -36,7 +36,7 @@ export function playerMask(r: Reader) {
   if(mask&0x40000)r.take(8);
   if(mask&0x80)r.take(1);
   if(mask&0x20)r.take(7);
-  if(mask&0x8)r.take(9);
+  if(mask&0x8){const ids=Array.from({length:4},()=>{const id=r.add16();return id===65535?-1:id;});const delay=r.add8();onAnimation?.(ids,delay);}
   let name:string|undefined;
   if(mask&0x10)name=appearanceName(r.take(r.u8()));
   if(mask&0x800)r.take(1);

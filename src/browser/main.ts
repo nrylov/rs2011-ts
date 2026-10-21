@@ -1,3 +1,4 @@
+import {ActivityIndicator} from './activity.ts';
 import {GatewayControls} from './gateway-controls.ts';
 import {DeveloperConsole} from './developer-console.ts';
 import {BotSDK,BotActions,plainText} from '../core/sdk.ts';
@@ -11,6 +12,12 @@ const canvas = get<HTMLCanvasElement>('map');
 const form = get<HTMLFormElement>('login');
 let session: Session | undefined, ws: WebSocket | undefined, controls:Controls|undefined;
 const data=browserData();
+const activity=new ActivityIndicator(get('player-activity'),()=>session,async id=>{
+ const response=await fetch(`/definitions/animation/${id}`);
+ if(!response.ok)throw new Error('Animation timing unavailable');return response.json();
+});
+// Refresh only this small indicator so finite animations expire without redrawing the map.
+setInterval(()=>activity.render(),500);
 let renderedMessages:Session|undefined,renderedMessageSequence=-1;
 const gatewayControls=new GatewayControls(()=>controls&&session?.status==='playing'?{sdk:controls.sdk,bot:controls.bot}:null);
 const developerConsole=new DeveloperConsole(()=>controls&&session?.status==='playing'?{sdk:controls.sdk,bot:controls.bot}:null);
@@ -30,6 +37,7 @@ get('map-zoom-out').onclick=()=>map.zoom(.8);
 get<HTMLInputElement>('map-grid').onchange=e=>{map.grid=(e.target as HTMLInputElement).checked;map.draw(session?.world);};
 get<HTMLSelectElement>('map-floor').onchange=e=>{const value=(e.target as HTMLSelectElement).value;map.floor=value==='auto'?null:Number(value);map.draw(session?.world);};
 function render() {
+  activity.render();
   developerConsole.render();gatewayControls.render();
   const w = session?.world;
   get('status').textContent = session ? ({handshake:'Connecting…',login:'Logging in…',playing:'Connected',closed:'Disconnected',error:'Connection failed'}[session.status]) : 'Disconnected';
