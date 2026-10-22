@@ -50,6 +50,8 @@ export class GatewaySDK {
  getSpells(){return this.query.getSpells();}
  castSpell(...args:Parameters<BotSDK['castSpell']>){return this.send.castSpell(...args);}
  homeTeleport(...args:Parameters<BotSDK['homeTeleport']>){return this.send.homeTeleport(...args);}
+ getAutocastState(){return this.query.getAutocastState();}
+ setAutocast(...args:Parameters<BotSDK['setAutocast']>){return this.send.setAutocast(...args);}
  getCombatSpells(){return this.query.getCombatSpells();}
  castSpellOnNpc(...args:Parameters<BotSDK['castSpellOnNpc']>){return this.send.castSpellOnNpc(...args);}
  getPrayerState(){return this.query.getPrayerState();}

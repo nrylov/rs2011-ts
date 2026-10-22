@@ -274,7 +274,7 @@ console.log(await sdk.getEquipmentStats());
 await sdk.closeEquipmentStats();
 ```
 
-These methods also work through the remote gateway. Styles accept a label, mode, RegExp or zero-based index; ambiguous modes reject with the available choices. Selection opens Combat Styles and waits for the authoritative style update, rejecting weapon changes during confirmation. `getCombatState()` includes weapon, selected index, availability and a reason when unavailable. Unknown health or unsynchronized values remain `null`. Maximum HP comes from the base Constitution XP level; current HP can exceed that maximum when boosted. Equipment bonuses preserve server text, including percentages, and remain unknown until received. These controls cover physical attack styles; spell selection and autocasting are separate future work.
+These methods also work through the remote gateway. Styles accept a label, mode, RegExp or zero-based index; ambiguous modes reject with the available choices. Selection opens Combat Styles and waits for the authoritative style update, rejecting weapon changes during confirmation. `getCombatState()` includes weapon, selected index, availability and a reason when unavailable. Unknown health or unsynchronized values remain `null`. Maximum HP comes from the base Constitution XP level; current HP can exceed that maximum when boosted. Equipment bonuses preserve server text, including percentages, and remain unknown until received. These controls cover physical attack styles; spell casting and autocast selection use the magic APIs below.
 
 ## Prayers and tutorial spell casting
 
@@ -363,3 +363,16 @@ if (offer?.id === 178) {
 ```
 
 The existing gateway/MCP dialogue API carries these offers; no automatic acceptance is performed. Published options disappear when the server hides the start-choice controls. A dispatched choice does not by itself establish a quest's subsequent progress.
+
+### Magic combat autocast
+
+```ts
+const autocast = await sdk.getAutocastState(); // selected spell and visible choices
+await sdk.setAutocast('Air Strike');           // Wind Strike alias
+await sdk.setAutocast('Wind Strike');          // idempotent, does not toggle it off
+await sdk.setAutocast(null);                   // disable
+```
+
+These methods work through the gateway and MCP, including browser-attached regular and lightweight clients. Selection opens Magic Spellbook and waits for the server's autocast variable (revision 634 varp 108). `getAutocastState()` is read-only and does not open a tab. Its choices require a visible combat spell with an Autocast action; Lunar spells are excluded. Spell IDs come from the revision 634 server profiles, not the 2004 SDK.
+
+Setting autocast selects a continuing combat spell; it does not start combat or prove that damage was dealt. The server remains responsible for equipment, level, rune and target restrictions. A staff is not required for this revision: [Jagex removed that requirement on 2 September 2009](https://secure.runescape.com/m=news/changes-to-autocasting-spells). Weapon changes clear autocast server-side. An unknown spell ID remains visible as `castId` with `spell: null`. Disabling requires the selected spell to remain visible in its spellbook because this server toggles Autocast by clicking that same spell. A timeout or refusal rejects the selection and releases its pending-operation guard.

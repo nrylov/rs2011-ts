@@ -46,3 +46,5 @@ Local gateway configuration reloads additive bot registrations without dropping 
 Execution uses a separate worker so even a CPU-bound loop can be terminated. New calls cancel the prior execution for that bot; bots run independently. Cancellation closes the script's gateway connection and prevents subsequent calls, but an already-accepted hosted action may still finish. This is a trusted local code-execution service, like a terminal—not an untrusted-code sandbox. Don't expose its stdio transport to strangers. Durable programs belong in the bot's directory and should use `runScript` from `bots/run-script.ts`.
 
 Resources expose the SDK README, agent guide and gateway documentation through fixed resource URIs.
+
+Autocast is available through `await sdk.getAutocastState()`, `await sdk.setAutocast('Wind Strike')` (alias `'Air Strike'`), and `await sdk.setAutocast(null)` to disable it. Re-selecting the current spell is safe. Selection awaits the server's chosen-spell update and does not start an attack. This revision allows autocasting without a staff; Lunar spells have no autocast option.

@@ -4,6 +4,8 @@ import {NavigationService,type RouteOptions,type WalkOptions} from './navigation
 export type {RouteOptions,WalkOptions,RoutePlan,DoorStep} from './navigation.ts';
 import {SpellService,type SpellTarget} from './spells.ts';
 import {MagicService} from './magic.ts';
+import {AutocastService} from './autocast.ts';
+export type {AutocastState,AutocastSpell} from './autocast.ts';
 import {PrayerService} from './prayer.ts';
 import {CombatService} from './combat.ts';
 import {CreationService,type CreationAmount,type CreationMenu} from './creation.ts';
@@ -34,6 +36,7 @@ export class BotSDK {
  readonly dialogue:DialogueService;
  readonly spells:SpellService;
  readonly magic:MagicService;
+ readonly autocast:AutocastService;
  readonly prayers:PrayerService;
  readonly combat:CombatService;
  readonly creation:CreationService;
@@ -41,11 +44,13 @@ export class BotSDK {
  getSessionStatus(){return {status:this.session.status,error:this.session.error};}
  readonly navigation:NavigationService;
  private changingRun=false;
- constructor(readonly session:Session,readonly data:GameData){this.sceneRegions=new SceneRegions(()=>session.world.region,(x,y)=>data.region(x,y));this.navigation=new NavigationService(this);this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);this.combat=new CombatService(this);this.prayers=new PrayerService(this);this.magic=new MagicService(this);this.spells=new SpellService(this);}
+ constructor(readonly session:Session,readonly data:GameData){this.sceneRegions=new SceneRegions(()=>session.world.region,(x,y)=>data.region(x,y));this.navigation=new NavigationService(this);this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);this.combat=new CombatService(this);this.prayers=new PrayerService(this);this.magic=new MagicService(this);this.autocast=new AutocastService(this);this.spells=new SpellService(this);}
  getState(){return this.session.world;}
  getSpells(){return this.spells.list();}
  castSpell(spell:string|RegExp,target?:SpellTarget,option?:string){return this.spells.cast(spell,target,option);}
  homeTeleport(timeout=45000){return this.spells.home(timeout);}
+ getAutocastState(){return this.autocast.state();}
+ setAutocast(spell:string|RegExp|null,timeout=5000){return this.autocast.set(spell,timeout);}
  getCombatSpells(){return this.magic.spells();}
  castSpellOnNpc(spell:string|RegExp,target:Entity|string|RegExp,timeout=20000){return this.magic.cast(spell,target,timeout);}
  getPrayerState(){return this.prayers.state();}

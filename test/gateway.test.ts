@@ -213,3 +213,20 @@ test('terminal SDK errors preserve decoder reasons through gateway state, pendin
  try{remote=await connectGateway(options(t.gateway.url));t.sdk.getDialog=()=>new Promise<null>(()=>{});const pending=remote.getDialog();await Bun.sleep(20);t.s.fail('Failed to decode game packet 70 (12 bytes): Truncated bit stream');await expect(pending).rejects.toThrow('packet 70');await Bun.sleep(20);expect(remote.getSessionStatus()).toMatchObject({status:'error',error:expect.stringContaining('Truncated bit stream')});expect(remote.hasAttachedClient()).toBe(true);await expect(remote.query.getRunState()).rejects.toThrow('Truncated bit stream');await expect(remote.waitForTicks(1)).rejects.toThrow('Truncated bit stream');}
  finally{remote?.close();await t.close();}
 });
+
+test('autocast is exposed remotely, waits for server selection, and observers cannot change it',async()=>{
+ const t=await setup();let remote,observer;
+ try{
+  const c=(id:number,options:string[]=[],mask=0)=>({id,parent:65535,options,type:5,hidden:false,text:'',setting:mask<<11});
+  t.sdk.data.interface=async id=>id===548?[c(176,['Magic Spellbook'])]:id===192?[c(25,['Autocast','Cast'],10)]:[];
+  const w=t.s.world;w.windowId=548;w.interfaces.set(22,192);w.containerSync.set('94:0','complete');w.containers.set('94:0',[]);
+  remote=await connectGateway(options(t.gateway.url));observer=await connectGateway(options(t.gateway.url,'observe'));
+  expect((await observer.getAutocastState()).enabled).toBe(false);
+  const action=remote.setAutocast('Air Strike',1000);
+  const until=Date.now()+1000;while(!t.peer.received.some(p=>p.opcode===23&&new DataView(p.body.buffer,p.body.byteOffset,p.body.byteLength).getUint32(0)===((192<<16)|25))&&Date.now()<until)await Bun.sleep(5);
+  expect(t.peer.received.some(p=>p.opcode===23&&new DataView(p.body.buffer,p.body.byteOffset,p.body.byteLength).getUint32(0)===((192<<16)|25))).toBe(true);
+  w.varps.set(108,3);(t.s as unknown as{notify():void}).notify();
+  expect(await action).toMatchObject({enabled:true,spell:{id:'wind_strike'}});
+  await expect(observer.setAutocast(null)).rejects.toThrow('Observer');
+ }finally{remote?.close();observer?.close();await t.close();}
+});
