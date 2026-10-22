@@ -394,3 +394,12 @@ lookup, server price inspection, `bot.buyFromShop(item,amount)`,
 `bot.sellToShop(item,amount)`, `bot.takeShopSample(item,amount)`, and
 `bot.closeShop()`. Arbitrary quantities are confirmed in batches; results report
 partial fills. See [shop examples and behavior](docs/sdk-actions-and-state.md#shops-revision-634).
+
+Browse the [searchable SDK API reference](http://127.0.0.1:8082/api/) without
+logging in. The regular client also serves it at
+[http://127.0.0.1:8083/api/](http://127.0.0.1:8083/api/). Both clients link
+to it from their header and developer console. It lists public SDK/bot
+methods, typed parameters, defaults, return types, examples and gateway
+availability. The reference regenerates from TypeScript at server startup
+and during builds; `bun run docs:api` writes a standalone
+`dist/api/index.html` for offline browsing or hosting.

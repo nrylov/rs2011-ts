@@ -91,3 +91,11 @@ sell with `bot.sellToShop(item,amount)`, and take free stock explicitly with
 Check the returned observed `amount`, `complete`, and `reason`; a partial fill
 is possible. `sdk.inspectShopItem(item)` opens the server's price-info panel.
 `bot.closeShop()` restores normal inventory use. See `docs/sdk-actions-and-state.md`.
+
+## API reference
+
+Open `/api/` on either client server for searchable command signatures,
+parameters/defaults, return types and examples. Gateway/controller/local-only
+badges distinguish dispatch availability. Definitions are generated from the
+current source at startup/build time; run `bun run docs:api` for an offline
+`dist/api/index.html`. Examples require the appropriate game context.

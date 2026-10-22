@@ -56,3 +56,9 @@ Shop support: `await bot.openShop()`, `await sdk.getShopState()`,
 `await bot.sellToShop('Logs','all')`, and `await bot.closeShop()`.
 Use `bot.takeShopSample(item,amount)` for free stock. Inspect the result's
 `amount`, `complete`, and `reason` before retrying a partial trade.
+
+The source-generated API reference is available without login at
+`http://127.0.0.1:8082/api/` (also port 8083). Use its gateway/controller
+badges to distinguish methods exposed through MCP from local-only helpers.
+Timeout arguments in SDK signatures are milliseconds; `execute_code.timeout`
+is seconds.

@@ -1,5 +1,9 @@
 # Reliable actions and readable state
 
+For every public command signature, parameter/default and return type, browse
+`/api/` on either client server. The source-generated reference includes
+search, category/availability filters, deep links and copyable examples.
+
 These APIs work in the local SDK and through the gateway/MCP. Refresh both the gateway and client SDK before using newly added methods; a running publisher keeps its previously loaded code. Reload MCP after updating its tool definitions. The changes do not require a game-server restart. Existing game actions already accepted by the server may finish.
 
 ## Cancel a pending action
