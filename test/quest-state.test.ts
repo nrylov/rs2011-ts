@@ -39,3 +39,6 @@ test('opening a quest journal sends its configured quest index and requires a cu
 });
 
 test('Blood Pact accepted stage uses the visible surface Xenia cache value',async()=>{const t=setup();try{t.w.varps.set(2500,10);expect(await t.sdk.getQuestState('blood_pact')).toMatchObject({value:10,stage:'started',status:'started'});t.w.varps.set(2500,1);expect(await t.sdk.getQuestState('blood_pact')).toMatchObject({value:1,stage:null,status:'started'});}finally{t.s.close();}});
+
+
+test('Vampire Slayer reads revision-634 stages and the three-point reward',async()=>{const t=setup();try{t.sdk.data.varbit=id=>({id,index:178,start:0,end:1});for(const [value,stage,status]of [[0,'unstarted','unstarted'],[1,'started','started'],[2,'armed','started'],[3,'completed','completed']] as const){t.w.varps.set(178,value);expect(await t.sdk.getQuestState('Vampire Slayer')).toMatchObject({value,stage,status,points:3});}}finally{t.s.close();}});

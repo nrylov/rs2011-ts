@@ -145,6 +145,7 @@ export const QUEST_PROFILES = [
  {"id":"troll_romance","name":"Troll Romance","index":112,"startPoint":"Talk to Ug in the troll stronghold.","points":2,"kind":"varp","variable":385,"stages":{"unstarted":0,"started":1}},
  {"id":"troll_stronghold","name":"Troll Stronghold","index":113,"startPoint":"Talk to Commander Denulth at the Burthorpe training camp.","points":1,"kind":"varp","variable":317,"stages":{"unstarted":0,"started":1}},
  {"id":"underground_pass","name":"Underground Pass","index":114,"startPoint":"Talk to King Lathas in Ardougne Castle.","points":5,"kind":"varp","variable":161,"stages":{"unstarted":0,"started":1}},
+ {"id":"vampire_slayer","name":"Vampire Slayer","index":16,"startPoint":"Talk to Morgan in Draynor Village.","points":3,"kind":"varbit","variable":6914,"stages":{"unstarted":0,"started":1,"armed":2,"completed":3}},
  {"id":"void_dance","name":"A Void Dance","index":173,"startPoint":"Talk to Commodore Tyr at the Void Knights' Outpost, accessible from the squire at Port Sarim docks.","points":1,"kind":"varbit","variable":7451,"stages":{"unstarted":0,"started":1}},
  {"id":"void_stares_back","name":"The Void Stares Back","index":174,"startPoint":"Talk to Captain Korasi in Falador Park.","points":1,"kind":"varbit","variable":8248,"stages":{"unstarted":0,"started":1}},
  {"id":"wanted","name":"Wanted!","index":115,"startPoint":"Talk to Sir Tiffy Cashien in Falador Park.","points":1,"kind":"varbit","variable":1051,"stages":{"unstarted":0,"completed":10}},
