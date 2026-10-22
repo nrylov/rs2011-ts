@@ -1,3 +1,4 @@
+import {SceneRegions} from './scene-regions.ts';
 import{interfaceId}from'./interface-names.ts';
 import {NavigationService,type RouteOptions,type WalkOptions} from './navigation.ts';
 export type {RouteOptions,WalkOptions,RoutePlan,DoorStep} from './navigation.ts';
@@ -36,9 +37,11 @@ export class BotSDK {
  readonly prayers:PrayerService;
  readonly combat:CombatService;
  readonly creation:CreationService;
+ readonly sceneRegions:SceneRegions;
+ getSessionStatus(){return {status:this.session.status,error:this.session.error};}
  readonly navigation:NavigationService;
  private changingRun=false;
- constructor(readonly session:Session,readonly data:GameData){this.navigation=new NavigationService(this);this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);this.combat=new CombatService(this);this.prayers=new PrayerService(this);this.magic=new MagicService(this);this.spells=new SpellService(this);}
+ constructor(readonly session:Session,readonly data:GameData){this.sceneRegions=new SceneRegions(()=>session.world.region,(x,y)=>data.region(x,y));this.navigation=new NavigationService(this);this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);this.combat=new CombatService(this);this.prayers=new PrayerService(this);this.magic=new MagicService(this);this.spells=new SpellService(this);}
  getState(){return this.session.world;}
  getSpells(){return this.spells.list();}
  castSpell(spell:string|RegExp,target?:SpellTarget,option?:string){return this.spells.cast(spell,target,option);}
@@ -146,7 +149,7 @@ export class BotSDK {
  async nearbyObjects(radius=24){
   const w=this.getState(),p=w.player;if(!p)return [];
   const regions:MapRegion[]=[];
-  for(let x=(p.x-radius)>>>6;x<=((p.x+radius)>>>6);x++)for(let y=(p.y-radius)>>>6;y<=((p.y+radius)>>>6);y++){const r=await this.data.region(x,y);if(r)regions.push(r);}
+  for(let x=Math.max(0,Math.floor((p.x-radius)/64));x<=Math.min(255,Math.floor((p.x+radius)/64));x++)for(let y=Math.max(0,Math.floor((p.y-radius)/64));y<=Math.min(255,Math.floor((p.y+radius)/64));y++){const r=await this.sceneRegions.region(x,y);if(r)regions.push(r);}
   const defs=new Map<number,ObjectType>();for(const r of regions)for(const o of r.objects)defs.set(o.id,o);
   for(const o of w.objectChanges.values())if(o.id!==null&&!defs.has(o.id))defs.set(o.id,await this.data.object(o.id));
   return sceneObjects(regions,w,id=>defs.get(id)).filter(o=>o.level===p.level&&Math.max(Math.abs(o.x-p.x),Math.abs(o.y-p.y))<=radius).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));
@@ -197,7 +200,7 @@ export class BotSDK {
  async collisionMap(){
   const w=this.getState(),p=w.player;if(!p)throw new Error('No player state');
   const regions:MapRegion[]=[];const radius=52;
-  for(let rx=Math.floor((p.x-radius)/64);rx<=Math.floor((p.x+radius)/64);rx++)for(let ry=Math.floor((p.y-radius)/64);ry<=Math.floor((p.y+radius)/64);ry++){const r=await this.data.region(rx,ry);if(r)regions.push(r);}
+  for(let rx=Math.floor((p.x-radius)/64);rx<=Math.floor((p.x+radius)/64);rx++)for(let ry=Math.floor((p.y-radius)/64);ry<=Math.floor((p.y+radius)/64);ry++){const r=await this.sceneRegions.region(rx,ry);if(r)regions.push(r);}
   const defs=new Map<number,ObjectType>();for(const r of regions)for(const o of r.objects)defs.set(o.id,o);
   for(const o of w.objectChanges.values())if(o.id!==null&&!defs.has(o.id))defs.set(o.id,await this.data.object(o.id));
   return new CollisionMap(regions,sceneObjects(regions,w,id=>defs.get(id)),p.level);

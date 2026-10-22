@@ -1,3 +1,4 @@
+import {SceneRegions} from '../core/scene-regions.ts';
 import type { Point } from '../core/routing.ts';
 import { RegionStore, MapProjection } from '../cache/store.ts';
 import { tileIndex, visiblePlane, type MapRegion, type MapObject } from '../cache/terrain.ts';
@@ -22,17 +23,19 @@ export class MapView {
   private definitions=new Map<number,ObjectType|null>();
   private definitionsPending=new Set<number>();
   private current?: World;
+  private layout?:World['region'];
   private dragging?: {x:number;y:number;centerX:number;centerY:number;moved:boolean};
   private requested = '';
   private lastWindow?: [number,number,number,number];
   constructor(private canvas: HTMLCanvasElement, private report: (message:string)=>void, private hover: (message:string)=>void, private pick:(x:number,y:number)=>void) {
     this.ctx=canvas.getContext('2d')!;
-    this.store=new RegionStore({region:async(x,y)=>{
+    const regions=new SceneRegions(()=>this.current?.region,async(x,y)=>{
       const r=await fetch(`/map/region/${x}/${y}`);
       if(r.status===404)return null;
       if(!r.ok){const e=await r.json().catch(()=>({error:'Map request failed'}));throw new Error(e.error);}
       return r.json();
-    }},()=>this.draw(this.current));
+    });
+    this.store=new RegionStore(regions,()=>this.draw(this.current));
     canvas.addEventListener('wheel',e=>{
       e.preventDefault();const r=canvas.getBoundingClientRect();
       this.projection.zoom(this.projection.scale*(e.deltaY<0?1.25:.8),e.clientX-r.left,e.clientY-r.top);
@@ -198,6 +201,7 @@ export class MapView {
     this.hover(`${x}, ${y} · plane ${plane}${objects.length?' · '+objects.slice(0,3).map(o=>`${o.name} (${o.id})`).join(', '):''}`);
   }
   draw(world?:World){
+    if(this.layout!==world?.region){this.layout=world?.region;this.store.clear();this.images.clear();this.requested='';this.route=[];this.blocked=[];}
     this.current=world;
     const width=this.canvas.clientWidth,height=this.canvas.clientHeight,dpr=devicePixelRatio||1,c=this.ctx,p=this.projection;
     this.canvas.width=width*dpr;this.canvas.height=height*dpr;c.scale(dpr,dpr);p.width=width;p.height=height;

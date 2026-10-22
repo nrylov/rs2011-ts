@@ -5,6 +5,8 @@ export interface RegionProvider { region(x: number, y: number): Promise<MapRegio
 export class RegionStore {
   readonly regions = new Map<string, MapRegion | null>();
   readonly errors = new Map<string, string>();
+  private generation=0;
+  clear(){this.generation++;this.regions.clear();this.errors.clear();this.pending.clear();this.retryAt.clear();}
   private pending = new Map<string, Promise<void>>();
   private retryAt = new Map<string, number>();
   constructor(private provider: RegionProvider, private changed = () => {}) {}
@@ -14,15 +16,18 @@ export class RegionStore {
     const key = `${x}:${y}`;
     if (this.regions.has(key) || Date.now() < (this.retryAt.get(key) ?? 0)) return;
     const active = this.pending.get(key); if (active) return active;
+    const generation=this.generation;
     const job = (async () => {
       try {
         const region = await this.provider.region(x,y);
+        if(generation!==this.generation)return;
         if (region && (region.x !== x || region.y !== y)) throw new Error('Map region coordinates do not match request');
         this.regions.set(key,region); this.errors.delete(key);
         if (this.regions.size > 40) this.regions.delete(this.regions.keys().next().value!);
       } catch(e) {
+        if(generation!==this.generation)return;
         this.errors.set(key,e instanceof Error ? e.message : String(e)); this.retryAt.set(key,Date.now()+10000);
-      } finally { this.pending.delete(key); this.changed(); }
+      } finally { if(generation===this.generation){this.pending.delete(key);this.changed();} }
     })();
     this.pending.set(key,job); return job;
   }

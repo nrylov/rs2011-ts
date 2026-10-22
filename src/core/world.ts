@@ -3,6 +3,8 @@ import { playerMask } from './player-appearance.ts';
 import { objectKey, type ObjectChange } from './objects.ts';
 import { PACKET_SIZES } from './protocol.ts';
 
+export interface InstanceChunk {x:number;y:number;level:number;sourceX:number;sourceY:number;sourceLevel:number;rotation:number;}
+export interface RegionLayout {zoneX:number;zoneY:number;size:number;baseX:number;baseY:number;chunks?:InstanceChunk[];loadType?:number;}
 export interface Tile { x: number; y: number; level: number; }
 export interface Entity extends Tile { index: number; type?: number; name?: string; hidden?:boolean; }
 export type ContainerSyncStatus='unknown'|'partial'|'complete';
@@ -21,7 +23,7 @@ export class World {
   playerUpdateAt=0;playerLastMoveTick=0;
   playerMotion:'walk'|'run'|'teleport'|null=null;
   playerAnimation:{ids:number[];delay:number;receivedAt:number;tick:number}|null=null;
-  region: { zoneX: number; zoneY: number; size: number; baseX: number; baseY: number } | null = null;
+  region: RegionLayout | null = null;
   players = new Map<number, Entity>();
   npcs = new Map<number, Entity>();
   containers = new Map<string, Item[]>();
@@ -82,7 +84,7 @@ export class World {
       case 27: case 63: case 109: case 71: this.updateGroundItem(opcode,r);break;
       case 82: case 58: this.updateObject(opcode,r);break;
       case 19: this.loadRegion(body); return 'region';
-      case 70: throw new Error('Dynamic/instanced region decoding is not implemented yet; refusing to expose incorrect coordinates');
+      case 70: this.loadRegion(body,true); return 'region';
       case 105: this.playerMotion=null;this.updatePlayers(body);this.playerUpdateAt=Date.now();this.tick++;if(this.playerMotion)this.playerLastMoveTick=this.tick;break;
       case 118: this.updateNpcs(body); break;
       case 47: {
@@ -140,7 +142,7 @@ export class World {
     return 'state';
   }
 
-  private loadRegion(body: Uint8Array) {
+  private loadRegion(body: Uint8Array,dynamic=false) {
     const r = new Reader(body);
     if (!this.region) {
       const bits = new Bits(body), tile = bits.read(30);
@@ -151,11 +153,23 @@ export class World {
       }
       bits.align(); r.pos = bits.bit >>> 3;
     }
-    const mapSize = r.sub8(), zoneY = r.addLe16(), zoneX = r.le16(); r.neg8();
-    const size = [104,120,136,168][mapSize];
-    if (!size || r.remaining % 16) throw new Error('Invalid region header/XTEA table');
-    this.region = { zoneX, zoneY, size, baseX: (zoneX - (size >>> 4)) * 8, baseY: (zoneY - (size >>> 4)) * 8 };
-    this.objectChanges.clear();this.groundItems.clear();this.activeZone=null;
+    const mapSize=dynamic?r.u8():r.sub8(),zoneY=r.addLe16();
+    let zoneX:number,loadType:number|undefined;
+    if(dynamic){const force=r.u8();zoneX=r.add16();loadType=r.add8();if(force>1||loadType<1||loadType>4)throw new Error('Invalid dynamic region flags');}
+    else{zoneX=r.le16();r.neg8();}
+    const size=[104,120,136,168][mapSize];if(!size)throw new Error('Invalid region map size');
+    const baseX=(zoneX-(size>>>4))*8,baseY=(zoneY-(size>>>4))*8;
+    let chunks:InstanceChunk[]|undefined;
+    if(dynamic){
+      chunks=[];const bits=new Bits(body);bits.bit=r.pos*8;
+      for(let level=0;level<4;level++)for(let x=0;x<size/8;x++)for(let y=0;y<size/8;y++)if(bits.read(1)){
+        const packed=bits.read(26);chunks.push({level,x:baseX+x*8,y:baseY+y*8,sourceLevel:packed>>>24&3,sourceX:(packed>>>14&1023)*8,sourceY:(packed>>>3&2047)*8,rotation:packed>>>1&3});
+      }
+      bits.align();r.pos=bits.bit>>>3;
+    }
+    if(r.remaining%16)throw new Error('Invalid region XTEA table');
+    this.region={zoneX,zoneY,size,baseX,baseY,...(chunks?{chunks,loadType}:{})};
+    if(!dynamic||loadType!==4){this.objectChanges.clear();this.groundItems.clear();}this.activeZone=null;
   }
 
   private setZone(x:number,y:number,level:number){

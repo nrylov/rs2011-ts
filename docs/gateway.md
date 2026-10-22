@@ -102,7 +102,7 @@ GATEWAY_URL=ws://127.0.0.1:7780/gateway bun run gateway:cli list
 
 ## Remote API and action evidence
 
-`getState()` returns a serializable snapshot, not the direct client's mutable `World` instance. Containers are keyed records (`state.containers['93:0']`); players, NPCs and skills are arrays. Window, visibility, varp and varbit values are included. Prefer the convenience getters for inventory/equipment/bank, counts, synchronization status, `isOpen`, and `getStateAge()`; snapshots remain available after a client disconnect and may be stale. Check `isClientOnline()` before planning actions. `subscribe` observes streamed state. `waitForCondition` and `waitForTicks` execute their predicates locally and reject on a client/gateway disconnect.
+`getState()` returns a serializable snapshot, not the direct client's mutable `World` instance. Containers are keyed records (`state.containers['93:0']`); players, NPCs and skills are arrays. Window, visibility, varp and varbit values are included. Prefer the convenience getters for inventory/equipment/bank, counts, synchronization status, `isOpen`, and `getStateAge()`; snapshots remain available after a client disconnect and may be stale. Check `isClientOnline()` before planning actions. `getSessionStatus()` reports the published session status and original decoder error, including packet opcode and size; terminal failures reject pending calls with that reason. Automatic MCP execution does not replace a failed game session with another login. Reload the existing client or explicitly start it again after resolving the cause. `subscribe` observes streamed state. `waitForCondition` and `waitForTicks` execute their predicates locally and reject on a client/gateway disconnect.
 
 The common methods are available directly on the remote SDK: inventory/entity searches, nearby objects/NPCs/ground items, dialogue and game-tab queries, tab selection and item/object dispatch. `sdk.query` exposes the complete supported read-only method set; `sdk.send` exposes the supported low-level mutating methods. Every remote dispatch returns a promise and must be awaited. RegExp patterns and optional arguments are supported; functions cannot be serialized into remote calls.
 
@@ -159,7 +159,7 @@ This establishes remote session ownership, authenticated control/observation, ac
 | Agent tooling | Initial MCP tools and account-directory setup are available; richer agent scheduling, persistent task tracking and automatic game-session recovery remain. |
 | Fleet GUI | A standalone map dashboard that consumes fleet positions; the authenticated listing feed is ready. |
 | Action coverage | Item-on-object/NPC actions, broader skilling/crafting/shop/trade/combat helpers, chat/friends and more interface controls. |
-| State coverage | Combat/targeting/animation evidence, NPC transform masks, more ClientScript-driven UI and instanced regions. |
+| State coverage | Combat/targeting/animation evidence, NPC transform masks, more ClientScript-driven UI and broader quest-specific coverage; instanced chunk mapping is supported. |
 | Navigation | Longer journeys, more automatic door/gate handling and fuller dynamic collision behavior. |
 | Operations | Game reconnect/login recovery, resumable tasks, persistent goals/logs, deployment supervision and additional load testing. |
 

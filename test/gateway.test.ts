@@ -207,3 +207,9 @@ test('controller disconnect cancels the walk inside talkTo without sending the N
   expect(t.peer.received.some(p=>[63,29,5,62,65].includes(p.opcode))).toBe(false);expect(t.s.status).toBe('playing');
  }finally{remote?.close();await t.close();}
 });
+
+test('terminal SDK errors preserve decoder reasons through gateway state, pending calls and subsequent queries',async()=>{
+ const t=await setup();let remote;
+ try{remote=await connectGateway(options(t.gateway.url));t.sdk.getDialog=()=>new Promise<null>(()=>{});const pending=remote.getDialog();await Bun.sleep(20);t.s.fail('Failed to decode game packet 70 (12 bytes): Truncated bit stream');await expect(pending).rejects.toThrow('packet 70');await Bun.sleep(20);expect(remote.getSessionStatus()).toMatchObject({status:'error',error:expect.stringContaining('Truncated bit stream')});expect(remote.hasAttachedClient()).toBe(true);await expect(remote.query.getRunState()).rejects.toThrow('Truncated bit stream');await expect(remote.waitForTicks(1)).rejects.toThrow('Truncated bit stream');}
+ finally{remote?.close();await t.close();}
+});

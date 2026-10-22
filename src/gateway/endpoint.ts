@@ -7,7 +7,7 @@ export async function attachGatewayClient(options:{url:string;name:string;token:
  let resolve!:()=>void,reject!:(e:Error)=>void;const ready=new Promise<void>((yes,no)=>{resolve=yes;reject=no;});
  const send=(data:unknown)=>{if(socket?.readyState===WebSocket.OPEN){if(socket.bufferedAmount>2_000_000){socket.close(1013,'Gateway link is too slow');return;}socket.send(JSON.stringify(data));}};
  const publish=()=>{publishTimer=undefined;if(registered){const s=options.sdk.session;const state:PublishedState={world:s.world.snapshot(),status:s.status,error:s.error};send({type:'state',state});}};
- const schedule=()=>{if(!publishTimer)publishTimer=setTimeout(publish,100);};
+ const schedule=()=>{if(['error','closed'].includes(options.sdk.session.status)){clearTimeout(publishTimer);publish();return;}if(!publishTimer)publishTimer=setTimeout(publish,100);};
  const unsubscribe=options.sdk.session.subscribe(schedule);
  const timer=setTimeout(()=>{reject(new Error('Gateway registration timed out'));close();},15000);
  function close(){if(stopped)return;stopped=true;registered=false;options.signal?.removeEventListener('abort',abort);reject(new Error('Gateway attachment cancelled'));options.onPresence?.({controller:null,observers:0});clearTimeout(timer);clearTimeout(retry);clearTimeout(publishTimer);clearInterval(heartbeat);unsubscribe();socket?.close();options.onStatus?.('disconnected');}

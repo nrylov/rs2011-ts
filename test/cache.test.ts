@@ -82,3 +82,7 @@ test.skipIf(!process.env.VOID_CACHE_PATH)('prepared cache reads actual starting-
     expect(Object.keys(region.underlayColours).length).toBeGreaterThan(100);
   }finally{cache.close();}
 });
+
+test('clearing map regions discards pending results from the previous instance',async()=>{
+ let resolve!:(r:null)=>void;let calls=0;const store=new RegionStore({region:()=>{calls++;return new Promise<null>(r=>resolve=r);}});const old=store.load(0,0),first=resolve;store.clear();const current=store.load(0,0);first(null);await old;expect(store.regions.has('0:0')).toBe(false);expect(store.loading).toBe(1);resolve(null);await current;expect(calls).toBe(2);expect(store.loading).toBe(0);expect(store.regions.has('0:0')).toBe(true);
+});

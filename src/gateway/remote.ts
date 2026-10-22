@@ -20,6 +20,9 @@ export class GatewaySDK {
  private notify(){for(const cb of this.listeners)try{cb();}catch(e){console.error('Gateway state observer failed',e);}}
  end(reason='Gateway connection closed'){if(this.closed)return;this.closeReason=reason;this.closed=true;this.online=false;clearInterval(this.heartbeat);for(const pending of this.calls.values()){clearTimeout(pending.timer);pending.reject(new Error(reason));}this.calls.clear();this.notify();this.socket.close();}
  close(){this.end();}
+ getSessionStatus(){return {status:this.state?.status??'offline',error:this.state?.error??null};}
+ hasAttachedClient(){return this.online&&!this.closed;}
+ private unavailableReason(){return this.state?.error?`Game client failed: ${this.state.error}`:'No playing game client is attached';}
  getState(){return this.state?.world??null;}
  getStateAge(){return this.age+Date.now()-this.received;}
  isClientOnline(){return this.online&&!this.closed&&this.state?.status==='playing';}
@@ -31,7 +34,7 @@ export class GatewaySDK {
  getEquipmentStatus(){return this.getState()?.containerSync['94:0']??'unknown';}
  count(id:number,container='93:0'){return (this.getState()?.containers[container]??[]).reduce((n,i)=>n+(i.id===id?i.amount:0),0);}
  subscribe(cb:()=>void){this.listeners.add(cb);return ()=>this.listeners.delete(cb);}
- waitForCondition(predicate:(state:WorldSnapshot)=>boolean,timeout=this.timeout){deadline(timeout);return new Promise<WorldSnapshot>((resolve,reject)=>{let timer:ReturnType<typeof setTimeout>;const finish=(error?:Error,value?:WorldSnapshot)=>{clearTimeout(timer);unsubscribe();error?reject(error):resolve(value!);};const check=()=>{if(!this.isClientOnline()){finish(new Error('No playing game client is attached'));return;}const state=this.getState();try{if(state&&predicate(state))finish(undefined,state);}catch(e){finish(e instanceof Error?e:new Error(String(e)));}};const unsubscribe=this.subscribe(check);timer=setTimeout(()=>finish(new Error('State observation timed out')),timeout);check();});}
+ waitForCondition(predicate:(state:WorldSnapshot)=>boolean,timeout=this.timeout){deadline(timeout);return new Promise<WorldSnapshot>((resolve,reject)=>{let timer:ReturnType<typeof setTimeout>;const finish=(error?:Error,value?:WorldSnapshot)=>{clearTimeout(timer);unsubscribe();error?reject(error):resolve(value!);};const check=()=>{if(!this.isClientOnline()){finish(new Error(this.unavailableReason()));return;}const state=this.getState();try{if(state&&predicate(state))finish(undefined,state);}catch(e){finish(e instanceof Error?e:new Error(String(e)));}};const unsubscribe=this.subscribe(check);timer=setTimeout(()=>finish(new Error('State observation timed out')),timeout);check();});}
  call(method:string,args:unknown[]=[],timeout=this.timeout):Promise<any>{if(this.closed||this.socket.readyState!==WebSocket.OPEN)return Promise.reject(new Error(this.closeReason));const id=String(++this.serial);let body:string;try{body=JSON.stringify({type:'call',id,method,args:encode(args),timeoutMs:deadline(timeout)});if(body.length>65536)throw new Error('Gateway request is too large');}catch(e){return Promise.reject(e);}
   return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.calls.delete(id);reject(new Error('Gateway request timed out; the game action may still be running'));},timeout+1000);this.calls.set(id,{resolve,reject,timer});try{this.socket.send(body);}catch(e){clearTimeout(timer);this.calls.delete(id);reject(e);}});
  }
@@ -75,7 +78,7 @@ export class GatewaySDK {
    const finish=(error?:Error,value?:Dialog)=>{if(done)return;done=true;clearTimeout(timer);clearInterval(poll);unsubscribe();options.signal?.removeEventListener('abort',abort);error?reject(error):resolve(value!);};
    const abort=()=>finish(new Error('Dialogue wait cancelled'));
    const check=()=>{
-    if(done)return;if(!this.isClientOnline()){finish(new Error('No playing game client is attached'));return;}if(reading)return;
+    if(done)return;if(!this.isClientOnline()){finish(new Error(this.unavailableReason()));return;}if(reading)return;
     reading=true;
     void this.call('sdk.getDialog',[],Math.max(100,Math.min(600000,end-Date.now()))).then((dialog:Dialog|null)=>{
      if(done)return;

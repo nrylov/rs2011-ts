@@ -61,7 +61,7 @@ test('external player enters view and remains tracked through subsequent idle pa
   idle.write(1,0).write(2,3).write(11,2044).align();
   w.apply(105,idle.finish());expect(w.players.size).toBe(2);
 });
-test('dynamic regions are explicit unsupported errors',()=>{expect(()=>new World().apply(70,new Uint8Array())).toThrow('not implemented');});
+test('truncated dynamic regions are rejected rather than exposing incomplete coordinates',()=>{expect(()=>new World().apply(70,new Uint8Array())).toThrow('Truncated');});
 test('invalid credentials fail before they can reach a transport',()=>{
   expect(()=>loginPacket({username:'waytoolongusername',password:'secret'},[1,2,3,4])).toThrow('Username');
   expect(()=>loginPacket({username:'test',password:'a\0b'},[1,2,3,4])).toThrow('ASCII');

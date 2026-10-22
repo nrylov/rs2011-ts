@@ -28,7 +28,7 @@ export class GatewayControls {
  }
  render(){
   const context=this.context();
-  if(this.owner&&this.owner.sdk!==context?.sdk){this.reset();this.paused=false;this.retryAt=0;this.status('offline','Sign in to make this character available to the SDK.');}
+  if(this.owner&&this.owner.sdk!==context?.sdk){const error=this.owner.sdk.session.error;this.bridge?.publish();this.reset();this.paused=false;this.retryAt=0;this.status(error?'unavailable':'offline',error?`SDK session failed: ${error}`:'Sign in to make this character available to the SDK.');}
   if(context&&!this.owner&&!this.pending&&!this.paused&&Date.now()>=this.retryAt)void this.connect(true);
   get<HTMLButtonElement>('gateway-attach').disabled=!context||this.pending;
   get<HTMLButtonElement>('gateway-auto').disabled=!context||this.pending;

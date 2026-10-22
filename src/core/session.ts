@@ -40,9 +40,12 @@ export class Session {
     if(!Number.isInteger(index)||index<1||index>=2048)throw new Error('Invalid attached player index');
     return new Session({send:()=>{},close:detach},{username:name||'external',password:''},[0,0,0,0],{index,name,send});
   }
+  private applyPacket(opcode:number,body:Uint8Array){
+    try{return this.world.apply(opcode,body);}catch(e){throw new Error(`Failed to decode game packet ${opcode} (${body.length} bytes): ${e instanceof Error?e.message:String(e)}`);}
+  }
   feedPacket(opcode:number,body:Uint8Array){
     if(!this.external)throw new Error('Decoded packet input is only available for attached clients');if(this.ended)return;this.lastReceived=Date.now();
-    try{if(this.world.apply(opcode,body)==='logout')this.close();this.notify();}catch(e){this.fail(e instanceof Error?e.message:String(e));}
+    try{if(this.applyPacket(opcode,body)==='logout')this.close();this.notify();}catch(e){this.fail(e instanceof Error?e.message:String(e));}
   }
   private loginBytes: Uint8Array;
   subscribe(callback: () => void) { this.listeners.add(callback); return () => { this.listeners.delete(callback); }; }
@@ -76,7 +79,7 @@ export class Session {
       this.data = this.data.slice(this.loginLength);
       this.framer = new Framer(new Isaac(this.keys.map(k => (k + 50) | 0)), (op, body) => {
         if (this.ended) return;
-        const result = this.world.apply(op, body);
+        const result = this.applyPacket(op, body);
         if (result === 'logout') this.close();
         else if (result === 'region') this.send(4); // FinishRegionLoad; no cache is needed for entity-only mode.
       });

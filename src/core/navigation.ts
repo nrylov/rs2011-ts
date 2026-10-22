@@ -59,7 +59,7 @@ export class NavigationService {
   const load=(rx:number,ry:number):Promise<void>=>{
    if(rx<0||ry<0||rx>255||ry>255)return Promise.resolve();const key=`${rx}:${ry}`;const existing=loaded.get(key);if(existing)return existing;
    if(loaded.size>=maxRegions)throw new Error(`Route exceeded its ${maxRegions}-region search budget`);
-   const pending=(async()=>{check();const region=await this.sdk.data.region(rx,ry);check();if(!region)return;
+   const pending=(async()=>{check();const region=await this.sdk.sceneRegions.region(rx,ry);check();if(!region)return;
     const world=this.sdk.getState(),defs=new Map<number,ObjectType>();for(const o of region.objects)defs.set(o.id,o);
     await Promise.all([...world.objectChanges.values()].filter(o=>o.id!==null&&(o.x>>>6)===rx&&(o.y>>>6)===ry&&!defs.has(o.id!)).map(async o=>defs.set(o.id!,await this.sdk.data.object(o.id!))));check();
     const objects=sceneObjects([region],world,id=>defs.get(id));
@@ -111,10 +111,10 @@ export class NavigationService {
  async walk(x:number,y:number,timeoutOrOptions:number|WalkOptions=120000,extra:RouteOptions={}){
   const options:WalkOptions=typeof timeoutOrOptions==='number'?{...extra,timeout:timeoutOrOptions}:timeoutOrOptions;
   const timeout=options.timeout??120000;if(!Number.isFinite(timeout)||timeout<100||timeout>595000)throw new Error('Walking timeout must be 100–595000 ms');limits(options);integer(x,'Destination x',0,16383);integer(y,'Destination y',0,16383);
-  const start=this.sdk.getState().player;if(!start)throw new Error('No player state');const level=start.level,end=Date.now()+timeout;
+  const start=this.sdk.getState().player;if(!start)throw new Error('No player state');const level=start.level,end=Date.now()+timeout,layout=this.sdk.getState().region;
   let last={...start},steps=0,doorsOpened=0,replans=0,movementFailures=0,lastProblem='';
   const guard=this.walkGuard;
-  const check=()=>{guard?.();const w=this.sdk.getState(),p=w.player;if(this.sdk.session.status!=='playing'||!p)throw new Error('Walking stopped: game session ended');if(Date.now()>=end)throw new Error(`Walking timed out at ${p.x}, ${p.y}`);if(p.level!==level)throw new Error('Walking stopped: player changed floor');if(!w.playerUpdateAt||Date.now()-w.playerUpdateAt>10000)throw new Error('Walking stopped: player state is stale');const hp=this.healthVarbit,parent=hp?w.varps.get(hp.index):undefined,direct=w.varbits.get(7198);const currentHp=direct!==undefined&&(parent===undefined||!hp||(w.variableUpdates.get('b7198')??0)>=(w.variableUpdates.get(`p${hp.index}`)??0))?direct:parent!==undefined&&hp?(parent>>>hp.start)&(2**(hp.end-hp.start+1)-1):null;if(currentHp===0||w.skills.get(3)?.level===0)throw new Error('Walking stopped: player died');if(distance(last,p)>32)throw new Error('Walking stopped: player teleported unexpectedly');};
+  const check=()=>{guard?.();const w=this.sdk.getState(),p=w.player;if(this.sdk.session.status!=='playing'||!p)throw new Error('Walking stopped: game session ended');if(Date.now()>=end)throw new Error(`Walking timed out at ${p.x}, ${p.y}`);if(p.level!==level)throw new Error('Walking stopped: player changed floor');if(w.region!==layout&&(layout?.chunks||w.region?.chunks))throw new Error('Walking stopped: instance map changed; plan a new route');if(!w.playerUpdateAt||Date.now()-w.playerUpdateAt>10000)throw new Error('Walking stopped: player state is stale');const hp=this.healthVarbit,parent=hp?w.varps.get(hp.index):undefined,direct=w.varbits.get(7198);const currentHp=direct!==undefined&&(parent===undefined||!hp||(w.variableUpdates.get('b7198')??0)>=(w.variableUpdates.get(`p${hp.index}`)??0))?direct:parent!==undefined&&hp?(parent>>>hp.start)&(2**(hp.end-hp.start+1)-1):null;if(currentHp===0||w.skills.get(3)?.level===0)throw new Error('Walking stopped: player died');if(distance(last,p)>32)throw new Error('Walking stopped: player teleported unexpectedly');};
   const bounded=async<T>(promise:Promise<T>):Promise<T>=>{
    let timer:ReturnType<typeof setTimeout>,poll:ReturnType<typeof setInterval>;
    try{return await Promise.race([promise,new Promise<never>((_,reject)=>{
