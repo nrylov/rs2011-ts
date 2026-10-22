@@ -109,11 +109,11 @@ See [the dialogue guide](docs/dialogue.md) for snapshots, `continueDialog`, choi
 
 ## Implemented and remaining work
 
-Implemented: RSA/XTEA/ISAAC login; fragmented framing; static-region/player/NPC movement; player names; containers/skills/messages; live object replacement; read-only JS5 archives, terrain, object/item/NPC definitions; IF3 text/actions; NPC variable-selected forms; window/mount/visibility updates; all five NPC/object options; equipment and common dialogue/bank controls; collision-aware multi-region walking with door handling; shared browser/headless helpers.
+Implemented: RSA/XTEA/ISAAC login; fragmented framing; static-region/player/NPC movement; player names; containers/skills/messages; live object replacement; read-only JS5 archives, terrain, object/item/NPC definitions; IF3 text/actions; NPC variable-selected forms and server-sent NPC transforms; window/mount/visibility updates; all five NPC/object options; equipment and common dialogue/bank controls; collision-aware multi-region walking with door handling; shared browser/headless helpers.
 
 Routing uses terrain flags, rotated footprints, directional walls, bridges and live object overrides. Unknown tiles are blocked and diagonal corner cutting is prevented. Paths are previews; the server remains authoritative. Routes span a local 52-tile window and use short, observed waypoints. Doors require explicit interaction. Dynamic object morphs and mobile entity occupancy are not yet fully modelled.
 
-Remaining: 3D models/animation/textures, original interface layout and ClientScript VM, item icons/audio, combat state, NPC transform masks, broad crafting/shop/quest helpers, automatic recovery/reconnection. Instanced map decoding projects cache chunks into live destination coordinates; quest-specific cutscene and interface coverage still varies. NPC names currently use initial type IDs, which can be stale after transforms. The amount form sends requested inputs but does not implement the general ClientScript input UI. This is an initial SDK, with a smaller API than rs-sdk.
+Remaining: 3D models/animation/textures, original interface layout and ClientScript VM, item icons/audio, combat state, NPC hit/animation evidence, broad crafting/shop/quest helpers, automatic recovery/reconnection. Instanced map decoding projects cache chunks into live destination coordinates; quest-specific cutscene and interface coverage still varies. The amount form sends requested inputs but does not implement the general ClientScript input UI. This is an initial SDK, with a smaller API than rs-sdk.
 
 The schematic map uses actual floor colours and placements; overlay masks and object drawings are approximations. Collision shading marks blocked tiles; walls remain visible as lines. Non-ASCII outbound text is currently rejected. Unsupported framed server packets are counted in `world.unhandled`.
 
@@ -217,6 +217,14 @@ The optional [Void compatibility overlay](compat/void/README.md) also supports a
 
 Firemaking on path tiles uses the optional Void fire-placement fix described in the compatibility guide. The original server rejected nonblocking floor decorations as though they were solid objects. The fix retains existing-fire and doorway restrictions. The lightweight client's tinderbox/log combination now uses the firemaking helper so it waits for XP, and displays server refusal messages beside the inventory. Generic item use no longer treats a tutorial-instruction redraw as successful recipe progress. Inventory buttons stay mounted through unrelated world updates, avoiding clicks being lost while entities update.
 
+
+## NPC transforms
+
+The server can replace an NPC's type in place: a sheared sheep, a defeated quest cultist who only offers Talk-to afterwards, a creature changing form. Revision 634 carries this in the NPC update packet's visual mask block, which the decoder now reads in full. `nearbyNpcs()`, `findNearbyNpc()`, `talkTo()` and `sendNpcOption()` resolve names and options from the NPC's current type, so an option that disappeared on the server disappears locally in the same tick. An entity captured before the change is rejected with "NPC changed or left view"; query again and act on the fresh entity. Cache-defined varbit/varp forms are resolved as before.
+
+The remaining mask fields (animation, hits, facing, graphics, overhead text, model changes) are consumed to stay aligned but are not yet exposed. A block the decoder cannot read is skipped for that tick, counted in `visualBlocksSkipped` and described in `getState().warnings`; positions are unaffected because they precede the masks.
+
+If the local definition is ever known to be wrong, `await sdk.sendNpcOption(npc, 0, {force: true})` sends an explicit slot 0–4 without checking the definition. The result carries `forced: true`; the server still decides what the click does, so observe messages and dialogue as usual. Do not use it as a default: the ordinary validation is what prevents scripts from repeating actions the server answers with "Nothing interesting happens."
 
 ## Gateway: hosted clients, local agents
 

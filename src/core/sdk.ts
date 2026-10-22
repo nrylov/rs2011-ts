@@ -172,19 +172,32 @@ export class BotSDK {
   if(!Number.isInteger(index)||index<0||index>4||!target.options[index])throw new Error('Object has no matching action');
   this.session.interactObject(target.id,target.x,target.y,index);
  }
- /** Dispatch any current NPC option. Confirms dispatch only; observe XP, inventory or dialogue separately. */
- async sendNpcOption(target:Entity|string|RegExp,option:string|RegExp|number=0){
+ /**
+  * Dispatch any current NPC option. Confirms dispatch only; observe XP, inventory or dialogue separately.
+  * The option is validated against the NPC's current definition, including server-sent transforms.
+  * `{force:true}` sends a numeric slot 0–4 without that check, for the rare case where the local
+  * definition is known to be wrong; the server still decides what the click does.
+  */
+ async sendNpcOption(target:Entity|string|RegExp,option:string|RegExp|number=0,options:{force?:boolean}={}){
+  if(!options||typeof options!=='object'||options.force!==undefined&&typeof options.force!=='boolean')throw new Error('Pass {force?:boolean} as the options object');
   const selected=typeof target==='string'||target instanceof RegExp?await this.findNearbyNpc(target):target;
   if(!selected)throw new Error('No matching nearby NPC');
   const current=this.getState().npcs.get(selected.index);
   if(!current||current.type!==selected.type||current.level!==this.getState().player?.level)throw new Error('NPC changed or left view; query nearby NPCs again');
-  const def=await this.npcDefinition(current.type!);if(!def)throw new Error('NPC is hidden in its current form');
-  const index=typeof option==='number'?option:def.options.findIndex(s=>!!s&&match(s,option));
-  if(!Number.isInteger(index)||index<0||index>4||!def.options[index])throw new Error('NPC has no matching action');
+  const def=await this.npcDefinition(current.type!);
+  let index:number;
+  if(options.force){
+   if(typeof option!=='number'||!Number.isInteger(option)||option<0||option>4)throw new Error('Forced NPC options must name a slot from 0 to 4');
+   index=option;
+  }else{
+   if(!def)throw new Error('NPC is hidden in its current form');
+   index=typeof option==='number'?option:def.options.findIndex(s=>!!s&&match(s,option));
+   if(!Number.isInteger(index)||index<0||index>4||!def.options[index])throw new Error('NPC has no matching action');
+  }
   const latest=this.getState().npcs.get(current.index);
   if(!latest||latest.type!==current.type||latest.level!==this.getState().player?.level)throw new Error('NPC changed or left view; query nearby NPCs again');
   this.session.interactNpc(latest.index,index);
-  return {dispatched:true as const,npcIndex:latest.index,option:def.options[index]};
+  return {dispatched:true as const,npcIndex:latest.index,option:def?.options[index]??null,...(options.force?{forced:true as const}:{})};
  }
  async findNearbyObject(pattern:string|RegExp,radius=24){return (await this.nearbyObjects(radius)).find(o=>match(o.name,pattern))??null;}
  async npcDefinition(type:number):Promise<NpcType|null>{

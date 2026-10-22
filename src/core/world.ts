@@ -1,5 +1,6 @@
 import { Bits, Reader } from './binary.ts';
 import { playerMask } from './player-appearance.ts';
+import { npcMask } from './npc-mask.ts';
 import { objectKey, type ObjectChange } from './objects.ts';
 import { PACKET_SIZES } from './protocol.ts';
 
@@ -46,6 +47,9 @@ export class World {
   packets: Record<number, number> = {};
   unhandled: Record<number, number> = {};
   visualBlocksSkipped = 0;
+  /** Recent non-fatal decode problems (for example an NPC mask block that could not be read). */
+  warnings:string[]=[];
+  private warn(message:string){this.warnings.push(message);if(this.warnings.length>20)this.warnings.shift();}
   private flags = new Uint8Array(2048);
   private regions = new Int32Array(2048);
   private locals: number[] = [];
@@ -281,7 +285,7 @@ export class World {
 
   private updateNpcs(body: Uint8Array) {
     const p = this.player; if (!p) throw new Error('NPC update before initial region');
-    const b = new Bits(body), count = b.read(8), next: number[] = [];
+    const b = new Bits(body), count = b.read(8), next: number[] = [], masked: number[] = [];
     if (count > this.npcOrder.length) throw new Error('NPC count exceeds previous tracking set');
     const step = (n: Entity) => { const d = NPC_STEP[b.read(3)]; n.x += d[0]; n.y += d[1]; };
     for (let i = count; i < this.npcOrder.length; i++) this.npcs.delete(this.npcOrder[i]);
@@ -290,20 +294,41 @@ export class World {
       if (b.read(1)) {
         const kind = b.read(2);
         if (kind === 3) { this.npcs.delete(index); continue; }
-        if (kind === 1) { step(n); b.read(1); }
-        if (kind === 2) { const run = b.read(1); step(n); if (run) step(n); b.read(1); }
+        if (kind === 0) masked.push(index);
+        else if (kind === 1) { step(n); if (b.read(1)) masked.push(index); }
+        else { const run = b.read(1); step(n); if (run) step(n); if (b.read(1)) masked.push(index); }
       }
       next.push(index);
     }
     while (b.bit + 15 <= body.length * 8) {
       const index = b.read(15); if (index === 32767) break;
       const level = b.read(2); b.read(1);
-      const dy = signed(b.read(5), 5), dx = signed(b.read(5), 5); b.read(3); b.read(1);
+      const dy = signed(b.read(5), 5), dx = signed(b.read(5), 5); b.read(3); const hasMask = b.read(1);
       const type = b.read(14);
       this.npcs.set(index, { index, type, level, x: p.x + dx, y: p.y + dy }); next.push(index);
+      if (hasMask) masked.push(index);
     }
     this.npcOrder = next;
-    // NPC visual masks (including transforms) remain a documented unsupported field.
+    if (masked.length) this.applyNpcMasks(body, (b.bit + 7) >>> 3, masked);
+  }
+
+  /**
+   * Byte-aligned mask blocks follow the bit section, one per flagged NPC in processing order. Positions
+   * are already applied, so a block the decoder cannot read is recorded and skipped instead of ending
+   * the session; only this tick's transforms are lost.
+   */
+  private applyNpcMasks(body: Uint8Array, pos: number, masked: number[]) {
+    const r = new Reader(body); r.pos = pos;
+    try {
+      for (const index of masked) {
+        const update = npcMask(r), n = this.npcs.get(index);
+        if (n && update.transform !== undefined) n.type = update.transform;
+      }
+      if (r.remaining) throw new Error(`${r.remaining} unread bytes after ${masked.length} NPC mask blocks`);
+    } catch (e) {
+      this.visualBlocksSkipped++;
+      this.warn(`NPC visual masks skipped at tick ${this.tick}: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   snapshot() {
@@ -312,6 +337,6 @@ export class World {
       region: this.region, runEnergy: this.runEnergy, players: [...this.players.values()], npcs: [...this.npcs.values()],
       containers: Object.fromEntries(this.containers), containerSync:Object.fromEntries(this.containerSync), skills: [...this.skills.values()],
       windowId:this.windowId,hidden:Object.fromEntries(this.hidden),varps:Object.fromEntries(this.varps),varbits:Object.fromEntries(this.varbits),interfaceItems:Object.fromEntries(this.interfaceItems),numberInput:this.numberInput,interfaceTexts: Object.fromEntries(this.texts), interfaces: Object.fromEntries(this.interfaces),
-      messages: this.messages, groundItems:[...this.groundItems.values()], objectChanges:[...this.objectChanges.values()], packets: this.packets, unhandled: this.unhandled, visualBlocksSkipped: this.visualBlocksSkipped };
+      messages: this.messages, groundItems:[...this.groundItems.values()], objectChanges:[...this.objectChanges.values()], packets: this.packets, unhandled: this.unhandled, visualBlocksSkipped: this.visualBlocksSkipped, warnings: this.warnings };
   }
 }
