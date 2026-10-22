@@ -80,7 +80,9 @@ export class ShopService {
  async inspect(selection:ItemSelector,options:{sample?:boolean;timeout?:number}={}){
   const sample=options.sample??false,timeout=options.timeout??5000;if(typeof sample!=='boolean'||!Number.isFinite(timeout)||timeout<=0)throw new Error('Pass a boolean sample flag and positive timeout');
   const end=Date.now()+timeout,item=await this.find(selection,sample);if(!item)throw new Error('No matching shop item');await this.side(item.shopToken,end-Date.now());this.assert(item.shopToken);
-  let signature='',since=Date.now();this.sdk.session.clickInterface(620,sample?26:25,0,item.id,item.slot*(sample?4:6));
+  let signature='',since=Date.now();// Stock buttons are generated script components: their wire item ID is -1.
+  // Sending the definition ID invokes ordinary inventory validation and rejects shared shops.
+  this.sdk.session.clickInterface(620,sample?26:25,0,-1,item.slot*(sample?4:6));
   await this.observe(()=>{this.assert(item.shopToken);const w=this.sdk.getState(),next=`${w.uiRevision}:${w.varcs.get(741)}:${w.varcs.get(744)}:${w.varcs.get(743)}`;if(next!==signature){signature=next;since=Date.now();}return this.sdk.isOpen(449)&&w.varcs.get(741)===item.id&&w.varcs.has(744)&&Date.now()-since>=160?true:undefined;},end-Date.now());
   const info=await this.info();if(!info)throw new Error('Shop info panel closed');return {...info,sample,unitPrice:sample?0:info.unitPrice};
  }
@@ -104,7 +106,7 @@ export class ShopService {
     const option=quantity===1?1:quantity===5?2:quantity===10?3:quantity===50?4:5;
     const before=this.sdk.count(item.id),stockBefore=stockCount(),moneyBefore=this.sdk.count(state.currency.id),sequence=this.sdk.getState().messageSequence;
     this.assert(state.token);const live=(this.sdk.getState().containers.get(selling?'93:0':`${sample?state.sampleId:state.stockId}:0`)??[]).find(i=>i.slot===current.slot);if(!live||live.id!==current.id)throw new Error('Shop item slot changed before dispatch');
-    this.sdk.session.clickInterface(selling?621:620,selling?0:sample?26:25,option,current.id,selling?current.slot:current.slot*(sample?4:6));
+    this.sdk.session.clickInterface(selling?621:620,selling?0:sample?26:25,option,selling?current.id:-1,selling?current.slot:current.slot*(sample?4:6));
     let last='',since=Date.now(),refusedAt:number|undefined;
     const observed=await this.observe(()=>{
      this.assert(state.token!);const delta=selling?before-this.sdk.count(item.id):this.sdk.count(item.id)-before,stockDelta=selling?stockCount()-stockBefore:stockBefore-stockCount(),moneyDelta=this.sdk.count(state.currency!.id)-moneyBefore,refusal=this.refusal(sequence);
