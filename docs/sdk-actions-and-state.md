@@ -114,3 +114,51 @@ Notes and lent items resolve to their underlying item's stats while retaining th
 Comparison deltas are **candidate minus reference**. Positive attack/strength/defence bonuses are increases; a negative attack-speed delta means the candidate's base attack interval is shorter. The helper provides no universal winner or DPS prediction: accuracy against the target, style, speed, requirements, ammunition, spell choice, special attacks and set effects can change the useful choice.
 
 Every result identifies its source as `revision-634-cache` and sets `serverOverridesIncluded: false`. Custom server item overrides, special effects, and live player-wide totals are not inferred from the cache. For the equipped character's authoritative displayed totals, use `openEquipmentStats()`/`getEquipmentStats()` instead.
+
+## Shops (revision 634)
+
+Use the same API locally, through the gateway, or in MCP `execute_code`:
+
+```ts
+await bot.openShop(/^shopkeeper$/i); // optional NPC, exact name, or RegExp
+console.log(await sdk.getShopState()); // title, currency balance, paid stock, samples
+const item = await sdk.findShopItem('Tinderbox');
+if (item && item.amount > 0) {
+  console.log(await sdk.inspectShopItem(item)); // opens the game's item-info side panel
+  console.log(await bot.buyFromShop(item, 7));
+}
+// Free stock is explicit: inspect getShopItems({sample:true}) before taking it.
+// await bot.takeShopSample('Bronze hatchet', 1);
+// await bot.sellToShop('Logs', 'all');
+await bot.closeShop();
+```
+
+Queries: `getShopState()`, `getShopItems({sample?:boolean})`,
+`findShopItem(id|exactName|RegExp|ShopItem,{sample?:boolean})`, and
+`getShopItemInfo()` are available to observers. Prices come from the server's
+item-info varcs, not cache item values. `getShopItemInfo()` returns null unless
+that panel is open. `inspectShopItem(item,{sample?:boolean,timeout?:number})`
+is a control action; it opens the panel and waits for the quote. Negative raw
+prices are retained, with `unitPrice:null`; explicit free-sample inspection
+returns `unitPrice:0`. Quotes can change with shop stock.
+
+`openShop(target?,timeout=20000)` walks to a nearby NPC with a Trade/Shop option
+and waits for fresh full stock. Custom shops reached through dialogue require
+using the dialogue API first. `closeShop(timeout=5000)` closes the shop and
+its side panels. `bot.closeInterface()` also handles shops. Normal inventory
+use/equip/drop actions require closing the shop first.
+
+`buyFromShop(item,amount=1,timeout=20000)`,
+`sellToShop(item,amount=1,timeout=20000)`, and
+`takeShopSample(item,amount=1,timeout=20000)` accept a positive integer or
+`'all'`. Numeric items mean definition IDs; objects validate their current slot
+and shop identity. Nonstandard quantities use supported buttons in sequential
+batches. Each batch waits for inventory changes plus stock or currency evidence.
+Results contain `requested`, observed `amount`, `complete`, `reason`, and
+`currency:{id,name,change}` (signed observed balance change). Stock, budget, or
+inventory limits can produce partial results; inspect them before continuing.
+`'all'` means the available quantity at the start, not future restocks. These
+observations cannot distinguish simultaneous manual trades or unrelated item
+changes; keep one controller and avoid overlapping manual inventory actions.
+Timeout/cancellation stops later batches; it cannot retract a packet already
+accepted by the server. Re-query inventory before retrying uncertain trades.

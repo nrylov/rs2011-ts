@@ -28,6 +28,9 @@ export class World {
   players = new Map<number, Entity>();
   npcs = new Map<number, Entity>();
   containers = new Map<string, Item[]>();
+  private packetSequence=0;
+  /** Last full-container packet, used to reject cached stock after reopening a shop. */
+  containerPacketVersions=new Map<string,number>();interfacePacketVersions=new Map<number,number>();
   containerSync=new Map<string,Exclude<ContainerSyncStatus,'unknown'>>();
   skills = new Map<number, Skill>();
   texts = new Map<number, string>();
@@ -60,6 +63,7 @@ export class World {
   get player() { return this.players.get(this.index) ?? null; }
 
   apply(opcode: number, body: Uint8Array) {
+    this.packetSequence++;
     this.packets[opcode] = (this.packets[opcode] ?? 0) + 1;
     const r = new Reader(body);
     switch (opcode) {
@@ -103,7 +107,7 @@ export class World {
           let amount = r.add8(); if (amount === 255) amount = r.middle32() >>> 0;
           const item = r.add16() - 1; if (item >= 0) items.push({ slot, id: item, amount });
         }
-        this.containers.set(`${id}:${secondary}`, items);this.containerSync.set(`${id}:${secondary}`,'complete'); break;
+        this.containers.set(`${id}:${secondary}`, items);this.containerSync.set(`${id}:${secondary}`,'complete');this.containerPacketVersions.set(`${id}:${secondary}`,this.packetSequence); break;
       }
       case 28: {
         const id = r.u16(), secondary = r.u8(), key = `${id}:${secondary}`;
@@ -113,11 +117,11 @@ export class World {
           let amount = item < 0 ? 0 : r.u8(); if (amount === 255) amount = r.i32() >>> 0;
           if (item < 0) items.delete(slot); else items.set(slot, { slot, id: item, amount });
         }
-        this.containers.set(key, [...items.values()].sort((a,b) => a.slot - b.slot));if(!this.containerSync.has(key))this.containerSync.set(key,'partial'); break;
+        this.containers.set(key, [...items.values()].sort((a,b) => a.slot - b.slot));if(!this.containerSync.has(key))this.containerSync.set(key,'partial');break;
       }
       case 90: {const item=r.le16(),packed=r.inverse32()>>>0,amount=r.i32()>>>0;this.interfaceItems.set(packed,{id:item===65535?-1:item,amount});this.interfaceVersions.set(packed>>>16,++this.uiRevision);break;}
       case 10: { const id = r.le32() >>> 0; this.texts.set(id, r.text());this.interfaceVersions.set(id>>>16,++this.uiRevision); break; }
-      case 102: { const mode=r.neg8();this.windowId=r.add16();if(mode===2){this.interfaces.clear();this.interfaceMounts.clear();}this.uiRevision++;this.interfaceRevision++;break; }
+      case 102: { const mode=r.neg8();this.windowId=r.add16();if(mode===2){this.interfaces.clear();this.interfaceMounts.clear();this.interfacePacketVersions.clear();}this.uiRevision++;this.interfaceRevision++;break; }
       case 108: { const hide=!!r.add8();const packed=r.le32()>>>0;this.hidden.set(packed,hide);this.interfaceVersions.set(packed>>>16,++this.uiRevision);break; }
       case 8: {
         const types=r.text(),args:(number|string)[]=Array(types.length);
@@ -129,8 +133,8 @@ export class World {
       case 92: {const text=r.text(),id=r.add16();this.varcStrings.set(id,text);this.interfaceVersions.set(905,++this.uiRevision);break;}
       case 53: {const id=r.addLe16(),text=r.text();this.varcStrings.set(id,text);this.interfaceVersions.set(905,++this.uiRevision);break;}
       case 44: { const value=r.inverse32();const id=r.add16();this.varps.set(id,value);this.variableUpdates.set(`p${id}`,++this.configRevision);break; }
-      case 37: { const id = r.le16(), parent = r.le32() >>> 0; r.add8(); for(const key of this.interfaceItems.keys())if((key>>>16)===id)this.interfaceItems.delete(key);if([667,178,275].includes(id))for(const key of this.texts.keys())if((key>>>16)===id)this.texts.delete(key);this.interfaces.set(parent, id);this.interfaceMounts.set(parent,++this.uiRevision);this.interfaceRevision++; break; }
-      case 112: {const parent=r.i32()>>>0;this.interfaces.delete(parent);this.interfaceMounts.delete(parent);this.uiRevision++;this.interfaceRevision++;break;}
+      case 37: { const id = r.le16(), parent = r.le32() >>> 0; r.add8(); for(const key of this.interfaceItems.keys())if((key>>>16)===id)this.interfaceItems.delete(key);if([667,178,275,620].includes(id))for(const key of this.texts.keys())if((key>>>16)===id)this.texts.delete(key);this.interfaces.set(parent, id);this.interfaceMounts.set(parent,++this.uiRevision);this.interfacePacketVersions.set(parent,this.packetSequence);this.interfaceRevision++; break; }
+      case 112: {const parent=r.i32()>>>0;this.interfaces.delete(parent);this.interfaceMounts.delete(parent);this.interfacePacketVersions.delete(parent);this.uiRevision++;this.interfaceRevision++;break;}
       case 7: { const id = r.u16(); this.varps.set(id, signed(r.u8(), 8));this.variableUpdates.set(`p${id}`,++this.configRevision); break; }
       case 73: { const value=signed(r.add8(),8),id=r.le16();this.varbits.set(id,value);this.variableUpdates.set(`b${id}`,++this.configRevision);break; }
       case 68: { const id=r.add16(),value=r.inverse32();this.varbits.set(id,value);this.variableUpdates.set(`b${id}`,++this.configRevision);break; }

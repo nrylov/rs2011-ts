@@ -81,3 +81,13 @@ Prefer `await sdk.getStateSummary()` for concise diagnostics, and `await sdk.get
 A timed-out or disconnected gateway command cancels its cooperative observation/route. Use `await sdk.cancelAction()` explicitly when needed and observe the original pending call settle before issuing conflicting actions. An accepted server movement/attack can finish; cancellation does not undo it. Await `getQuestOffer()` locally as well as remotely; hidden fields return null until explicitly revealed. Quest progress/points/journal and Auto Retaliate examples are in `docs/sdk-actions-and-state.md`.
 
 For equipment decisions use `await sdk.getItemStats(idOrItem)` and `await sdk.compareItems(candidate, reference)`. They expose cache bonuses, base speed, styles and explicit level requirements without equipping anything. Comparison deltas are candidate minus reference; a negative speed delta is faster. Results exclude server overrides and set/special effects, and do not prove equip eligibility or predict DPS. Use actual equipment totals for the currently equipped character.
+
+## Shops
+
+Use `await bot.openShop(target?)`, then `await sdk.getShopState()` or
+`await sdk.findShopItem(exactNameOrId)`. Buy with `bot.buyFromShop(item,amount)`,
+sell with `bot.sellToShop(item,amount)`, and take free stock explicitly with
+`bot.takeShopSample(item,amount)`. Amount accepts a positive integer or `'all'`.
+Check the returned observed `amount`, `complete`, and `reason`; a partial fill
+is possible. `sdk.inspectShopItem(item)` opens the server's price-info panel.
+`bot.closeShop()` restores normal inventory use. See `docs/sdk-actions-and-state.md`.

@@ -50,3 +50,9 @@ Resources expose the SDK README, agent guide and gateway documentation through f
 Autocast is available through `await sdk.getAutocastState()`, `await sdk.setAutocast('Wind Strike')` (alias `'Air Strike'`), and `await sdk.setAutocast(null)` to disable it. Re-selecting the current spell is safe. Selection awaits the server's chosen-spell update and does not start an attack. This revision allows autocasting without a staff; Lunar spells have no autocast option.
 
 The SDK also exposes cancellation, arbitrary-quantity banking, named inventory actions, reachability, quest progress/journals/points, instance source coordinates and timestamped message queries. Prefer `await sdk.getStateSummary()` for compact diagnostics. Use `await sdk.setAutoRetaliate(true|false)` for confirmed retaliation changes. See [SDK actions and state](../docs/sdk-actions-and-state.md) for examples and activation requirements.
+
+Shop support: `await bot.openShop()`, `await sdk.getShopState()`,
+`await sdk.inspectShopItem('Tinderbox')`, `await bot.buyFromShop('Tinderbox',7)`,
+`await bot.sellToShop('Logs','all')`, and `await bot.closeShop()`.
+Use `bot.takeShopSample(item,amount)` for free stock. Inspect the result's
+`amount`, `complete`, and `reason` before retrying a partial trade.

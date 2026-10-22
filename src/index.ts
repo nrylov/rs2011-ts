@@ -27,3 +27,5 @@ export type {CombatSpell} from './core/magic.ts';
 export type {SpellDefinition,SpellTarget} from './core/spells.ts';
 
 export type {RouteOptions,WalkOptions,RoutePlan,DoorStep} from './core/navigation.ts';
+
+export type {ShopAmount,ShopItem,ShopState} from './core/shops.ts';

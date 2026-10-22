@@ -13,12 +13,12 @@ export class GatewaySDK {
  constructor(private socket:WebSocket,readonly mode:Mode,private timeout:number){
   this.bot=Object.fromEntries(botActions.map(name=>[name,(...args:unknown[])=>{
    const requested=typeof args[2]==='number'?args[2]:(args[2] as {timeout?:number}|undefined)?.timeout??120000;
-   const positions:Record<string,number>={depositItem:2,withdrawItem:2,depositAll:0,create:2},at=positions[name],explicit=at===undefined?undefined:args[at];
+   const positions:Record<string,number>={openShop:1,closeShop:0,buyFromShop:2,sellToShop:2,takeShopSample:2,depositItem:2,withdrawItem:2,depositAll:0,create:2},at=positions[name],explicit=at===undefined?undefined:args[at];
    const timeout=name==='walkTo'?requested+5000:name==='talkTo'?(typeof args[1]==='number'?args[1]:20000)+5000:typeof explicit==='number'?explicit+5000:this.timeout;
    return this.call(`bot.${name}`,args,Math.min(600000,Math.max(100,timeout)));
   }])) as RemoteBotActions;
   this.query=Object.fromEntries(queryMethods.map(name=>[name,(...args:unknown[])=>this.call(`sdk.${name}`,args)])) as RemoteQueries;
-  this.send=Object.fromEntries(sdkActions.map(name=>[name,(...args:unknown[])=>{const position:Record<string,number>={setAutoRetaliate:1,openQuestJournal:1,revealQuestOffer:1,castSpellOnNpc:2,homeTeleport:0,setAutocast:1,setPrayer:2,selectCombatStyle:1,openEquipmentStats:0,closeEquipmentStats:0,openPrayerList:0};const at=position[name],requested=at===undefined?undefined:args[at];return this.call(`sdk.${name}`,args,typeof requested==='number'?Math.min(600000,Math.max(100,requested+5000)):this.timeout);}])) as RemoteSends;
+  this.send=Object.fromEntries(sdkActions.map(name=>[name,(...args:unknown[])=>{const position:Record<string,number>={setAutoRetaliate:1,openQuestJournal:1,revealQuestOffer:1,castSpellOnNpc:2,homeTeleport:0,setAutocast:1,setPrayer:2,selectCombatStyle:1,openEquipmentStats:0,closeEquipmentStats:0,openPrayerList:0};const at=position[name],requested=name==='inspectShopItem'?(args[1] as {timeout?:number}|undefined)?.timeout:at===undefined?undefined:args[at];return this.call(`sdk.${name}`,args,typeof requested==='number'?Math.min(600000,Math.max(100,requested+5000)):this.timeout);}])) as RemoteSends;
   this.heartbeat=setInterval(()=>{if(socket.readyState===WebSocket.OPEN)socket.send(JSON.stringify({type:'ping'}));},20000);
  }
  receive(m:any){if(m.type==='state'){this.state=m.state;this.online=m.online===true;this.received=Date.now();this.age=typeof m.ageMs==='number'?m.ageMs:Infinity;this.notify();}else if(m.type==='result'){const pending=this.calls.get(m.id);if(pending){clearTimeout(pending.timer);this.calls.delete(m.id);m.error?pending.reject(new Error(m.error)):pending.resolve(m.value);}}else if(m.type==='error')this.end(m.error);}
@@ -38,6 +38,11 @@ export class GatewaySDK {
  getItemStats(...args:Parameters<BotSDK['getItemStats']>){return this.query.getItemStats(...args);}
  compareItems(...args:Parameters<BotSDK['compareItems']>){return this.query.compareItems(...args);}
  itemDefinition(...args:Parameters<BotSDK['itemDefinition']>){return this.query.itemDefinition(...args);}
+ getShopState(...args:Parameters<BotSDK['getShopState']>){return this.query.getShopState(...args);}
+ getShopItems(...args:Parameters<BotSDK['getShopItems']>){return this.query.getShopItems(...args);}
+ findShopItem(...args:Parameters<BotSDK['findShopItem']>){return this.query.findShopItem(...args);}
+ getShopItemInfo(...args:Parameters<BotSDK['getShopItemInfo']>){return this.query.getShopItemInfo(...args);}
+ inspectShopItem(...args:Parameters<BotSDK['inspectShopItem']>){return this.send.inspectShopItem(...args);}
  findBankItem(...args:Parameters<BotSDK['findBankItem']>){return this.query.findBankItem(...args);}
  getInventoryDetails(){return this.query.getInventoryDetails();}
  getGroundItemDetails(...args:Parameters<BotSDK['getGroundItemDetails']>){return this.query.getGroundItemDetails(...args);}

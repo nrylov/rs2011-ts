@@ -293,3 +293,13 @@ test('item stats and comparisons are read-only remote queries requiring no equip
   expect((await listGatewayBots(t.gateway.url,config.monitorToken))[0].busy).toBe(false);expect(t.peer.received.some(p=>[23,59,9].includes(p.opcode))).toBe(false);
  }finally{observer?.close();await t.close();}
 });
+test('shops expose read-only queries to observers and serialized actions to controllers',async()=>{
+ const t=await setup();let remote,observer;try{
+  const w=t.s.world;w.interfaces.set(1,620);w.interfaces.set(2,621);w.varps.set(118,24);w.varps.set(1496,25);w.containers.set('24:0',[{id:1351,slot:3,amount:10}]);w.containers.set('25:0',[]);w.containerSync.set('24:0','complete');w.containerSync.set('25:0','complete');
+  const calls:unknown[]=[];t.bot.buyFromShop=async(...args)=>{calls.push(args);return {amount:3} as any;};t.bot.sellToShop=async(...args)=>{calls.push(args);return {amount:2} as any;};t.bot.takeShopSample=async(...args)=>{calls.push(args);return {amount:1} as any;};t.sdk.inspectShopItem=async(...args)=>{calls.push(args);return {unitPrice:7} as any;};
+  remote=await connectGateway(options(t.gateway.url));observer=await connectGateway(options(t.gateway.url,'observe'));
+  expect(await observer.getShopState()).toMatchObject({open:true,ready:true});expect(await observer.findShopItem(/^bronze/i)).toMatchObject({id:1351,slot:3});expect(await remote.getShopItems()).toHaveLength(1);expect(await observer.getShopItemInfo()).toBeNull();
+  expect(await remote.bot.buyFromShop(1351,3,1000)).toMatchObject({amount:3});expect(await remote.bot.sellToShop(1351,2,1000)).toMatchObject({amount:2});expect(await remote.bot.takeShopSample(1351,1,1000)).toMatchObject({amount:1});expect(await remote.inspectShopItem(1351,{timeout:1000})).toMatchObject({unitPrice:7});expect(calls).toHaveLength(4);
+  await expect(observer.bot.buyFromShop(1351)).rejects.toThrow('Observer');await expect(observer.bot.sellToShop(1351)).rejects.toThrow('Observer');await expect(observer.bot.takeShopSample(1351)).rejects.toThrow('Observer');await expect(observer.inspectShopItem(1351)).rejects.toThrow('Observer');await expect(observer.bot.openShop()).rejects.toThrow('Observer');await expect(observer.bot.closeShop()).rejects.toThrow('Observer');
+ }finally{remote?.close();observer?.close();await t.close();}
+});

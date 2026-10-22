@@ -1,3 +1,5 @@
+import {ShopService,type ShopAmount} from './shops.ts';
+export type {ShopAmount,ShopItem,ShopState} from './shops.ts';
 import {SceneRegions,toSourceCoords} from './scene-regions.ts';
 import {canReach,type ReachabilityTarget} from './reachability.ts';
 export type {ReachabilityTarget} from './reachability.ts';
@@ -47,6 +49,7 @@ export class BotSDK {
  readonly itemStats:ItemStatsService;
  readonly quests:QuestService;
  readonly banking:BankingService;
+ readonly shops:ShopService;
  readonly autocast:AutocastService;
  readonly prayers:PrayerService;
  readonly combat:CombatService;
@@ -56,7 +59,7 @@ export class BotSDK {
  getSessionStatus(){return {status:this.session.status,error:this.session.error};}
  readonly navigation:NavigationService;
  private changingRun=false;
- constructor(readonly session:Session,readonly data:GameData){this.sceneRegions=new SceneRegions(()=>session.world.region,(x,y)=>data.region(x,y));this.navigation=new NavigationService(this);this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);this.combat=new CombatService(this);this.prayers=new PrayerService(this);this.magic=new MagicService(this);this.itemStats=new ItemStatsService(this);this.quests=new QuestService(this);this.banking=new BankingService(this);this.autocast=new AutocastService(this);this.spells=new SpellService(this);}
+ constructor(readonly session:Session,readonly data:GameData){this.sceneRegions=new SceneRegions(()=>session.world.region,(x,y)=>data.region(x,y));this.navigation=new NavigationService(this);this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);this.combat=new CombatService(this);this.prayers=new PrayerService(this);this.magic=new MagicService(this);this.itemStats=new ItemStatsService(this);this.quests=new QuestService(this);this.banking=new BankingService(this);this.shops=new ShopService(this);this.autocast=new AutocastService(this);this.spells=new SpellService(this);}
  getState(){return this.session.world;}
  toSourceCoords(tile=this.getState().player){return tile?toSourceCoords(this.getState().region,tile):null;}
  getRegionLayout(){return this.getState().region;}
@@ -95,6 +98,11 @@ export class BotSDK {
  getItemStats(item:number|{id:number}){return this.itemStats.read(item);}
  compareItems(candidate:number|{id:number},reference:number|{id:number}){return this.itemStats.compare(candidate,reference);}
  itemDefinition(id:number){if(!Number.isInteger(id)||id<0||id>65535)throw new Error('Item ID must be an integer from 0 to 65535');return Promise.resolve(this.data.item(id));}
+ getShopState(){return this.shops.state();}
+ async getShopItems(options:{sample?:boolean}={}){if(options.sample!==undefined&&typeof options.sample!=='boolean')throw new Error('sample must be boolean');const state=await this.shops.state();if(!state.ready)throw new Error(state.reason!);return options.sample?state.samples:state.stock;}
+ findShopItem(selection:ItemSelector,options:{sample?:boolean}={}){if(options.sample!==undefined&&typeof options.sample!=='boolean')throw new Error('sample must be boolean');return this.shops.find(selection,options.sample??false);}
+ getShopItemInfo(){return this.shops.info();}
+ inspectShopItem(selection:ItemSelector,options:{sample?:boolean;timeout?:number}={}){return this.session.withAction(()=>this.shops.inspect(selection,options));}
  findBankItem(selection:ItemSelector){return this.banking.find(selection,true);}
  getBank(){return this.getState().containers.get('95:0')??[];}
  count(id:number,container='93:0'){return (this.getState().containers.get(container)??[]).reduce((n,i)=>n+(i.id===id?i.amount:0),0);}
@@ -183,6 +191,7 @@ export class BotSDK {
  }
  sendDropItem(item:Item|number){this.sendItemOption(this.inventoryItem(item),7);}
  inventoryActionError(){
+  if(this.isOpen(620))return 'Close the shop before using inventory items.';
   if(this.isOpen(667))return 'Close Equipment Stats before using inventory items.';
   if(this.isOpen(762)||this.isOpen(11))return 'Close the bank or deposit box before using inventory items.';
   if(!this.isOpen(149))return this.isOpen(372)?'Inventory interface is closed. Select Inventory from Game tabs; if it is unavailable, follow the current tutorial instructions.':'Inventory interface is closed. Select Inventory from Game tabs or close the current interface.';
@@ -406,7 +415,12 @@ export class BotActions {
   throw new Error('Bank did not open before the timeout. Check dialogue, PIN requirements, and whether the target can be reached.');
  });}
  async confirmAppearance(){return this.exclusive(async()=>{if(!this.sdk.isOpen(1028))throw new Error('Character creation is not open');this.sdk.session.clickInterface(1028,117);await this.sdk.session.waitFor(()=>!this.sdk.isOpen(1028),5000);});}
- async closeInterface(){return this.exclusive(async()=>{const creation=await this.sdk.getCreationMenu(),ids=[762,11,667,...(creation?[creation.id,...(creation.id===905?[916]:[])]:[])];const open=ids.filter(id=>this.sdk.isOpen(id));if(!open.length)return;this.sdk.session.closeInterface();await this.sdk.session.waitFor(()=>open.every(id=>!this.sdk.isOpen(id)),5000);});}
+ async closeInterface(){return this.exclusive(async()=>{const creation=await this.sdk.getCreationMenu(),ids=[620,621,449,762,11,667,...(creation?[creation.id,...(creation.id===905?[916]:[])]:[])];const open=ids.filter(id=>this.sdk.isOpen(id));if(!open.length)return;this.sdk.session.closeInterface();await this.sdk.session.waitFor(()=>open.every(id=>!this.sdk.isOpen(id)),5000);});}
+ async openShop(target?:Entity|string|RegExp,timeout=20000){return this.exclusive(()=>this.sdk.shops.open(target,timeout));}
+ async closeShop(timeout=5000){return this.exclusive(()=>this.sdk.shops.close(timeout));}
+ async buyFromShop(item:ItemSelector,amount:ShopAmount=1,timeout=20000){return this.exclusive(()=>this.sdk.shops.trade('buy',item,amount,timeout));}
+ async sellToShop(item:ItemSelector,amount:ShopAmount=1,timeout=20000){return this.exclusive(()=>this.sdk.shops.trade('sell',item,amount,timeout));}
+ async takeShopSample(item:ItemSelector,amount:ShopAmount=1,timeout=20000){return this.exclusive(()=>this.sdk.shops.trade('take',item,amount,timeout));}
  async depositItem(item:ItemSelector,amount:BankAmount=1,timeout=15000){return this.exclusive(()=>this.sdk.banking.transfer('deposit',item,amount,timeout));}
  async withdrawItem(item:ItemSelector,amount:BankAmount=1,timeout=15000){return this.exclusive(()=>this.sdk.banking.transfer('withdraw',item,amount,timeout));}
  async depositAll(timeout=15000){return this.exclusive(()=>this.sdk.banking.depositAll(timeout));}

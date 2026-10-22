@@ -388,3 +388,9 @@ Use `sdk.cancelAction()` to cancel a pending cooperative command; `bot.depositIt
 Item/object definitions, named inventory actions, visible quest offers, journal/progress/points queries, instance source-coordinate conversion and timestamped messages are documented with examples in [SDK actions and state](docs/sdk-actions-and-state.md). Prefer `await sdk.getStateSummary()` when printing state for an agent; raw snapshots retain full instance chunks for map consumers. Refresh the gateway and client to activate the new API surface.
 
 Individual gear statistics are available with `await sdk.getItemStats(itemIdOrObject)`. Use `await sdk.compareItems(candidate, reference)` for named bonus deltas, base weapon speed, styles and explicit equip-level requirements. These read-only cache queries do not equip either item and do not rank a universal winner. See [item stats and comparisons](docs/sdk-actions-and-state.md#individual-item-stats-and-comparisons) for units and server-override limitations.
+
+Shop SDK support includes `bot.openShop()`, `sdk.getShopState()`, named stock
+lookup, server price inspection, `bot.buyFromShop(item,amount)`,
+`bot.sellToShop(item,amount)`, `bot.takeShopSample(item,amount)`, and
+`bot.closeShop()`. Arbitrary quantities are confirmed in batches; results report
+partial fills. See [shop examples and behavior](docs/sdk-actions-and-state.md#shops-revision-634).
