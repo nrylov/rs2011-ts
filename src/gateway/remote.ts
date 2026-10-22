@@ -35,6 +35,8 @@ export class GatewaySDK {
  isOpen(value:number|string){const id=interfaceId(value);const w=this.getState();return !!w&&(w.windowId===id||Object.values(w.interfaces).includes(id));}
  getInventory(){return this.getState()?.containers['93:0']??[];}
  getEquipment(){return this.getState()?.containers['94:0']??[];}
+ getItemStats(...args:Parameters<BotSDK['getItemStats']>){return this.query.getItemStats(...args);}
+ compareItems(...args:Parameters<BotSDK['compareItems']>){return this.query.compareItems(...args);}
  itemDefinition(...args:Parameters<BotSDK['itemDefinition']>){return this.query.itemDefinition(...args);}
  findBankItem(...args:Parameters<BotSDK['findBankItem']>){return this.query.findBankItem(...args);}
  getInventoryDetails(){return this.query.getInventoryDetails();}

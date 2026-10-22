@@ -284,3 +284,12 @@ test('new information queries and Auto Retaliate transport current state and kee
   w.varps.set(172,0);(t.s as any).notify();expect(await pending).toMatchObject({enabled:true});await expect(observer.setAutoRetaliate(false)).rejects.toThrow('Observer');await expect(observer.useInventoryItem(1351,'Wield')).rejects.toThrow('Observer');
  }finally{remote?.close();observer?.close();await t.close();}
 });
+
+test('item stats and comparisons are read-only remote queries requiring no equipment or interface changes',async()=>{
+ const t=await setup();let observer;
+ try{
+  t.sdk.data.item=id=>({id,name:id===1277?'Bronze sword':'Iron sword',stackable:false,noteId:-1,noteTemplate:-1,lendId:-1,lendTemplate:-1,options:['Wield'],floorOptions:[],params:{0:id===1277?4:6,641:id===1277?50:70,14:4,686:5}});
+  observer=await connectGateway(options(t.gateway.url,'observe'));expect(await observer.getItemStats(1277)).toMatchObject({bonuses:{meleeStrength:5},attackSpeedTicks:4});expect(await observer.compareItems(1279,1277)).toMatchObject({bonusDelta:{stabAttack:2,meleeStrength:2}});
+  expect((await listGatewayBots(t.gateway.url,config.monitorToken))[0].busy).toBe(false);expect(t.peer.received.some(p=>[23,59,9].includes(p.opcode))).toBe(false);
+ }finally{observer?.close();await t.close();}
+});

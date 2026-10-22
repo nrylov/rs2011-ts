@@ -6,6 +6,8 @@ import {NavigationService,type RouteOptions,type WalkOptions} from './navigation
 export type {RouteOptions,WalkOptions,RoutePlan,DoorStep} from './navigation.ts';
 import {SpellService,type SpellTarget} from './spells.ts';
 import {MagicService} from './magic.ts';
+import {ItemStatsService} from './item-stats.ts';
+export type {ItemStats,ItemBonuses} from './item-stats.ts';
 import {QuestService,type QuestSelector} from './quests.ts';
 export type {QuestSelector,QuestState} from './quests.ts';
 import {BankingService,type ItemSelector,type BankAmount} from './banking.ts';
@@ -42,6 +44,7 @@ export class BotSDK {
  readonly dialogue:DialogueService;
  readonly spells:SpellService;
  readonly magic:MagicService;
+ readonly itemStats:ItemStatsService;
  readonly quests:QuestService;
  readonly banking:BankingService;
  readonly autocast:AutocastService;
@@ -53,7 +56,7 @@ export class BotSDK {
  getSessionStatus(){return {status:this.session.status,error:this.session.error};}
  readonly navigation:NavigationService;
  private changingRun=false;
- constructor(readonly session:Session,readonly data:GameData){this.sceneRegions=new SceneRegions(()=>session.world.region,(x,y)=>data.region(x,y));this.navigation=new NavigationService(this);this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);this.combat=new CombatService(this);this.prayers=new PrayerService(this);this.magic=new MagicService(this);this.quests=new QuestService(this);this.banking=new BankingService(this);this.autocast=new AutocastService(this);this.spells=new SpellService(this);}
+ constructor(readonly session:Session,readonly data:GameData){this.sceneRegions=new SceneRegions(()=>session.world.region,(x,y)=>data.region(x,y));this.navigation=new NavigationService(this);this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);this.combat=new CombatService(this);this.prayers=new PrayerService(this);this.magic=new MagicService(this);this.itemStats=new ItemStatsService(this);this.quests=new QuestService(this);this.banking=new BankingService(this);this.autocast=new AutocastService(this);this.spells=new SpellService(this);}
  getState(){return this.session.world;}
  toSourceCoords(tile=this.getState().player){return tile?toSourceCoords(this.getState().region,tile):null;}
  getRegionLayout(){return this.getState().region;}
@@ -89,6 +92,8 @@ export class BotSDK {
  getEquipmentStatus(){return this.getState().containerSync.get('94:0')??'unknown';}
  getInventory(){return this.getState().containers.get('93:0')??[];}
  getEquipment(){return this.getState().containers.get('94:0')??[];}
+ getItemStats(item:number|{id:number}){return this.itemStats.read(item);}
+ compareItems(candidate:number|{id:number},reference:number|{id:number}){return this.itemStats.compare(candidate,reference);}
  itemDefinition(id:number){if(!Number.isInteger(id)||id<0||id>65535)throw new Error('Item ID must be an integer from 0 to 65535');return Promise.resolve(this.data.item(id));}
  findBankItem(selection:ItemSelector){return this.banking.find(selection,true);}
  getBank(){return this.getState().containers.get('95:0')??[];}

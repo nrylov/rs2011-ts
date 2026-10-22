@@ -95,3 +95,22 @@ await sdk.setAutoRetaliate(false);
 ```
 
 The setter selects Combat Styles, clicks revision-634 component 884:15 only when necessary, and waits for varp 172 (0 = enabled, 1 = disabled). Unknown synchronization remains `enabled: null`. Hidden/locked controls and fresh refusals reject. Repeating the current setting is safe. These operations are also in the lightweight/regular development-console examples; no game-server patch is required.
+
+## Individual item stats and comparisons
+
+```ts
+const sword = await sdk.getItemStats(1277);          // Bronze sword
+const comparison = await sdk.compareItems(1279, 1277); // Iron minus Bronze
+console.log(sword.bonuses, sword.attackSpeedTicks, sword.requirements);
+console.log(comparison.bonusDelta, comparison.attackSpeedTicksDelta);
+```
+
+These are read-only cache queries and work through the gateway/MCP, including observer connections. They do not equip anything or open a game interface. Both methods accept numeric item IDs or objects with an `id`, so inventory, bank and ground item objects can be passed directly.
+
+`getItemStats` returns named attack/defence bonuses, melee/ranged/magic strength, prayer, magic damage and damage absorption percentages, base attack speed, weapon style/options and explicit equip-level requirements. Strength parameters are divided by ten to match revision-634 display units; percentage fields remain percentages. Missing bonus parameters on equipment default to zero as in the cache's equipment view. Missing attack speed remains null. The seconds field is the nominal interval at 600 ms per game tick, before attack-style or spell-specific changes.
+
+Notes and lent items resolve to their underlying item's stats while retaining the requested ID and `noted`/`lent` flags. `equipment` describes the resolved base item, not proof that the requested noted/lent ID can be equipped. Non-equipment returns `bonuses: null`. The requirements list includes only requirements explicitly encoded in the cache; absence is not proof that no server restriction exists.
+
+Comparison deltas are **candidate minus reference**. Positive attack/strength/defence bonuses are increases; a negative attack-speed delta means the candidate's base attack interval is shorter. The helper provides no universal winner or DPS prediction: accuracy against the target, style, speed, requirements, ammunition, spell choice, special attacks and set effects can change the useful choice.
+
+Every result identifies its source as `revision-634-cache` and sets `serverOverridesIncluded: false`. Custom server item overrides, special effects, and live player-wide totals are not inferred from the cache. For the equipped character's authoritative displayed totals, use `openEquipmentStats()`/`getEquipmentStats()` instead.

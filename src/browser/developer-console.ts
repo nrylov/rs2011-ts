@@ -22,6 +22,8 @@ const examples:[string,string][]=[
  ['Disable autocast',"await sdk.setAutocast(null)"],
  ['Enable Auto Retaliate',"await sdk.setAutoRetaliate(true)"],
  ['Disable Auto Retaliate',"await sdk.setAutoRetaliate(false)"],
+ ['Inspect bronze sword stats',"await sdk.getItemStats(1277)"],
+ ['Compare iron and bronze swords',"await sdk.compareItems(1279, 1277)"],
  ['Inspect Auto Retaliate',"await sdk.getAutoRetaliateState()"],
  ['Inspect autocast',"await sdk.getAutocastState()"],
  ['Activate Thick Skin',"await sdk.setPrayer('Thick Skin', true)"],
