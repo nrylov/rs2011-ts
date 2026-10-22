@@ -1,6 +1,7 @@
 import type { Component } from '../cache/definitions.ts';
 import type { Session } from './session.ts';
 import { DIALOGUE_PROFILES } from './dialogue-profiles.ts';
+import {readQuestOffer} from './quest-offer.ts';
 
 export type DialogPattern = string | RegExp;
 export interface DialogButton {
@@ -50,9 +51,10 @@ export class DialogueService {
     // publish the explicit decision buttons; map/reveal controls are separate.
     const buttons:DialogButton[]=[];
     for(const component of [73,74]){const c=byId.get(component);if(c&&visible(c))buttons.push({index:buttons.length+1,component,text:component===73?'Yes':'No',dispatch:'interface',option:0});}
-    const title=byId.get(14),fields=[[52,'Start point'],[55,'Requirements'],[59,'Required items'],[62,'Combat'],[66,'Rewards']] as const;
-    const lines=fields.flatMap(([component,label])=>{const c=byId.get(component),value=c?text(c):'';return value?[`${label}: ${value}`]:[];});
-    return {id,parent,token:this.token(id,parent),kind:buttons.length?'choice':'text',title:title?text(title):'Quest',lines,text:lines,buttons,options:buttons,continueButton:null};
+    const offer=readQuestOffer(w,components,false);if(!offer)return null;
+    const fields=[['startPoint','Start point'],['requirements','Requirements'],['items','Required items'],['combat','Combat'],['rewards','Rewards']] as const;
+    const lines=fields.flatMap(([key,label])=>offer[key]?[`${label}: ${offer[key]}`]:[]);
+    return {id,parent,token:this.token(id,parent),kind:buttons.length?'choice':'text',title:offer.quest??'Quest',lines,text:lines,buttons,options:buttons,continueButton:null};
    }
    const buttons:DialogButton[]=[];
    for(const c of [...components].sort((a,b)=>a.id-b.id))if(visible(c)){

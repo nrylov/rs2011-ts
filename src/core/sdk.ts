@@ -1,9 +1,15 @@
-import {SceneRegions} from './scene-regions.ts';
+import {SceneRegions,toSourceCoords} from './scene-regions.ts';
+import {canReach,type ReachabilityTarget} from './reachability.ts';
+export type {ReachabilityTarget} from './reachability.ts';
 import{interfaceId}from'./interface-names.ts';
 import {NavigationService,type RouteOptions,type WalkOptions} from './navigation.ts';
 export type {RouteOptions,WalkOptions,RoutePlan,DoorStep} from './navigation.ts';
 import {SpellService,type SpellTarget} from './spells.ts';
 import {MagicService} from './magic.ts';
+import {QuestService,type QuestSelector} from './quests.ts';
+export type {QuestSelector,QuestState} from './quests.ts';
+import {BankingService,type ItemSelector,type BankAmount} from './banking.ts';
+export type {ItemSelector,BankAmount} from './banking.ts';
 import {AutocastService} from './autocast.ts';
 export type {AutocastState,AutocastSpell} from './autocast.ts';
 import {PrayerService} from './prayer.ts';
@@ -36,6 +42,8 @@ export class BotSDK {
  readonly dialogue:DialogueService;
  readonly spells:SpellService;
  readonly magic:MagicService;
+ readonly quests:QuestService;
+ readonly banking:BankingService;
  readonly autocast:AutocastService;
  readonly prayers:PrayerService;
  readonly combat:CombatService;
@@ -45,8 +53,18 @@ export class BotSDK {
  getSessionStatus(){return {status:this.session.status,error:this.session.error};}
  readonly navigation:NavigationService;
  private changingRun=false;
- constructor(readonly session:Session,readonly data:GameData){this.sceneRegions=new SceneRegions(()=>session.world.region,(x,y)=>data.region(x,y));this.navigation=new NavigationService(this);this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);this.combat=new CombatService(this);this.prayers=new PrayerService(this);this.magic=new MagicService(this);this.autocast=new AutocastService(this);this.spells=new SpellService(this);}
+ constructor(readonly session:Session,readonly data:GameData){this.sceneRegions=new SceneRegions(()=>session.world.region,(x,y)=>data.region(x,y));this.navigation=new NavigationService(this);this.dialogue=new DialogueService(session,id=>data.interface(id));this.creation=new CreationService(this);this.combat=new CombatService(this);this.prayers=new PrayerService(this);this.magic=new MagicService(this);this.quests=new QuestService(this);this.banking=new BankingService(this);this.autocast=new AutocastService(this);this.spells=new SpellService(this);}
  getState(){return this.session.world;}
+ toSourceCoords(tile=this.getState().player){return tile?toSourceCoords(this.getState().region,tile):null;}
+ getRegionLayout(){return this.getState().region;}
+ getStateSummary(){
+  const w=this.getState(),r=w.region;
+  return {name:w.name,tick:w.tick,player:w.player,sourcePlayer:this.toSourceCoords(),region:r?{zoneX:r.zoneX,zoneY:r.zoneY,size:r.size,baseX:r.baseX,baseY:r.baseY,instanced:!!r.chunks,chunkCount:r.chunks?.length??0,sourceRegionCount:r.chunks?new Set(r.chunks.map(c=>`${c.sourceX>>>6}:${c.sourceY>>>6}`)).size:0}:null,inventory:this.getInventory(),equipment:this.getEquipment(),messageSequence:w.messageSequence,messages:this.getMessages().slice(-10),session:this.getSessionStatus()};
+ }
+ getMessages(options:{afterSequence?:number;sinceTick?:number;sinceTime?:number}={}){
+  for(const key of ['afterSequence','sinceTick','sinceTime'] as const)if(options[key]!==undefined&&(!Number.isFinite(options[key])||options[key]!<0))throw new Error('Message filters must be non-negative numbers');
+  const w=this.getState();return w.messages.map((m,index)=>({...m,sequence:m.sequence??w.messageSequence-w.messages.length+index+1,ageMs:m.receivedAt===undefined?null:Math.max(0,Date.now()-m.receivedAt)})).filter(m=>(options.afterSequence===undefined||m.sequence>options.afterSequence)&&(options.sinceTick===undefined||m.tick!==undefined&&m.tick>=options.sinceTick)&&(options.sinceTime===undefined||m.receivedAt!==undefined&&m.receivedAt>=options.sinceTime));
+ }
  getSpells(){return this.spells.list();}
  castSpell(spell:string|RegExp,target?:SpellTarget,option?:string){return this.spells.cast(spell,target,option);}
  homeTeleport(timeout=45000){return this.session.withAction(()=>this.spells.home(timeout));}
@@ -58,6 +76,8 @@ export class BotSDK {
  async getPrayers(){return (await this.getPrayerState()).prayers;}
  openPrayerList(timeout=5000){return this.session.withAction(()=>this.prayers.open(timeout));}
  setPrayer(selection:string|RegExp|number,enabled:boolean,timeout=5000){return this.session.withAction(()=>this.prayers.set(selection,enabled,timeout));}
+ getAutoRetaliateState(){return this.combat.autoRetaliateState();}
+ setAutoRetaliate(enabled:boolean,timeout=5000){return this.session.withAction(()=>this.combat.setAutoRetaliate(enabled,timeout));}
  getHealth(){return this.combat.health();}
  getCombatState(){return this.combat.state();}
  async getCombatStyles(){return (await this.getCombatState()).styles;}
@@ -69,6 +89,8 @@ export class BotSDK {
  getEquipmentStatus(){return this.getState().containerSync.get('94:0')??'unknown';}
  getInventory(){return this.getState().containers.get('93:0')??[];}
  getEquipment(){return this.getState().containers.get('94:0')??[];}
+ itemDefinition(id:number){if(!Number.isInteger(id)||id<0||id>65535)throw new Error('Item ID must be an integer from 0 to 65535');return Promise.resolve(this.data.item(id));}
+ findBankItem(selection:ItemSelector){return this.banking.find(selection,true);}
  getBank(){return this.getState().containers.get('95:0')??[];}
  count(id:number,container='93:0'){return (this.getState().containers.get(container)??[]).reduce((n,i)=>n+(i.id===id?i.amount:0),0);}
  isOpen(value:number|string){const id=interfaceId(value);return this.getState().windowId===id||[...this.getState().interfaces.values()].includes(id);}
@@ -110,6 +132,25 @@ export class BotSDK {
   this.session.clickInterface(464,current.component,current.option);
   return {...current,dispatched:true as const};
  }
+ /** Quest start screen (interface 178, quest_intro). Null unless its "Start this quest?" Yes/No choice is showing. */
+ getQuestOffer(){return this.quests.offer();}
+ getQuestDefinitions(){return this.quests.definitions();}
+ getQuestState(quest:QuestSelector){return this.quests.state(quest);}
+ getQuests(){return this.quests.list();}
+ getQuestPoints(){return this.quests.points();}
+ getQuestJournal(){return this.quests.journal();}
+ openQuestJournal(quest:QuestSelector,timeout=5000){return this.session.withAction(()=>this.quests.openJournal(quest,timeout));}
+ revealQuestOffer(field:'items'|'rewards',timeout=5000){return this.session.withAction(()=>this.quests.reveal(field,timeout));}
+ /** Click Yes or No on the quest start screen and wait for it to close. Dialogue helpers cannot see this interface. */
+ async answerQuestOffer(accept:boolean,timeout=5000){
+  if(typeof accept!=='boolean'||!Number.isFinite(timeout)||timeout<=0)throw new Error('Pass a boolean answer and a positive timeout');
+  if(!await this.getQuestOffer())throw new Error('No quest start screen is open');
+  this.session.clickInterface(178,accept?73:74);
+  await this.session.waitFor(()=>!this.isOpen(178)||this.getState().hidden.get((178<<16)|27)===true,timeout).catch(error=>{if(this.session.actionSignal?.aborted)throw error;throw new Error('The quest start screen did not close: '+(error instanceof Error?error.message:String(error)));});
+  return {accepted:accept};
+ }
+ acceptQuest(timeout?:number){return this.answerQuestOffer(true,timeout);}
+ declineQuest(timeout?:number){return this.answerQuestOffer(false,timeout);}
  getRunState(){
   const mode=this.getState().varps.get(173);
   return {enabled:mode===0?false:mode===1?true:null,mode:mode===0?'walk':mode===1?'run':mode===3?'rest':mode===4?'music':'unknown',energy:this.getState().runEnergy,available:this.isOpen(750)};
@@ -144,6 +185,16 @@ export class BotSDK {
  }
  private inventoryItem(item:Item|number){const current=this.getInventory().find(i=>i.slot===(typeof item==='number'?item:item.slot));if(!current||typeof item!=='number'&&current.id!==item.id)throw new Error('Item slot changed; query inventory again');return current;}
  sendUseItemOnItem(source:Item|number,target:Item|number){const error=this.inventoryActionError();if(error)throw new Error(error);const from=this.inventoryItem(source),to=this.inventoryItem(target);if(from.slot===to.slot)throw new Error('Select two different inventory slots');this.session.useItemOnItem(from,to);}
+ async getGroundItemDetails(radius=24){return Promise.all(this.getGroundItems(radius).map(async item=>{const def=await this.itemDefinition(item.id);return {...item,name:def.name,options:def.floorOptions};}));}
+ objectDefinition(id:number){if(!Number.isInteger(id)||id<0||id>65535)throw new Error('Object ID must be an integer from 0 to 65535');return Promise.resolve(this.data.object(id));}
+ async getInventoryDetails(){return Promise.all(this.getInventory().map(async item=>{const def=await this.itemDefinition(item.id);return {...item,name:def.name,options:def.options.map((label,slot)=>({slot,option:inventoryOption(slot),label})).filter(o=>!!o.label)};}));}
+ async useInventoryItem(selection:ItemSelector,option:string|RegExp){
+  if(typeof option!=='string'&&!(option instanceof RegExp))throw new Error('Pass an item action name or RegExp');
+  const item=await this.banking.find(selection);if(!item)throw new Error('No matching inventory item');
+  const def=await this.itemDefinition(item.id),choices=def.options.flatMap((label,index)=>label&&match(label,option)?[index]:[]);
+  if(choices.length!==1)throw new Error(`${choices.length?'Ambiguous':'No matching'} item action. Available: ${def.options.filter(Boolean).join(', ')}`);
+  this.sendItemOption(item,inventoryOption(choices[0]));return {dispatched:true as const,item,option:def.options[choices[0]]};
+ }
  getGroundItems(radius=24){const p=this.getState().player;return p?[...this.getState().groundItems.values()].filter(i=>i.level===p.level&&Math.max(Math.abs(i.x-p.x),Math.abs(i.y-p.y))<=radius).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y)):[];}
  async findGroundItem(pattern:string|RegExp,radius=24){for(const i of this.getGroundItems(radius))if(match((await this.data.item(i.id)).name,pattern))return i;return null;}
  sendTakeGroundItem(item:GroundItem){const current=this.getState().groundItems.get(item.key);if(!current||current.id!==item.id||current.level!==this.getState().player?.level)throw new Error('Ground item left view; query nearby items again');this.session.interactGroundItem(current.id,current.x,current.y);}
@@ -224,6 +275,7 @@ export class BotSDK {
   for(const o of w.objectChanges.values())if(o.id!==null&&!defs.has(o.id))defs.set(o.id,await this.data.object(o.id));
   return new CollisionMap(regions,sceneObjects(regions,w,id=>defs.get(id)),p.level);
  }
+ canReach(target:ReachabilityTarget,options:Omit<RouteOptions,'openDoors'|'interactionSize'|'tolerance'>={}){return canReach(this,target,options);}
  planRoute(x:number,y:number,options:RouteOptions={}){return this.navigation.plan(x,y,options);}
  /** Read-only approach plan; unlike tile tolerance, the final edge cannot cross a wall/closed door. */
  async planNpcInteraction(target:Entity|string|RegExp,options:Omit<RouteOptions,'tolerance'|'interactionSize'>={}){
@@ -350,20 +402,9 @@ export class BotActions {
  });}
  async confirmAppearance(){return this.exclusive(async()=>{if(!this.sdk.isOpen(1028))throw new Error('Character creation is not open');this.sdk.session.clickInterface(1028,117);await this.sdk.session.waitFor(()=>!this.sdk.isOpen(1028),5000);});}
  async closeInterface(){return this.exclusive(async()=>{const creation=await this.sdk.getCreationMenu(),ids=[762,11,667,...(creation?[creation.id,...(creation.id===905?[916]:[])]:[])];const open=ids.filter(id=>this.sdk.isOpen(id));if(!open.length)return;this.sdk.session.closeInterface();await this.sdk.session.waitFor(()=>open.every(id=>!this.sdk.isOpen(id)),5000);});}
- async depositItem(item:Item,amount:1|5|10|'all'=1){return this.exclusive(async()=>{
-  if(!this.sdk.isOpen(762)&&!this.sdk.isOpen(11))throw new Error('Bank is not open');
-  this.requireItem(item);
-  const inv=this.sdk.count(item.id),bank=this.sdk.count(item.id,'95:0'),n=amount==='all'?inv:Math.min(inv,amount),option=amount==='all'?5:({1:0,5:1,10:2}[amount]);
-  this.sdk.session.clickInterface(this.sdk.isOpen(762)?763:11,this.sdk.isOpen(762)?0:17,option,item.id,item.slot);
-  await this.sdk.session.waitFor(()=>this.sdk.count(item.id)<=inv-n&&(!this.sdk.isOpen(762)||this.sdk.count(item.id,'95:0')>=bank+n));return {amount:n};
- });}
- async withdrawItem(item:Item,amount:1|5|10|'all'=1){return this.exclusive(async()=>{
-  if(!this.sdk.isOpen(762))throw new Error('Bank is not open');if(this.sdk.getState().varps.get(115)===1)throw new Error('Select item withdrawal mode first');
-  this.requireItem(item,'95:0');
-  const inv=this.sdk.count(item.id),bank=this.sdk.count(item.id,'95:0'),n=amount==='all'?bank:Math.min(bank,amount);
-  this.sdk.session.clickInterface(762,93,amount==='all'?5:({1:0,5:1,10:2}[amount]),item.id,item.slot);
-  await this.sdk.session.waitFor(()=>this.sdk.count(item.id)>=inv+n&&this.sdk.count(item.id,'95:0')<=bank-n);return {amount:n};
- });}
+ async depositItem(item:ItemSelector,amount:BankAmount=1,timeout=15000){return this.exclusive(()=>this.sdk.banking.transfer('deposit',item,amount,timeout));}
+ async withdrawItem(item:ItemSelector,amount:BankAmount=1,timeout=15000){return this.exclusive(()=>this.sdk.banking.transfer('withdraw',item,amount,timeout));}
+ async depositAll(timeout=15000){return this.exclusive(()=>this.sdk.banking.depositAll(timeout));}
  /** Select an open production recipe and observe its first conversion, input prompt or next menu. */
  async create(product:string|RegExp,amount:CreationAmount=1,timeout=20_000,expected?:CreationMenu){return this.exclusive(async()=>{
   this.timeout(timeout);const inventory=this.sdk.getInventory(),before=JSON.stringify(inventory),counts=new Map<number,number>(),xp=new Map([...this.sdk.getState().skills].map(([id,s])=>[id,s.xp]));for(const item of inventory)counts.set(item.id,(counts.get(item.id)??0)+item.amount);const sequence=this.sdk.getState().messageSequence,inputSequence=this.sdk.getState().scriptSequence;

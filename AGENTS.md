@@ -71,3 +71,11 @@ For long travel use `await bot.walkTo(x, y, {timeout: 180000, tolerance: 2})`; d
 See `mcp/README.md`, the main README, `docs/production.md` and `docs/gateway.md` for current APIs and limitations.
 
 For NPCs in enclosed rooms, use `await sdk.planNpcInteraction(npcOrName)` to inspect approach tiles and required doors without moving. `await bot.talkTo(npcOrName, 30000)` performs that approach and surfaces fresh server refusals. Geometric arrival tolerance does not prove interaction reachability across a wall.
+
+## Action cancellation and readable queries
+
+Prefer `await sdk.getStateSummary()` for concise diagnostics, and `await sdk.getMessages({afterSequence})` for fresh feedback. Use `await sdk.getInventoryDetails()`, `getGroundItemDetails()` and `itemDefinition(id)` for names and actual action labels; `await sdk.useInventoryItem(itemId, 'Eat')` sends the named action but still requires observing its effect.
+
+`bot.depositItem` and `withdrawItem` accept item IDs, exact names, regexes or explicit item objects, plus any positive integer quantity or `'all'`. `bot.depositAll()` deposits all carried IDs. Explicit objects remain slot-checked. `sdk.canReach(target)` reports walking geometry and blocking doors; it does not prove projectile line of sight or bypass quest rules.
+
+A timed-out or disconnected gateway command cancels its cooperative observation/route. Use `await sdk.cancelAction()` explicitly when needed and observe the original pending call settle before issuing conflicting actions. An accepted server movement/attack can finish; cancellation does not undo it. Await `getQuestOffer()` locally as well as remotely; hidden fields return null until explicitly revealed. Quest progress/points/journal and Auto Retaliate examples are in `docs/sdk-actions-and-state.md`.

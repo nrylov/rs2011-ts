@@ -35,7 +35,7 @@ test('action helpers reject overlapping control and wait for both sides of a dep
  const peer=await createPeer();const s=await connectHeadless({username:'test',password:'pass',modulus:peer.modulus,port:peer.port});
  try{
  await s.waitFor(w=>w.tick>0);s.world.interfaces.set(1,762);s.world.interfaces.set(2,763);s.world.containers.set('93:0',[{id:1511,slot:0,amount:1}]);
- const sdk=new BotSDK(s,{} as DiskCache),bot=new BotActions(sdk);let finished=false;
+ const sdk=new BotSDK(s,{item:(id:number)=>({id,name:'Logs',noteTemplate:-1,noteId:-1})} as unknown as DiskCache),bot=new BotActions(sdk);let finished=false;
  const action=bot.depositItem({id:1511,slot:0,amount:1}).then(()=>{finished=true;});
  await expect(bot.equipItem({id:1351,slot:1,amount:1})).rejects.toThrow('already running');await Bun.sleep(30);expect(finished).toBe(false);
  peer.emit(20,new Writer().u16(93).u8(0).u16(0).finish());await Bun.sleep(30);expect(finished).toBe(false);

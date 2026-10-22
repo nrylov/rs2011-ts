@@ -11,9 +11,14 @@ export class GatewaySDK {
  private closeReason='Gateway connection closed';private state:PublishedState|null=null;private online=false;private closed=false;private received=0;private age=Infinity;private serial=0;
  private calls=new Map<string,{resolve:(v:any)=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>();private listeners=new Set<()=>void>();private heartbeat:ReturnType<typeof setInterval>;
  constructor(private socket:WebSocket,readonly mode:Mode,private timeout:number){
-  this.bot=Object.fromEntries(botActions.map(name=>[name,(...args:unknown[])=>{const requested=typeof args[2]==='number'?args[2]:(args[2] as {timeout?:number}|undefined)?.timeout??120000;return this.call(`bot.${name}`,args,name==='walkTo'?Math.min(600000,Math.max(100,requested+5000)):name==='talkTo'?Math.min(600000,Math.max(100,(typeof args[1]==='number'?args[1]:20000)+5000)):this.timeout);}])) as RemoteBotActions;
+  this.bot=Object.fromEntries(botActions.map(name=>[name,(...args:unknown[])=>{
+   const requested=typeof args[2]==='number'?args[2]:(args[2] as {timeout?:number}|undefined)?.timeout??120000;
+   const positions:Record<string,number>={depositItem:2,withdrawItem:2,depositAll:0,create:2},at=positions[name],explicit=at===undefined?undefined:args[at];
+   const timeout=name==='walkTo'?requested+5000:name==='talkTo'?(typeof args[1]==='number'?args[1]:20000)+5000:typeof explicit==='number'?explicit+5000:this.timeout;
+   return this.call(`bot.${name}`,args,Math.min(600000,Math.max(100,timeout)));
+  }])) as RemoteBotActions;
   this.query=Object.fromEntries(queryMethods.map(name=>[name,(...args:unknown[])=>this.call(`sdk.${name}`,args)])) as RemoteQueries;
-  this.send=Object.fromEntries(sdkActions.map(name=>[name,(...args:unknown[])=>{const position:Record<string,number>={castSpellOnNpc:2,homeTeleport:0,setAutocast:1,setPrayer:2,selectCombatStyle:1,openEquipmentStats:0,closeEquipmentStats:0,openPrayerList:0};const at=position[name],requested=at===undefined?undefined:args[at];return this.call(`sdk.${name}`,args,typeof requested==='number'?Math.min(600000,Math.max(100,requested+5000)):this.timeout);}])) as RemoteSends;
+  this.send=Object.fromEntries(sdkActions.map(name=>[name,(...args:unknown[])=>{const position:Record<string,number>={setAutoRetaliate:1,openQuestJournal:1,revealQuestOffer:1,castSpellOnNpc:2,homeTeleport:0,setAutocast:1,setPrayer:2,selectCombatStyle:1,openEquipmentStats:0,closeEquipmentStats:0,openPrayerList:0};const at=position[name],requested=at===undefined?undefined:args[at];return this.call(`sdk.${name}`,args,typeof requested==='number'?Math.min(600000,Math.max(100,requested+5000)):this.timeout);}])) as RemoteSends;
   this.heartbeat=setInterval(()=>{if(socket.readyState===WebSocket.OPEN)socket.send(JSON.stringify({type:'ping'}));},20000);
  }
  receive(m:any){if(m.type==='state'){this.state=m.state;this.online=m.online===true;this.received=Date.now();this.age=typeof m.ageMs==='number'?m.ageMs:Infinity;this.notify();}else if(m.type==='result'){const pending=this.calls.get(m.id);if(pending){clearTimeout(pending.timer);this.calls.delete(m.id);m.error?pending.reject(new Error(m.error)):pending.resolve(m.value);}}else if(m.type==='error')this.end(m.error);}
@@ -30,6 +35,16 @@ export class GatewaySDK {
  isOpen(value:number|string){const id=interfaceId(value);const w=this.getState();return !!w&&(w.windowId===id||Object.values(w.interfaces).includes(id));}
  getInventory(){return this.getState()?.containers['93:0']??[];}
  getEquipment(){return this.getState()?.containers['94:0']??[];}
+ itemDefinition(...args:Parameters<BotSDK['itemDefinition']>){return this.query.itemDefinition(...args);}
+ findBankItem(...args:Parameters<BotSDK['findBankItem']>){return this.query.findBankItem(...args);}
+ getInventoryDetails(){return this.query.getInventoryDetails();}
+ getGroundItemDetails(...args:Parameters<BotSDK['getGroundItemDetails']>){return this.query.getGroundItemDetails(...args);}
+ objectDefinition(...args:Parameters<BotSDK['objectDefinition']>){return this.query.objectDefinition(...args);}
+ getMessages(...args:Parameters<BotSDK['getMessages']>){return this.query.getMessages(...args);}
+ toSourceCoords(...args:Parameters<BotSDK['toSourceCoords']>){return this.query.toSourceCoords(...args);}
+ getRegionLayout(){return this.query.getRegionLayout();}
+ getStateSummary(){return this.query.getStateSummary();}
+ useInventoryItem(...args:Parameters<BotSDK['useInventoryItem']>){return this.send.useInventoryItem(...args);}
  getBank(){return this.getState()?.containers['95:0']??[];}
  getInventoryStatus(){return this.getState()?.containerSync['93:0']??'unknown';}
  getEquipmentStatus(){return this.getState()?.containerSync['94:0']??'unknown';}
@@ -39,6 +54,7 @@ export class GatewaySDK {
  call(method:string,args:unknown[]=[],timeout=this.timeout):Promise<any>{if(this.closed||this.socket.readyState!==WebSocket.OPEN)return Promise.reject(new Error(this.closeReason));const id=String(++this.serial);let body:string;try{body=JSON.stringify({type:'call',id,method,args:encode(args),timeoutMs:deadline(timeout)});if(body.length>65536)throw new Error('Gateway request is too large');}catch(e){return Promise.reject(e);}
   return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.calls.delete(id);reject(new Error('Gateway request timed out; the game action may still be running'));},timeout+1000);this.calls.set(id,{resolve,reject,timer});try{this.socket.send(body);}catch(e){clearTimeout(timer);this.calls.delete(id);reject(e);}});
  }
+ canReach(...args:Parameters<BotSDK['canReach']>){return this.query.canReach(...args);}
  planRoute(...args:Parameters<BotSDK['planRoute']>){return this.query.planRoute(...args);}
  planNpcInteraction(...args:Parameters<BotSDK['planNpcInteraction']>){return this.query.planNpcInteraction(...args);}
  routeTo(...args:Parameters<BotSDK['routeTo']>){return this.query.routeTo(...args);}
@@ -59,6 +75,8 @@ export class GatewaySDK {
  getPrayers(){return this.query.getPrayers();}
  openPrayerList(...args:Parameters<BotSDK['openPrayerList']>){return this.send.openPrayerList(...args);}
  setPrayer(...args:Parameters<BotSDK['setPrayer']>){return this.send.setPrayer(...args);}
+ getAutoRetaliateState(){return this.query.getAutoRetaliateState();}
+ setAutoRetaliate(...args:Parameters<BotSDK['setAutoRetaliate']>){return this.send.setAutoRetaliate(...args);}
  getHealth(){return this.query.getHealth();}
  getCombatState(){return this.query.getCombatState();}
  getCombatStyles(){return this.query.getCombatStyles();}
@@ -97,6 +115,16 @@ export class GatewaySDK {
  }
  getEmotes(){return this.query.getEmotes();}
  getRunState(){return this.query.getRunState();}
+ getQuestDefinitions(){return this.query.getQuestDefinitions();}
+ getQuestState(...args:Parameters<BotSDK['getQuestState']>){return this.query.getQuestState(...args);}
+ getQuests(){return this.query.getQuests();}
+ getQuestPoints(){return this.query.getQuestPoints();}
+ getQuestJournal(){return this.query.getQuestJournal();}
+ openQuestJournal(...args:Parameters<BotSDK['openQuestJournal']>){return this.send.openQuestJournal(...args);}
+ revealQuestOffer(...args:Parameters<BotSDK['revealQuestOffer']>){return this.send.revealQuestOffer(...args);}
+ getQuestOffer(){return this.query.getQuestOffer();}
+ acceptQuest(...args:Parameters<BotSDK['acceptQuest']>){return this.send.acceptQuest(...args);}
+ declineQuest(...args:Parameters<BotSDK['declineQuest']>){return this.send.declineQuest(...args);}
  performEmote(...args:Parameters<BotSDK['performEmote']>){return this.send.performEmote(...args);}
  setRunning(...args:Parameters<BotSDK['setRunning']>){return this.send.setRunning(...args);}
  getGameTabs(){return this.query.getGameTabs();}

@@ -270,3 +270,17 @@ test('controller disconnect cancels a pending cast without replacing the playing
   expect(t.s.status).toBe('playing');expect((await listGatewayBots(t.gateway.url,config.monitorToken))[0].busy).toBe(false);replacement=await connectGateway(options(t.gateway.url));expect(replacement.isClientOnline()).toBe(true);
  }finally{remote?.close();replacement?.close();await t.close();}
 });
+
+test('new information queries and Auto Retaliate transport current state and keep mutations unavailable to observers',async()=>{
+ const t=await setup();let remote,observer;
+ try{
+  const c=(id:number,options:string[]=[])=>({id,parent:65535,hidden:false,text:'',type:0,setting:0,options});
+  t.sdk.data.interface=async id=>id===548?[c(171,['Combat Styles'])]:id===884?[c(15,['Auto Retaliate'])]:[];
+  const w=t.s.world;w.windowId=548;w.interfaces.set(2,884);w.varps.set(172,1);w.varps.set(29,2);w.varps.set(101,1);
+  remote=await connectGateway(options(t.gateway.url));observer=await connectGateway(options(t.gateway.url,'observe'));
+  expect((await observer.itemDefinition(1351)).name).toBe('Bronze hatchet');expect(await observer.getQuestState('cooks_assistant')).toMatchObject({status:'completed'});expect((await observer.getQuestPoints()).current).toBe(1);expect(await observer.toSourceCoords()).toMatchObject({x:w.player!.x,y:w.player!.y});expect((await observer.getStateSummary()).player?.x).toBe(w.player!.x);
+  const pending=remote.setAutoRetaliate(true,1000),until=Date.now()+1000;
+  while(!t.peer.received.some(p=>p.opcode===23&&new DataView(p.body.buffer,p.body.byteOffset,p.body.byteLength).getUint32(0)===((884<<16)|15))&&Date.now()<until)await Bun.sleep(5);
+  w.varps.set(172,0);(t.s as any).notify();expect(await pending).toMatchObject({enabled:true});await expect(observer.setAutoRetaliate(false)).rejects.toThrow('Observer');await expect(observer.useInventoryItem(1351,'Wield')).rejects.toThrow('Observer');
+ }finally{remote?.close();observer?.close();await t.close();}
+});

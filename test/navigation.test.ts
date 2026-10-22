@@ -130,3 +130,20 @@ test('diagonal adjacency cannot hide a door or a wall on the interaction boundar
  t.w.npcs.set(5,{index:5,type:945,x:64,y:6,level:0});
  const plan=await t.sdk.planNpcInteraction('Guide');expect(plan?.doors).toHaveLength(1);expect(plan?.path.length).toBeGreaterThan(1);
 });
+
+test('canReach identifies a blocking gate without moving and distinguishes a currently open route',async()=>{
+ const t=npcFixture(63);
+ expect(await t.sdk.canReach('Guide')).toMatchObject({reachable:false,reachableAfterOpeningDoors:true,blockingDoor:{id:10,name:'Gate'},scope:'walking-geometry'});
+ expect(t.moves).toEqual([]);expect(t.opens).toEqual([]);
+ t.w.objectChanges.set(objectKey(63,5,0,0),{id:null,x:63,y:5,level:0,shape:0,rotation:2});
+ expect(await t.sdk.canReach('Guide')).toMatchObject({reachable:true,blockingDoor:null});
+ expect(await t.sdk.canReach({x:64,y:5,level:1})).toMatchObject({reachable:false,reason:expect.stringContaining('floor')});
+});
+
+test('object reachability does not accept an interaction edge through a separate wall',async()=>{
+ const object:MapObject={...gate,id:22,name:'Chest',x:65,y:5,shape:10,solid:2,options:['Open']};
+ const wall={...gate,id:23,name:'Wall',x:64,y:5,rotation:2,options:[]};
+ const t=fixture([region(0,0,(_,y)=>y===5),region(1,0,(_,y)=>y===5,[object,wall])],63);
+ expect(await t.sdk.canReach(object)).toMatchObject({reachable:false,blockingDoor:null});
+ expect(t.moves).toHaveLength(0);
+});

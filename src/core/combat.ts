@@ -11,6 +11,7 @@ const words=(s:string)=>s.replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()
 export function levelFromXp(xp:number){let points=0;for(let level=1;level<99;level++){points+=Math.floor(level+300*2**(level/7));if(xp<Math.floor(points/4))return level;}return 99;}
 export class CombatService {
  private changing=false;
+ private changingRetaliate=false;
  constructor(private sdk:BotSDK){}
  private async varbit(id:number){
   const def=await this.sdk.data.varbit(id),w=this.sdk.getState(),direct=w.varbits.get(id),parent=w.varps.get(def.index);
@@ -53,6 +54,31 @@ export class CombatService {
     return w.varps.get(43)===chosen.index;
    },timeout);return this.state();
   }finally{this.changing=false;}
+ }
+ async autoRetaliateState(){
+  const components=await this.sdk.data.interface(884),tabs=await this.sdk.getGameTabs(),button=components.find(c=>c.id===15),value=this.sdk.getState().varps.get(172);
+  const enabled=value===0?true:value===1?false:null;
+  const reason=!tabs.some(t=>t.label==='Combat Styles')?'Combat Styles is currently unavailable':!this.sdk.isOpen(884)?'Select Combat Styles first':!button||!this.visible(884,button,components)?'Auto Retaliate is hidden':enabled===null?'Auto Retaliate has not synchronized yet':null;
+  return {enabled,available:reason===null,reason};
+ }
+ async setAutoRetaliate(enabled:boolean,timeout=5000){
+  if(typeof enabled!=='boolean'||!Number.isFinite(timeout)||timeout<=0)throw new Error('Pass a boolean Auto Retaliate setting and a positive timeout');
+  if(this.changingRetaliate)throw new Error('An Auto Retaliate change is already pending');this.changingRetaliate=true;
+  try{
+   const end=Date.now()+timeout,remaining=()=>{const ms=end-Date.now();if(ms<=0)throw new Error('Auto Retaliate selection timed out');return ms;};
+   await this.sdk.selectGameTab('Combat Styles');
+   await this.sdk.session.waitFor(()=>this.sdk.isOpen(884)&&[0,1].includes(this.sdk.getState().varps.get(172)!),remaining());
+   const state=await this.autoRetaliateState();if(!state.available)throw new Error(state.reason!);if(state.enabled===enabled)return state;
+   const components=await this.sdk.data.interface(884),button=components.find(c=>c.id===15),option=button?.options.findIndex(o=>/^Auto Retaliate$/i.test(o??''))??-1;
+   if(!button||option<0||!this.sdk.isOpen(884)||!this.visible(884,button,components))throw new Error('Auto Retaliate action is unavailable');
+   if((this.sdk.getState().varps.get(172)===0)!==state.enabled)throw new Error('Auto Retaliate changed before dispatch; read it again');
+   remaining();const sequence=this.sdk.getState().messageSequence;this.sdk.session.clickInterface(884,15,option);
+   await this.sdk.session.waitFor(w=>{
+    if(!this.sdk.isOpen(884))throw new Error('Combat Styles closed during Auto Retaliate confirmation');
+    if(w.messageSequence>sequence)for(const m of w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length)))if([0,4,109].includes(m.type)&&/^You (?:cannot|can't|need|must)/i.test(plainText(m.text)))throw new Error(plainText(m.text));
+    return w.varps.get(172)===(enabled?0:1);
+   },remaining());return this.autoRetaliateState();
+  }finally{this.changingRetaliate=false;}
  }
  async stats(){
   if(!this.sdk.isOpen(667))return {open:false,stats:[] as EquipmentStat[]};

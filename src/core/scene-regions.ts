@@ -1,5 +1,15 @@
 import {tileIndex,type MapRegion,type MapObject} from '../cache/terrain.ts';
-import type {RegionLayout} from './world.ts';
+import type {RegionLayout,Tile} from './world.ts';
+export function toSourceCoords(layout:RegionLayout|null,tile:Tile):Tile|null {
+ for(const value of [tile.x,tile.y,tile.level])if(!Number.isInteger(value))throw new Error('Coordinates must be integer tiles');
+ if(tile.x<0||tile.y<0||tile.x>16383||tile.y>16383||tile.level<0||tile.level>3)throw new Error('Coordinates are outside the world');
+ if(!layout?.chunks)return {...tile};
+ const chunk=layout.chunks.find(c=>c.level===tile.level&&tile.x>=c.x&&tile.x<c.x+8&&tile.y>=c.y&&tile.y<c.y+8);if(!chunk)return null;
+ const x=tile.x-chunk.x,y=tile.y-chunk.y;
+ const [a,b]=chunk.rotation===0?[x,y]:chunk.rotation===1?[7-y,x]:chunk.rotation===2?[7-x,7-y]:[y,7-x];
+ return {x:chunk.sourceX+a,y:chunk.sourceY+b,level:chunk.sourceLevel};
+}
+
 /** Cache-backed geometry in the server's destination coordinates, including instances. */
 export class SceneRegions {
  private layout:RegionLayout|null|undefined;

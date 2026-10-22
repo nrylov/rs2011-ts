@@ -12,7 +12,7 @@ export type ContainerSyncStatus='unknown'|'partial'|'complete';
 export interface Item { slot: number; id: number; amount: number; }
 export interface GroundItem extends Tile { key:number; id:number; amount:number; }
 export interface Skill { index: number; level: number; xp: number; }
-export interface Message { type: number; name?: string; text: string; }
+export interface Message { type: number; name?: string; text: string; tick?:number;receivedAt?:number;sequence?:number; }
 const WALK = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
 const NPC_STEP = [[0,1],[1,1],[1,0],[1,-1],[0,-1],[-1,-1],[-1,0],[-1,1]];
 const RUN = [[-2,-2],[-1,-2],[0,-2],[1,-2],[2,-2],[-2,-1],[2,-1],[-2,0],[2,0],[-2,1],[2,1],[-2,2],[-1,2],[0,2],[1,2],[2,2]];
@@ -129,7 +129,7 @@ export class World {
       case 92: {const text=r.text(),id=r.add16();this.varcStrings.set(id,text);this.interfaceVersions.set(905,++this.uiRevision);break;}
       case 53: {const id=r.addLe16(),text=r.text();this.varcStrings.set(id,text);this.interfaceVersions.set(905,++this.uiRevision);break;}
       case 44: { const value=r.inverse32();const id=r.add16();this.varps.set(id,value);this.variableUpdates.set(`p${id}`,++this.configRevision);break; }
-      case 37: { const id = r.le16(), parent = r.le32() >>> 0; r.add8(); for(const key of this.interfaceItems.keys())if((key>>>16)===id)this.interfaceItems.delete(key);if(id===667)for(const key of this.texts.keys())if((key>>>16)===667)this.texts.delete(key);this.interfaces.set(parent, id);this.interfaceMounts.set(parent,++this.uiRevision);this.interfaceRevision++; break; }
+      case 37: { const id = r.le16(), parent = r.le32() >>> 0; r.add8(); for(const key of this.interfaceItems.keys())if((key>>>16)===id)this.interfaceItems.delete(key);if([667,178,275].includes(id))for(const key of this.texts.keys())if((key>>>16)===id)this.texts.delete(key);this.interfaces.set(parent, id);this.interfaceMounts.set(parent,++this.uiRevision);this.interfaceRevision++; break; }
       case 112: {const parent=r.i32()>>>0;this.interfaces.delete(parent);this.interfaceMounts.delete(parent);this.uiRevision++;this.interfaceRevision++;break;}
       case 7: { const id = r.u16(); this.varps.set(id, signed(r.u8(), 8));this.variableUpdates.set(`p${id}`,++this.configRevision); break; }
       case 73: { const value=signed(r.add8(),8),id=r.le16();this.varbits.set(id,value);this.variableUpdates.set(`b${id}`,++this.configRevision);break; }
@@ -137,7 +137,7 @@ export class World {
       case 52: {
         const type = r.smart(); r.i32(); const mask = r.u8();
         const name = mask & 1 ? r.text() : undefined; if (mask & 2) r.text();
-        this.messageSequence++;this.messages.push({ type, name, text: r.text() });
+        this.messageSequence++;this.messages.push({ type, name, text: r.text(),tick:this.tick,receivedAt:Date.now(),sequence:this.messageSequence });
         if (this.messages.length > 200) this.messages.shift(); break;
       }
       case 55: return 'logout';
@@ -337,6 +337,6 @@ export class World {
       region: this.region, runEnergy: this.runEnergy, players: [...this.players.values()], npcs: [...this.npcs.values()],
       containers: Object.fromEntries(this.containers), containerSync:Object.fromEntries(this.containerSync), skills: [...this.skills.values()],
       windowId:this.windowId,hidden:Object.fromEntries(this.hidden),varps:Object.fromEntries(this.varps),varbits:Object.fromEntries(this.varbits),interfaceItems:Object.fromEntries(this.interfaceItems),numberInput:this.numberInput,interfaceTexts: Object.fromEntries(this.texts), interfaces: Object.fromEntries(this.interfaces),
-      messages: this.messages, groundItems:[...this.groundItems.values()], objectChanges:[...this.objectChanges.values()], packets: this.packets, unhandled: this.unhandled, visualBlocksSkipped: this.visualBlocksSkipped, warnings: this.warnings };
+      messageSequence:this.messageSequence,messages: this.messages, groundItems:[...this.groundItems.values()], objectChanges:[...this.objectChanges.values()], packets: this.packets, unhandled: this.unhandled, visualBlocksSkipped: this.visualBlocksSkipped, warnings: this.warnings };
   }
 }

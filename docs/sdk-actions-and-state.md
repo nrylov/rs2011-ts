@@ -1,0 +1,97 @@
+# Reliable actions and readable state
+
+These APIs work in the local SDK and through the gateway/MCP. Refresh both the gateway and client SDK before using newly added methods; a running publisher keeps its previously loaded code. Reload MCP after updating its tool definitions. The changes do not require a game-server restart. Existing game actions already accepted by the server may finish.
+
+## Cancel a pending action
+
+```ts
+const pending = sdk.castSpellOnNpc('Air Strike', chicken, 20000);
+// From another control request, or while retaining pending locally:
+await sdk.cancelAction();
+await pending.catch(error => console.log(error.message));
+```
+
+The gateway aborts hosted mutations when their command deadline expires, their controller disconnects, or `cancelAction()` is called. Pending observations and dialogue waits unsubscribe; cooperative walking stops scheduling further legs. A packet already accepted by the game is not undone. There is no stop-combat or undo-attack packet in this cancellation API.
+
+The action lock remains held until its implementation unwinds. An outstanding cache read or other non-cooperative preparation may need to return first, but its cancelled scope prevents a late game packet. The gateway never releases ownership just to allow overlapping actions. Observers cannot cancel a controller's action. Standalone high-level bot actions and confirmed combat setters also own cancellation scopes.
+
+Named casting now recognizes fresh `I can't reach` refusals. A cast consuming runes or awarding Magic XP remains its observed-success criterion; autocast selection is a separate operation. Gateway deadlines honor explicit cast, walk and banking timeouts plus response margin.
+
+## Banking and item actions
+
+```ts
+await bot.depositItem(590, 7);             // numeric ID, arbitrary positive amount
+await bot.depositItem('Logs', 'all');     // every matching item, including a stack
+await bot.depositAll();                   // all carried item IDs
+await bot.withdrawItem(590, 5);           // ID, not a slot
+await bot.withdrawItem(/^tinderbox$/i, 1);
+const bankItem = await sdk.findBankItem(590);
+await bot.withdrawItem(bankItem, 1);      // explicit objects still validate their slot
+
+const definition = await sdk.itemDefinition(2309);
+const inventory = await sdk.getInventoryDetails();
+await sdk.useInventoryItem(2309, 'Eat');   // numeric selectors are item IDs here
+const ground = await sdk.getGroundItemDetails();
+const object = await sdk.objectDefinition(3045);
+```
+
+Bank amounts accept positive integers up to 2147483647 or `'all'`. Arbitrary amounts use the real Deposit-X/Withdraw-X prompt and confirm the observed inventory/bank transfer. Notes deposited into the bank are checked against their unnoted ID. Withdrawal requires item mode; note-mode withdrawal is rejected explicitly. Explicit item objects remain useful for stale-slot protection; ambiguous name patterns reject instead of choosing a different item type.
+
+`useInventoryItem` confirms dispatch only; observe HP, inventory, XP or messages to confirm its effect. Named actions preserve their original cache menu slots. The existing synchronous local `getGroundItems()` remains available to map/UI consumers; the awaited details query adds names and floor options. Empty names in the actual cache stay empty rather than being guessed.
+
+## Reachability
+
+```ts
+const approach = await sdk.canReach(npc); // also accepts an object, tile, or NPC name
+console.log(approach.reachable, approach.blockingDoor, approach.reason);
+```
+
+`reachable` means a walking approach exists with the current collision. A closed door can produce `reachable: false`, `reachableAfterOpeningDoors: true` and the actual `blockingDoor`/`requiredDoors`. The query moves nothing. `planNpcInteraction` and `planRoute` remain available for detailed paths.
+
+This is walking geometry, not spell line of sight or a guarantee of permission. Doors can still be quest-locked; winches, cutscenes, cages, floors and special transit may require explicit game actions. Unknown terrain remains blocked. Object approaches are checked against the local collision map and do not authorize interaction through a wall.
+
+## Quests
+
+```ts
+const offer = await sdk.getQuestOffer();
+if (offer?.hiddenFields.items) await sdk.revealQuestOffer('items');
+if (offer?.hiddenFields.rewards) await sdk.revealQuestOffer('rewards');
+await sdk.acceptQuest(); // or declineQuest()
+
+const quest = await sdk.getQuestState("Cook's Assistant");
+const points = await sdk.getQuestPoints();
+const known = await sdk.getQuestDefinitions();
+const states = await sdk.getQuests();
+await sdk.openQuestJournal("Cook's Assistant");
+const journal = await sdk.getQuestJournal();
+```
+
+Offers and generic dialogues respect component ancestors' visibility. Hidden items/rewards return `null`; explicit reveal clicks the game's own controls. A missing title can be recovered only when the start-point text uniquely identifies a known quest, and `titleSource` reports that fallback. It remains `null` when identity is uncertain. `getQuestOffer()` is now awaited even locally.
+
+The generated profiles use this project's Void quest variable definitions, not revision-225 IDs. The catalogue is definition coverage, not a claim that every listed quest is implemented. Quest state distinguishes `unknown`, `unstarted`, `started` and `completed`; an unsynchronized variable does not silently mean unstarted. Varbit reads honor newer direct versus parent updates. Journals show the currently received, visible scroll lines; opening one is a game action and may replace the current modal. Unsupported journal indices fail explicitly.
+
+The base server has a separate quest-offer metadata fix: its loader stores `name` and `questPoints` as dedicated fields, so the offer must read those rather than generic extra parameters. That source fix needs a rebuilt game server; SDK fallback supports existing running servers without a restart.
+
+## Coordinates, messages and compact state
+
+```ts
+const summary = await sdk.getStateSummary();
+const sourceTile = await sdk.toSourceCoords();             // current player
+const otherSourceTile = await sdk.toSourceCoords({x:6501, y:1048, level:1});
+const fullLayout = await sdk.getRegionLayout();
+const messages = await sdk.getMessages({afterSequence: previousSequence});
+```
+
+Source-coordinate conversion reverses the instance chunk's rotation and plane. Normal world tiles are unchanged; unmapped instance holes return `null`. **Send movement and interaction actions in destination/game coordinates**, never converted source coordinates. Source coordinates are for inspection and comparison with world maps.
+
+`getStateSummary()` replaces the region's full chunk table with counts and includes the player's source tile. Raw `getState()` and the gateway snapshot retain their original layout metadata for consumers that need it. Message packets now carry local receipt time (`receivedAt`, epoch milliseconds), received client tick (`tick`) and monotonic session `sequence`. These are receipt metadata, not a claim to know the server's original send time. `getMessages` supports `afterSequence`, `sinceTick` and `sinceTime`; legacy manually inserted messages can have unknown time/age.
+
+## Auto Retaliate
+
+```ts
+const retaliation = await sdk.getAutoRetaliateState();
+await sdk.setAutoRetaliate(true);
+await sdk.setAutoRetaliate(false);
+```
+
+The setter selects Combat Styles, clicks revision-634 component 884:15 only when necessary, and waits for varp 172 (0 = enabled, 1 = disabled). Unknown synchronization remains `enabled: null`. Hidden/locked controls and fresh refusals reject. Repeating the current setting is safe. These operations are also in the lightweight/regular development-console examples; no game-server patch is required.

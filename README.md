@@ -198,6 +198,10 @@ Use `await sdk.getEmotes()` for cache-defined names and `sdk.getRunState()` for 
 
 All four methods are also available through the remote gateway; await remote queries, including `await sdk.getRunState()`.
 
+## Quest start screen
+
+Some quests (for example The Restless Ghost) open the revision 634 quest intro screen (interface 178, "Start this quest?"). `getDialog()` exposes the visible Yes/No choices. For structured details use `await sdk.getQuestOffer()`, then `await sdk.acceptQuest()` or `await sdk.declineQuest()`. Hidden required-item/reward text is omitted until `revealQuestOffer('items'|'rewards')` clicks the game's reveal control. Quest helpers are available through the gateway. See [SDK actions and state](docs/sdk-actions-and-state.md) for quest progress, journal, points, cancellation, banking, reachability and Auto Retaliate APIs.
+
 ## Nearby objects
 
 Transit objects have cyan diamond markers on the map: ladders, stairs, trapdoors/hatches, cave entrances, portals, gangplanks, pullable levers and other objects with travel or shortcut actions. One-way ladders/stairs show an up/down arrow and direction label. Click a marker or its label to choose the object's cache-defined action, including **Climb-down** on the Tutorial Island basement ladder. Closed trapdoors offer Open; live object updates switch the menu to the opened object's actions. Markers use the current floor and respect bridge levels. Doors and gates retain their amber/green markers. Labels appear when zoomed in; icons remain clickable when zoomed out.
@@ -376,3 +380,9 @@ await sdk.setAutocast(null);                   // disable
 These methods work through the gateway and MCP, including browser-attached regular and lightweight clients. Selection opens Magic Spellbook and waits for the server's autocast variable (revision 634 varp 108). `getAutocastState()` is read-only and does not open a tab. Its choices require a visible combat spell with an Autocast action; Lunar spells are excluded. Spell IDs come from the revision 634 server profiles, not the 2004 SDK.
 
 Setting autocast selects a continuing combat spell; it does not start combat or prove that damage was dealt. The server remains responsible for equipment, level, rune and target restrictions. A staff is not required for this revision: [Jagex removed that requirement on 2 September 2009](https://secure.runescape.com/m=news/changes-to-autocasting-spells). Weapon changes clear autocast server-side. An unknown spell ID remains visible as `castId` with `spell: null`. Disabling requires the selected spell to remain visible in its spellbook because this server toggles Autocast by clicking that same spell. A timeout or refusal rejects the selection and releases its pending-operation guard.
+
+## Action reliability and state queries
+
+Use `sdk.cancelAction()` to cancel a pending cooperative command; `bot.depositItem`/`withdrawItem` now accept item IDs, names or objects and arbitrary positive quantities, and `bot.depositAll()` deposits carried items. `sdk.canReach(target)` inspects walking approaches and blocking doors without moving. `sdk.getAutoRetaliateState()`/`setAutoRetaliate(boolean)` expose confirmed retaliation controls.
+
+Item/object definitions, named inventory actions, visible quest offers, journal/progress/points queries, instance source-coordinate conversion and timestamped messages are documented with examples in [SDK actions and state](docs/sdk-actions-and-state.md). Prefer `await sdk.getStateSummary()` when printing state for an agent; raw snapshots retain full instance chunks for map consumers. Refresh the gateway and client to activate the new API surface.

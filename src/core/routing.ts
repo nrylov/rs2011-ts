@@ -26,6 +26,9 @@ export class CollisionMap {
    }
   }
  }
+ canInteractEdge(a:Point,b:Point):boolean{
+  return Math.abs(a.x-b.x)+Math.abs(a.y-b.y)===1&&this.known.has(key(a.x,a.y))&&this.known.has(key(b.x,b.y))&&!this.blocked.has(key(a.x,a.y))&&!this.edges.has(`${key(a.x,a.y)}>${key(b.x,b.y)}`);
+ }
  canStep(a:Point,b:Point):boolean{
   const dx=b.x-a.x,dy=b.y-a.y;if(Math.abs(dx)>1||Math.abs(dy)>1||!dx&&!dy)return false;
   if(!this.known.has(key(b.x,b.y))||this.blocked.has(key(b.x,b.y))||this.edges.has(`${key(a.x,a.y)}>${key(b.x,b.y)}`))return false;
