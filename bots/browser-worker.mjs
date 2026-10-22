@@ -8,7 +8,7 @@ const reply=value=>new Promise(resolve=>process.stdout.write(JSON.stringify(valu
 try{
  await mkdir(config.profile,{recursive:true,mode:0o700});const connection=config.profile+'/connection.json';
  try{const saved=JSON.parse(await readFile(connection,'utf8'));browser=await puppeteer.connect({browserWSEndpoint:saved.endpoint,defaultViewport:null});}catch{}
- if(!browser){created=true;browser=await puppeteer.launch({executablePath:config.executable,headless:config.headless===true,userDataDir:config.profile,defaultViewport:null,handleSIGINT:false,handleSIGTERM:false,handleSIGHUP:false,args:['--no-first-run','--no-default-browser-check','--window-size=1440,1000','--disable-background-timer-throttling','--disable-renderer-backgrounding']});await writeFile(connection,JSON.stringify({endpoint:browser.wsEndpoint()}),{mode:0o600});}
+ if(!browser){created=true;browser=await puppeteer.launch({executablePath:config.executable,headless:config.headless===true,userDataDir:config.profile,defaultViewport:null,handleSIGINT:false,handleSIGTERM:false,handleSIGHUP:false,args:['--no-first-run','--no-default-browser-check','--window-size=1440,1000','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']});await writeFile(connection,JSON.stringify({endpoint:browser.wsEndpoint()}),{mode:0o600});}
  const pages=await browser.pages();let page=pages.find(p=>p.url().startsWith(config.url));
  if(!page){page=pages.find(p=>p.url()==='about:blank')??await browser.newPage();await page.goto(config.url,{waitUntil:'domcontentloaded',timeout:30000});}
  await page.bringToFront();

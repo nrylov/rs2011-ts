@@ -50,3 +50,24 @@ The helper validates known source anchors, refuses an existing output directory 
 Checks cover attached-session packet decoding/dispatch, local provisioning restrictions, account configuration persistence, and source preparation. Real-client validation uses a copied game server with independent saves and a dedicated headless browser profile. It checks normal login, automatic publication, agent control, shared interface state, manual mouse interaction, companion geometry and generated account login without accessing user browser profiles.
 
 A clean local minimap-marker build is prepared at `dev/client/void-client.pending.js`; it has not replaced the bundle being served. When ready to update clients, back up `dev/client/void-client.js`, copy the pending bundle into that filename and reload the regular client. Reloading ends that browser's current game session, so do this between agent runs. The server-side production-menu patch is activated separately through its pending server overlay; see `compat/void/README.md`.
+
+## Background tabs
+
+Client preparation patches the Kotlin/JS platform loop so incoming game and
+cache WebSocket data can wake due loops even when chained browser timers are
+delayed. The wake respects each loop's requested delay, avoids reentry,
+cancels the prior timeout and unregisters stopped loops. Rebuild the regular
+client after updating this patch; TypeScript bridge reloads alone do not
+change the native game loop.
+
+The gateway uses native WebSocket ping/pong liveness and state publishing can
+flush directly on inbound game events, reducing dependence on page timers.
+Agent-launched browsers also disable background-window occlusion alongside
+the existing timer/renderer throttling flags. These flags apply to a newly
+launched managed browser, not an already open personal browser.
+
+A browser can still freeze or discard a page, and a sleeping computer cannot
+keep a game session alive. For long unattended runs, use a managed browser
+or headless lightweight client. For a personal browser, exclude the local
+client site from its memory/energy saving controls if it still suspends it.
+Stale game state remains rejected; native pongs do not count as state updates.

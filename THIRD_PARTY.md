@@ -2,6 +2,8 @@
 
 This project implements the revision 634 protocol exposed by GregHib/Void and uses its Kotlin server encoders, cache decoders and client packet-size metadata as references. `src/core/protocol.ts` contains extracted packet sizes from `void-client/src/commonMain/kotlin/InboundPacketHeader.kt`.
 
+`test/fixtures/platform-loop.js.kt` preserves the matching Void client platform loop as a patch-validation fixture; the license notice below applies.
+
 Reference repositories:
 
 - https://github.com/GregHib/void

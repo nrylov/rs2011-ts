@@ -9,7 +9,8 @@ export function validateConfig(input:GatewayConfig){
  const tokens=new Set<string>();for(const [name,creds]of Object.entries(input.bots)){const key=botKey(name);if(bots[key])throw new Error('Duplicate normalized bot name');for(const field of ['clientToken','controlToken','observeToken'] as const){const token=creds?.[field];if(typeof token!=='string'||token.length<24||tokens.has(token))throw new Error('Use unique tokens of at least 24 characters for every gateway role');tokens.add(token);}bots[key]=creds;}
  if(typeof input.monitorToken!=='string'||input.monitorToken.length<24||tokens.has(input.monitorToken))throw new Error('Use a separate monitorToken of at least 24 characters');return {bots,monitorToken:input.monitorToken};
 }
-export function startGateway(options:{config:GatewayConfig;port?:number;hostname?:string;allowedOrigins?:string[]}){
+export function startGateway(options:{config:GatewayConfig;port?:number;hostname?:string;allowedOrigins?:string[];heartbeatIntervalMs?:number;heartbeatTimeoutMs?:number}){
+ const heartbeatInterval=options.heartbeatIntervalMs??10000,heartbeatTimeout=options.heartbeatTimeoutMs??60000;if(!Number.isFinite(heartbeatInterval)||heartbeatInterval<1||!Number.isFinite(heartbeatTimeout)||heartbeatTimeout<=heartbeatInterval)throw new Error('Heartbeat timeout must exceed its positive interval');
  const config=validateConfig(options.config),bots=new Map(Object.keys(config.bots).map(k=>[k,{agents:new Set<Peer>(),updatedAt:0} as Bot])),pending=new Map<string,Pending>(),peers=new Set<Peer>();
  const send=(p:Peer,data:unknown)=>{if(p.socket.readyState===1){if(p.socket.getBufferedAmount()>2_000_000){p.socket.close(1013,'Subscriber is too slow');return;}p.socket.send(JSON.stringify(data));}};
  const state=(b:Bot)=>({type:'state',state:b.state??null,online:!!b.client&&!b.awaitingState,ageMs:b.updatedAt?Date.now()-b.updatedAt:null});
@@ -22,6 +23,7 @@ export function startGateway(options:{config:GatewayConfig;port?:number;hostname
   fetch(req,s){const url=new URL(req.url);if(url.pathname==='/health')return Response.json({ok:true,protocol:1});if(url.pathname==='/bots'){if(!equal(req.headers.get('authorization')?.replace(/^Bearer /,''),config.monitorToken))return new Response('Unauthorized',{status:401});return Response.json([...bots].filter(([name])=>!!config.bots[name]).map(([name,b])=>({name,online:!!b.client&&!b.awaitingState,status:b.state?.status??'offline',player:b.state?.world.player??null,updatedAt:b.updatedAt||null,controlled:!!b.controller,busy:!!b.busy})),{headers:{'Cache-Control':'no-store'}});}
    if(url.pathname!=='/gateway')return new Response('Not found',{status:404});const origin=req.headers.get('origin');if(origin&&new URL(origin).host!==url.host&&!options.allowedOrigins?.includes(origin))return new Response('Invalid origin',{status:403});if(s.upgrade(req,{data:{seen:Date.now()} as Peer}))return;return new Response('WebSocket required',{status:426});},
   websocket:{maxPayloadLength:1_048_576,
+   pong(ws){ws.data.seen=Date.now();},
    open(ws){const p=ws.data;p.socket=ws;peers.add(p);p.authTimer=setTimeout(()=>ws.close(1008,'Authentication required'),5000);},
    message(ws,raw){const p=ws.data;try{if(typeof raw!=='string')throw new Error('JSON messages required');const m=JSON.parse(raw);p.seen=Date.now();
     if(!p.role){if(m.type!=='hello'||m.version!==1)throw new Error('Gateway protocol 1 required');const key=botKey(m.bot),creds=config.bots[key],b=bots.get(key);if(!creds||!b)throw new Error('Authentication failed');
@@ -46,7 +48,8 @@ export function startGateway(options:{config:GatewayConfig;port?:number;hostname
    close(ws){const p=ws.data;clearTimeout(p.authTimer);peers.delete(p);if(!p.bot)return;const b=bots.get(p.bot)!;if(b.client===p)failClient(b);b.agents.delete(p);if(b.controller===p)b.controller=undefined;presence(b);for(const [key,j]of pending)if(j.peer===p){if(j.mutation&&b.client)send(b.client,{type:'cancel',id:key});if(!j.mutation){clearTimeout(j.timer);pending.delete(key);}}},
   },
  });
- const heartbeat=setInterval(()=>{for(const p of peers)if(Date.now()-p.seen>60000)p.socket.close(1001,'Heartbeat expired');},10000);
+ // Browsers answer protocol pings without a throttled JavaScript heartbeat timer.
+ const heartbeat=setInterval(()=>{for(const p of peers){if(p.socket.readyState!==1)continue;if(Date.now()-p.seen>heartbeatTimeout)p.socket.close(1001,'Heartbeat expired');else p.socket.ping();}},heartbeatInterval);
  function addBots(input:GatewayConfig){const next=validateConfig(input);if(next.monitorToken!==config.monitorToken||Object.entries(config.bots).some(([name,creds])=>!next.bots[name]||(['clientToken','controlToken','observeToken'] as const).some(key=>creds[key]!==next.bots[name][key])))throw new Error('Token changes or bot removals require a gateway restart');let added=0;for(const[name,creds]of Object.entries(next.bots))if(!config.bots[name]){config.bots[name]=creds;bots.set(name,{agents:new Set<Peer>(),updatedAt:0});added++;}return added;}
  function reloadConfig(input:GatewayConfig){
   const next=validateConfig(input);let added=0,changed=0,removed=0;

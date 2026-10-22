@@ -194,3 +194,19 @@ await bot.talkTo(npc, 30000);
 ```
 
 `planNpcInteraction` returns a `RoutePlan` or `null` when no route is found. It uses the NPC footprint and an unblocked final interaction boundary. `planRoute(x, y, {tolerance: 1})` is geometric tile proximity and can legitimately stop across a wall; it is not an NPC reachability test. Advanced tile queries can use `{interactionSize: 1}` for the same boundary check. `sendNpcOption` remains a raw dispatch and does not open doors. Refresh browser publishers and restart the gateway/MCP after the active run to activate these additions.
+
+## Background-tab reliability
+
+Transport liveness uses server-originated WebSocket ping frames and native
+pong responses instead of relying exclusively on browser JavaScript timers.
+Publishers flush due state snapshots on incoming game events as well as the
+normal trailing timer. Heartbeats do not refresh the snapshot age: commands
+still reject genuinely stale game state.
+
+The regular client additionally needs the updated Kotlin/JS loop from
+`scripts/prepare-void-client-bridge.ts`, rebuilt as described in
+`compat/void-client/README.md`. It wakes due game/cache loops from socket
+arrivals without duplicate ticks. This helps ordinary background throttling;
+it cannot guarantee a session through full tab suspension, discarding,
+computer sleep or network loss. New agent-managed browser launches include
+background timer, renderer and occluded-window exemptions.
