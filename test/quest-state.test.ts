@@ -37,3 +37,5 @@ test('opening a quest journal sends its configured quest index and requires a cu
   expect(await t.sdk.openQuestJournal('cooks_assistant',1000)).toEqual({title:"Cook's Assistant",lines:['I have helped the cook.']});expect(slots).toEqual([profile.index]);
  }finally{t.s.close();}
 });
+
+test('Blood Pact accepted stage uses the visible surface Xenia cache value',async()=>{const t=setup();try{t.w.varps.set(2500,10);expect(await t.sdk.getQuestState('blood_pact')).toMatchObject({value:10,stage:'started',status:'started'});t.w.varps.set(2500,1);expect(await t.sdk.getQuestState('blood_pact')).toMatchObject({value:1,stage:null,status:'started'});}finally{t.s.close();}});
