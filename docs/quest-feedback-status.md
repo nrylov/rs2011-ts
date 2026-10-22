@@ -26,3 +26,7 @@ A staff requirement would be historically incorrect for this revision: [Jagex re
 ## Follow-up implementation
 
 The SDK backlog pass implements the entries marked above and adds confirmed `getAutoRetaliateState`/`setAutoRetaliate` operations. See [SDK actions and state](sdk-actions-and-state.md) for examples and limits. Service/client refresh is required to activate new APIs; existing MCP/gateway processes can still have older method lists.
+
+## Deferred server gameplay work
+
+- **Draynor Manor attacking dead trees:** identify the specific revision-634 trees that have no normal Chop option and implement their proximity-triggered attacks, including zero-damage hitsplats and occasional low damage. Verify the historical trigger range, timing, animations and damage before implementing. Check Animal Magnetism's quest-specific interaction with these trees separately so ordinary behavior and quest interactions both work. Reported by the user; deferred, not implemented or independently verified.
