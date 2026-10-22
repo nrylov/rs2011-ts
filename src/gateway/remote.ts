@@ -13,13 +13,14 @@ export class GatewaySDK {
  constructor(private socket:WebSocket,readonly mode:Mode,private timeout:number){
   this.bot=Object.fromEntries(botActions.map(name=>[name,(...args:unknown[])=>{const requested=typeof args[2]==='number'?args[2]:(args[2] as {timeout?:number}|undefined)?.timeout??120000;return this.call(`bot.${name}`,args,name==='walkTo'?Math.min(600000,Math.max(100,requested+5000)):name==='talkTo'?Math.min(600000,Math.max(100,(typeof args[1]==='number'?args[1]:20000)+5000)):this.timeout);}])) as RemoteBotActions;
   this.query=Object.fromEntries(queryMethods.map(name=>[name,(...args:unknown[])=>this.call(`sdk.${name}`,args)])) as RemoteQueries;
-  this.send=Object.fromEntries(sdkActions.map(name=>[name,(...args:unknown[])=>this.call(`sdk.${name}`,args)])) as RemoteSends;
+  this.send=Object.fromEntries(sdkActions.map(name=>[name,(...args:unknown[])=>{const position:Record<string,number>={castSpellOnNpc:2,homeTeleport:0,setAutocast:1,setPrayer:2,selectCombatStyle:1,openEquipmentStats:0,closeEquipmentStats:0,openPrayerList:0};const at=position[name],requested=at===undefined?undefined:args[at];return this.call(`sdk.${name}`,args,typeof requested==='number'?Math.min(600000,Math.max(100,requested+5000)):this.timeout);}])) as RemoteSends;
   this.heartbeat=setInterval(()=>{if(socket.readyState===WebSocket.OPEN)socket.send(JSON.stringify({type:'ping'}));},20000);
  }
  receive(m:any){if(m.type==='state'){this.state=m.state;this.online=m.online===true;this.received=Date.now();this.age=typeof m.ageMs==='number'?m.ageMs:Infinity;this.notify();}else if(m.type==='result'){const pending=this.calls.get(m.id);if(pending){clearTimeout(pending.timer);this.calls.delete(m.id);m.error?pending.reject(new Error(m.error)):pending.resolve(m.value);}}else if(m.type==='error')this.end(m.error);}
  private notify(){for(const cb of this.listeners)try{cb();}catch(e){console.error('Gateway state observer failed',e);}}
  end(reason='Gateway connection closed'){if(this.closed)return;this.closeReason=reason;this.closed=true;this.online=false;clearInterval(this.heartbeat);for(const pending of this.calls.values()){clearTimeout(pending.timer);pending.reject(new Error(reason));}this.calls.clear();this.notify();this.socket.close();}
  close(){this.end();}
+ cancelAction(){return this.send.cancelAction();}
  getSessionStatus(){return {status:this.state?.status??'offline',error:this.state?.error??null};}
  hasAttachedClient(){return this.online&&!this.closed;}
  private unavailableReason(){return this.state?.error?`Game client failed: ${this.state.error}`:'No playing game client is attached';}

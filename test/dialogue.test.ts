@@ -15,7 +15,7 @@ function fixture(definitions?:Map<number,Component[]>){
   [372,[component(0,'Tutorial'),component(1,'Instructions')]],
  ]);
  let onClick:(id:number,c:number)=>void=()=>{};
- const session={world,status:'playing',error:null,subscribe:(cb:()=>void)=>{listeners.add(cb);return()=>listeners.delete(cb);},continueDialogue:(id:number,c:number)=>{sent.push({id,component:c});onClick(id,c);},clickInterface:(id:number,c:number,option:number)=>{sent.push({id,component:c,option});onClick(id,c);}};
+ const session={checkAction:()=>{},withAction:async<T>(fn:()=>Promise<T>)=>fn(),world,status:'playing',error:null,subscribe:(cb:()=>void)=>{listeners.add(cb);return()=>listeners.delete(cb);},continueDialogue:(id:number,c:number)=>{sent.push({id,component:c});onClick(id,c);},clickInterface:(id:number,c:number,option:number)=>{sent.push({id,component:c,option});onClick(id,c);}};
  const data={region:(x:number,y:number)=>({x,y,terrain:{flags:Array(16384).fill(0),underlays:[],overlays:[],shapes:[],rotations:[]},objects:[],underlayColours:{},overlayColours:{}}),interface:async(id:number)=>{const d=defs.get(id);if(!d)throw new Error(`Unknown test interface ${id}`);return d;},npc:async(id:number)=>({id,name:'Guide',combat:0,size:1,options:['Talk-to']}),varbit:()=>({id:1,index:1,start:0,end:1})} as unknown as GameData;
  const sdk=new BotSDK(session as unknown as Session,data),bot=new BotActions(sdk);
  const notify=()=>{for(const fn of listeners)fn();};

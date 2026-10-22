@@ -90,6 +90,7 @@ export class DialogueService {
  }
  changed(before:Dialog,timeout=15_000):Promise<Dialog|null>{return this.observe(d=>!d||d.token!==before.token,{timeout},120,900);}
  private observe(predicate:(dialog:Dialog|null)=>boolean,options:DialogWaitOptions,settle:number,closedGrace=settle):Promise<Dialog|null>{
+  const signals=[options.signal,this.session.actionSignal].filter((s):s is AbortSignal=>!!s);options={...options,signal:signals.length?AbortSignal.any(signals):undefined};
   const timeout=options.timeout??15_000;
   if(!Number.isFinite(timeout)||timeout<=0)return Promise.reject(new Error('Dialogue timeout must be positive'));
   return new Promise((resolve,reject)=>{

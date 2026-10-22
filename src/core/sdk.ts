@@ -41,6 +41,7 @@ export class BotSDK {
  readonly combat:CombatService;
  readonly creation:CreationService;
  readonly sceneRegions:SceneRegions;
+ cancelAction(){return this.session.cancelAction();}
  getSessionStatus(){return {status:this.session.status,error:this.session.error};}
  readonly navigation:NavigationService;
  private changingRun=false;
@@ -48,22 +49,22 @@ export class BotSDK {
  getState(){return this.session.world;}
  getSpells(){return this.spells.list();}
  castSpell(spell:string|RegExp,target?:SpellTarget,option?:string){return this.spells.cast(spell,target,option);}
- homeTeleport(timeout=45000){return this.spells.home(timeout);}
+ homeTeleport(timeout=45000){return this.session.withAction(()=>this.spells.home(timeout));}
  getAutocastState(){return this.autocast.state();}
- setAutocast(spell:string|RegExp|null,timeout=5000){return this.autocast.set(spell,timeout);}
+ setAutocast(spell:string|RegExp|null,timeout=5000){return this.session.withAction(()=>this.autocast.set(spell,timeout));}
  getCombatSpells(){return this.magic.spells();}
- castSpellOnNpc(spell:string|RegExp,target:Entity|string|RegExp,timeout=20000){return this.magic.cast(spell,target,timeout);}
+ castSpellOnNpc(spell:string|RegExp,target:Entity|string|RegExp,timeout=20000){return this.session.withAction(()=>this.magic.cast(spell,target,timeout));}
  getPrayerState(){return this.prayers.state();}
  async getPrayers(){return (await this.getPrayerState()).prayers;}
- openPrayerList(timeout=5000){return this.prayers.open(timeout);}
- setPrayer(selection:string|RegExp|number,enabled:boolean,timeout=5000){return this.prayers.set(selection,enabled,timeout);}
+ openPrayerList(timeout=5000){return this.session.withAction(()=>this.prayers.open(timeout));}
+ setPrayer(selection:string|RegExp|number,enabled:boolean,timeout=5000){return this.session.withAction(()=>this.prayers.set(selection,enabled,timeout));}
  getHealth(){return this.combat.health();}
  getCombatState(){return this.combat.state();}
  async getCombatStyles(){return (await this.getCombatState()).styles;}
- selectCombatStyle(selection:string|RegExp|number,timeout=5000){return this.combat.select(selection,timeout);}
+ selectCombatStyle(selection:string|RegExp|number,timeout=5000){return this.session.withAction(()=>this.combat.select(selection,timeout));}
  getEquipmentStats(){return this.combat.stats();}
- openEquipmentStats(timeout=5000){return this.combat.openStats(timeout);}
- closeEquipmentStats(timeout=5000){return this.combat.closeStats(timeout);}
+ openEquipmentStats(timeout=5000){return this.session.withAction(()=>this.combat.openStats(timeout));}
+ closeEquipmentStats(timeout=5000){return this.session.withAction(()=>this.combat.closeStats(timeout));}
  getInventoryStatus(){return this.getState().containerSync.get('93:0')??'unknown';}
  getEquipmentStatus(){return this.getState().containerSync.get('94:0')??'unknown';}
  getInventory(){return this.getState().containers.get('93:0')??[];}
@@ -258,7 +259,7 @@ export class BotActions {
  private requireItem(item:Item,container='93:0'){const current=this.sdk.getState().containers.get(container)?.find(i=>i.slot===item.slot);if(!current||current.id!==item.id||current.amount<1)throw new Error('Item slot changed; query the current container before acting');}
 
  constructor(readonly sdk:BotSDK){}
- private async exclusive<T>(fn:()=>Promise<T>):Promise<T>{if(this.busy)throw new Error('Another bot action is already running');this.busy=true;try{return await fn();}finally{this.busy=false;}}
+ private async exclusive<T>(fn:()=>Promise<T>):Promise<T>{if(this.busy)throw new Error('Another bot action is already running');this.busy=true;try{return await this.sdk.session.withAction(fn);}finally{this.busy=false;}}
  async walkTo(x:number,y:number,timeoutOrOptions:number|WalkOptions=120000,options:RouteOptions={}){return this.exclusive(async()=>{
   await this.dismissCurrentDialog();return this.sdk.navigation.walk(x,y,timeoutOrOptions,options);
  });}
@@ -298,7 +299,7 @@ export class BotActions {
   if(!Number.isFinite(timeout)||timeout<=0||!Number.isInteger(maxSteps)||maxSteps<1)throw new Error('Invalid dialogue navigation limit');
   let dialog=await this.sdk.getDialog(),steps=0,choicesSelected=0;
   if(!dialog||dialog.kind==='instruction')dialog=await this.sdk.waitForDialog({timeout});
-  while(dialog&&dialog.kind!=='instruction'){
+  while(dialog&&dialog.kind!=='instruction'){this.sdk.session.checkAction();
    const remaining=deadline-Date.now();if(remaining<=0)throw new Error('Dialogue navigation timed out');
    if(dialog.kind==='choice'&&choicesSelected>=choices.length)return {dialog,steps,choicesSelected,ended:false,awaitingChoice:true};
    if(steps>=maxSteps)throw new Error('Dialogue navigation reached its step limit');
@@ -328,7 +329,7 @@ export class BotActions {
   const selected=candidates[0];if(!selected)throw new Error(target?'This target has no usable banking action':'No nearby bank with a usable Bank, Use-quickly, Use, or banker Talk-to action');
   const before=await this.sdk.getDialog(),sequence=this.sdk.getState().messageSequence,pressed=new Set<string>();let steps=0,stableSince=0,stableToken:string|undefined;
   if('index'in selected.target)await this.sdk.sendNpcOption(selected.target,selected.option);else this.sdk.sendObjectOption(selected.target,selected.option);
-  while(Date.now()<end){
+  while(Date.now()<end){this.sdk.session.checkAction();
    if(this.sdk.isOpen(762))return;
    if(this.sdk.session.status!=='playing')throw new Error('Game connection closed while opening bank');
    const refused=this.rejectionSince(sequence);if(refused)throw new Error(refused);
@@ -367,7 +368,7 @@ export class BotActions {
  async create(product:string|RegExp,amount:CreationAmount=1,timeout=20_000,expected?:CreationMenu){return this.exclusive(async()=>{
   this.timeout(timeout);const inventory=this.sdk.getInventory(),before=JSON.stringify(inventory),counts=new Map<number,number>(),xp=new Map([...this.sdk.getState().skills].map(([id,s])=>[id,s.xp]));for(const item of inventory)counts.set(item.id,(counts.get(item.id)??0)+item.amount);const sequence=this.sdk.getState().messageSequence,inputSequence=this.sdk.getState().scriptSequence;
   const result=await this.sdk.selectCreationProduct(product,amount,expected),deadline=Date.now()+timeout;
-  while(Date.now()<deadline){
+  while(Date.now()<deadline){this.sdk.session.checkAction();
    const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);
    const itemId=result.product.itemId,changed=JSON.stringify(this.sdk.getInventory())!==before,productChanged=itemId!==undefined&&this.sdk.count(itemId)!==(counts.get(itemId)??0),gainedXp=[...this.sdk.getState().skills].some(([id,s])=>xp.has(id)&&s.xp>xp.get(id)!);
    if(changed&&(itemId===undefined||productChanged||gainedXp))return {...result,effect:'inventory' as const};
@@ -381,7 +382,7 @@ export class BotActions {
  /** Resolves after inventory contents or the active dialogue change. Dispatch is not proof that a recipe completed. */
  async useItemOnItem(source:Item,target:Item,timeout=15_000){return this.exclusive(async()=>{
   this.timeout(timeout);this.requireItem(source);this.requireItem(target);const relevant=()=>JSON.stringify(this.sdk.getInventory().filter(i=>i.slot===source.slot||i.slot===target.slot)),before=relevant(),dialog=await this.sdk.getDialog(),creation=await this.sdk.getCreationMenu(),sequence=this.sdk.getState().messageSequence;this.sdk.sendUseItemOnItem(source,target);
-  const deadline=Date.now()+timeout;while(Date.now()<deadline){if(relevant()!==before)return {effect:'inventory' as const};const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);const menu=await this.sdk.getCreationMenu();if(menu&&menu.id!==905&&menu.token!==creation?.token)return {effect:'creation' as const,menu};const next=await this.sdk.getDialog();if(next&&next.kind!=='instruction'&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};if(this.sdk.session.status!=='playing')throw new Error('Game connection closed');await new Promise(r=>setTimeout(r,50));}
+  const deadline=Date.now()+timeout;while(Date.now()<deadline){this.sdk.session.checkAction();if(relevant()!==before)return {effect:'inventory' as const};const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);const menu=await this.sdk.getCreationMenu();if(menu&&menu.id!==905&&menu.token!==creation?.token)return {effect:'creation' as const,menu};const next=await this.sdk.getDialog();if(next&&next.kind!=='instruction'&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};if(this.sdk.session.status!=='playing')throw new Error('Game connection closed');await new Promise(r=>setTimeout(r,50));}
   throw new Error('No inventory or dialogue change was observed. Check game messages and recipe requirements.');
  });}
  /** Resolves on consumption/conversion of the source item or a new recipe dialogue, not packet dispatch. */
@@ -389,7 +390,7 @@ export class BotActions {
   this.timeout(timeout);this.requireItem(source);
   const relevant=()=>JSON.stringify(this.sdk.getInventory().filter(i=>i.id===source.id||i.slot===source.slot)),before=relevant(),dialog=await this.sdk.getDialog(),creation=await this.sdk.getCreationMenu(),sequence=this.sdk.getState().messageSequence;
   this.sdk.sendUseItemOnObject(source,target);
-  const deadline=Date.now()+timeout;while(Date.now()<deadline){
+  const deadline=Date.now()+timeout;while(Date.now()<deadline){this.sdk.session.checkAction();
    if(relevant()!==before)return {effect:'inventory' as const};
    const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);
    const menu=await this.sdk.getCreationMenu();if(menu&&menu.id!==905&&menu.token!==creation?.token)return {effect:'creation' as const,menu};const next=await this.sdk.getDialog();if(next&&next.kind!=='instruction'&&next.token!==dialog?.token)return {effect:'dialogue' as const,dialog:next};

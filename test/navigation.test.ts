@@ -12,7 +12,7 @@ function region(x:number,y:number,open:(x:number,y:number)=>boolean=()=>true,obj
 function fixture(regions:MapRegion[],x=2,y=5){
  const w=new World();w.index=1;w.playerUpdateAt=Date.now();w.players.set(1,{index:1,x,y,level:0});
  const moves: {x:number;y:number}[]=[],opens:number[]=[];let onOpen=()=>{w.objectChanges.set(objectKey(63,5,0,0),{id:null,x:63,y:5,level:0,shape:0,rotation:2});};let onWalk:(x:number,y:number)=>void=(x,y)=>{Object.assign(w.player!,{x,y});};
- const session={world:w,status:'playing',subscribe(){return()=>{};},walk(x:number,y:number){moves.push({x,y});onWalk(x,y);},interactObject(id:number){opens.push(id);onOpen();},async waitFor(predicate:(world:World)=>boolean){for(let n=0;n<12;n++){if(predicate(w))return;w.tick++;w.playerUpdateAt=Date.now();}throw Error('Observed effect timed out');}} as unknown as Session;
+ const session={checkAction:()=>{},withAction:async<T>(fn:()=>Promise<T>)=>fn(),world:w,status:'playing',subscribe(){return()=>{};},walk(x:number,y:number){moves.push({x,y});onWalk(x,y);},interactObject(id:number){opens.push(id);onOpen();},async waitFor(predicate:(world:World)=>boolean){for(let n=0;n<12;n++){if(predicate(w))return;w.tick++;w.playerUpdateAt=Date.now();}throw Error('Observed effect timed out');}} as unknown as Session;
  const data={npc:(id:number)=>({id,name:'Guide',size:1,combat:0,options:['Talk-to']}),region:(x:number,y:number)=>regions.find(r=>r.x===x&&r.y===y)??null,object:(id:number)=>({...gate,id})} as unknown as GameData;
  const sdk=new BotSDK(session,data);sdk.getDialog=async()=>null;const bot=new BotActions(sdk);
  return {w,sdk,bot,moves,opens,setOpen(fn:()=>void){onOpen=fn;},setWalk(fn:(x:number,y:number)=>void){onWalk=fn;}};

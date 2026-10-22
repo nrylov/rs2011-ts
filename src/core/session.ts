@@ -106,7 +106,19 @@ export class Session {
     this.readyReject(new Error(this.error ?? 'Session closed before login completed'));
     this.transport.close(); this.stoppedResolve(); this.notify();
   }
+  private action?:AbortController;
+  get actionSignal(){return this.action?.signal;}
+  checkAction(){if(this.action?.signal.aborted)throw this.action.signal.reason instanceof Error?this.action.signal.reason:new Error('Game action cancelled');}
+  cancelAction(){const action=this.action;if(!action||action.signal.aborted)return {cancelled:false};action.abort(new Error('Game action cancelled'));return {cancelled:true};}
+  async withAction<T>(work:()=>T|Promise<T>):Promise<T>{if(this.action){this.checkAction();return await work();}return this.runAction(new AbortController().signal,work);}
+  async runAction<T>(signal:AbortSignal,work:()=>T|Promise<T>):Promise<T>{
+    if(this.action)throw new Error('A game action is still running');
+    const action=new AbortController(),abort=()=>action.abort(signal.reason??new Error('Game action cancelled'));
+    this.action=action;signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();
+    try{this.checkAction();return await work();}finally{signal.removeEventListener('abort',abort);if(this.action===action)this.action=undefined;}
+  }
   send(opcode: number, payload = new Uint8Array(0)) {
+    if(opcode!==0&&opcode!==4)this.checkAction();
     if (this.status !== 'playing' || this.ended) throw new Error('Character is not connected');
     if (Date.now() - this.lastReceived > 30_000) throw new Error('Character state is stale');
     try { if(this.external)this.external.send(opcode,payload);else this.transport.send(new Writer().u8(opcode + this.out.next()).raw(payload).finish()); }
@@ -176,16 +188,15 @@ export class Session {
   continueDialogue(id: number, component: number, button = -1) {
     this.send(2, new Writer().add16(button).middle32((id << 16) | component).finish());
   }
-  waitFor(predicate: (world: World) => boolean, timeout = 15_000): Promise<void> {
-    if (this.ended) return Promise.reject(new Error(this.error ?? 'Session closed'));
-    if (predicate(this.world)) return Promise.resolve();
-    return new Promise((resolve, reject) => {
-      const finish = (error?: Error) => { clearTimeout(timer); unsubscribe(); error ? reject(error) : resolve(); };
-      const unsubscribe = this.subscribe(() => {
-        if (this.ended) finish(new Error(this.error ?? 'Session closed'));
-        else { try { if (predicate(this.world)) finish(); } catch (e) { finish(e instanceof Error ? e : new Error(String(e))); } }
-      });
-      const timer = setTimeout(() => finish(new Error(`Observed effect timed out after ${timeout} ms`)), timeout);
+  waitFor(predicate: (world: World) => boolean, timeout = 15_000, signal=this.actionSignal): Promise<void> {
+    if(!Number.isFinite(timeout)||timeout<=0)return Promise.reject(new Error('Observation timeout must be positive'));
+    return new Promise((resolve,reject)=>{
+      let done=false;let timer:ReturnType<typeof setTimeout>|undefined;let unsubscribe=()=>{};
+      const finish=(error?:Error)=>{if(done)return;done=true;clearTimeout(timer);unsubscribe();signal?.removeEventListener('abort',abort);error?reject(error):resolve();};
+      const abort=()=>finish(signal?.reason instanceof Error?signal.reason:new Error('Game action cancelled'));
+      const check=()=>{if(done)return;if(signal?.aborted){abort();return;}if(this.ended){finish(new Error(this.error??'Session closed'));return;}try{if(predicate(this.world))finish();}catch(e){finish(e instanceof Error?e:new Error(String(e)));}};
+      unsubscribe=this.subscribe(check);timer=setTimeout(()=>finish(new Error(`Observed effect timed out after ${timeout} ms`)),timeout);
+      signal?.addEventListener('abort',abort,{once:true});check();
     });
   }
 }

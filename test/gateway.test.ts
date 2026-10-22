@@ -230,3 +230,43 @@ test('autocast is exposed remotely, waits for server selection, and observers ca
   await expect(observer.setAutocast(null)).rejects.toThrow('Observer');
  }finally{remote?.close();observer?.close();await t.close();}
 });
+
+test('expired cooperative observations release mutation ownership instead of holding it for the full action timeout',async()=>{
+ const t=await setup();let remote;
+ try{
+  t.sdk.selectGameTab=async()=>{await t.s.waitFor(()=>false,20000);};remote=await connectGateway(options(t.gateway.url));
+  const started=Date.now();await expect(remote.call('sdk.selectGameTab',['Inventory'],100)).rejects.toThrow(/timed out|cancelled/);
+  const until=Date.now()+500;while((await listGatewayBots(t.gateway.url,config.monitorToken))[0].busy&&Date.now()<until)await Bun.sleep(5);
+  expect((await listGatewayBots(t.gateway.url,config.monitorToken))[0].busy).toBe(false);expect(Date.now()-started).toBeLessThan(1000);
+  t.sdk.selectGameTab=async()=>{};await remote.selectGameTab('Inventory');
+ }finally{remote?.close();await t.close();}
+});
+
+test('explicit cancelAction is available while busy, rejects observers and waits for the original cast to unwind',async()=>{
+ const t=await setup();let remote,observer;
+ try{
+  t.sdk.castSpellOnNpc=async()=>{await t.s.waitFor(()=>false,20000);return {} as any;};
+  remote=await connectGateway(options(t.gateway.url));observer=await connectGateway(options(t.gateway.url,'observe'));
+  const action=remote.castSpellOnNpc('Air Strike','Chicken'),caught=action.catch(e=>e);await Bun.sleep(20);
+  await expect(observer.cancelAction()).rejects.toThrow('Observer');expect(await remote.cancelAction()).toEqual({cancelled:true});expect(String(await caught)).toContain('cancelled');
+  expect((await listGatewayBots(t.gateway.url,config.monitorToken))[0].busy).toBe(false);expect(await remote.cancelAction()).toEqual({cancelled:false});
+ }finally{remote?.close();observer?.close();await t.close();}
+});
+
+test('cancelled asynchronous preparation cannot send a late movement packet after it finishes',async()=>{
+ const t=await setup();let remote;let finish!:()=>void;
+ try{
+  const before={...t.s.world.player!};t.sdk.selectGameTab=async()=>{await new Promise<void>(resolve=>finish=resolve);t.s.walk(before.x+1,before.y);};
+  remote=await connectGateway(options(t.gateway.url));const pending=remote.call('sdk.selectGameTab',['Inventory'],100).catch(e=>e);await Bun.sleep(20);await remote.cancelAction();finish();expect(String(await pending)).toContain('cancelled');await Bun.sleep(20);
+  expect(t.peer.received.filter(p=>p.opcode===35)).toHaveLength(0);expect(t.s.world.player?.x).toBe(before.x);
+ }finally{finish?.();remote?.close();await t.close();}
+});
+
+test('controller disconnect cancels a pending cast without replacing the playing client',async()=>{
+ const t=await setup();let remote,replacement;
+ try{
+  t.sdk.castSpellOnNpc=async()=>{await t.s.waitFor(()=>false,20000);return {} as any;};remote=await connectGateway(options(t.gateway.url));const pending=remote.castSpellOnNpc('Air Strike','Chicken').catch(e=>e);await Bun.sleep(20);remote.close();await pending;
+  const until=Date.now()+500;while((await listGatewayBots(t.gateway.url,config.monitorToken))[0].busy&&Date.now()<until)await Bun.sleep(5);
+  expect(t.s.status).toBe('playing');expect((await listGatewayBots(t.gateway.url,config.monitorToken))[0].busy).toBe(false);replacement=await connectGateway(options(t.gateway.url));expect(replacement.isClientOnline()).toBe(true);
+ }finally{remote?.close();replacement?.close();await t.close();}
+});
