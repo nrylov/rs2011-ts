@@ -1,6 +1,6 @@
+import {actionRefusalSince} from './action-feedback.ts';
 import type {BotSDK} from './sdk.ts';
 import {levelFromXp} from './combat.ts';
-import {plainText} from './dialogue.ts';
 import {PRAYER_PROFILES} from './prayer-profiles.ts';
 export type PrayerBook='normal'|'curses';
 export interface PrayerEntry {id:string;name:string;index:number;bit:number;level:number;members:boolean;active:boolean|null;meetsLevel:boolean|null;}
@@ -36,7 +36,7 @@ export class PrayerService {
    this.sdk.session.clickInterface(271,8,0,-1,prayer.index);
    await this.sdk.session.waitFor(w=>{
     if(this.book()!==state.book||!this.sdk.isOpen(271)||w.varcs.get(181)===1)throw new Error('Prayer book or interface changed before confirmation');
-    if(w.messageSequence>sequence)for(const m of w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length)))if([0,4,109].includes(m.type)&&/^(?:You (?:can't|cannot|need|must|don't|do not|haven't|have (?:to|not|no|run out|insufficient))|This prayer)/i.test(plainText(m.text)))throw new Error(plainText(m.text));
+    const refusal=actionRefusalSince(w,sequence,/^This prayer/i);if(refusal)throw new Error(refusal);
     const mask=w.varps.get(varp);return mask!==undefined&&!!(mask&(1<<prayer.bit))===enabled;
    },timeout);return this.state();
   }finally{this.changing=false;}

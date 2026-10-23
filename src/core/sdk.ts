@@ -1,3 +1,4 @@
+import {actionRefusalSince} from './action-feedback.ts';
 import {ShopService,type ShopAmount} from './shops.ts';
 export type {ShopAmount,ShopItem,ShopState} from './shops.ts';
 import {SceneRegions,toSourceCoords} from './scene-regions.ts';
@@ -201,7 +202,7 @@ export class BotSDK {
    if(!this.isOpen(750)||this.getRunState().enabled!==before.enabled)throw new Error('Run mode changed while loading the orb; query the current state again');
    const sequence=this.getState().messageSequence;this.session.clickInterface(750,orb.id,option);
    await this.session.waitFor(w=>{
-    if(w.messageSequence>sequence)for(const m of w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length)))if([0,4,109].includes(m.type)&&/^(?:You (?:don't|do not|can't|cannot|need)|Nothing interesting)/i.test(plainText(m.text)))throw new Error(plainText(m.text));
+    const refusal=actionRefusalSince(w,sequence);if(refusal)throw new Error(refusal);
     return this.getRunState().enabled===enabled;
    },timeout);
    return this.getRunState();
@@ -352,7 +353,9 @@ export class BotSDK {
 }
 export class BotActions {
  private busy=false;
- private rejectionSince(sequence:number){const w=this.sdk.getState();if(w.messageSequence<=sequence)return null;const messages=w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length));for(const m of messages){if(![0,4,109].includes(m.type))continue;const text=plainText(m.text);if(/^(?:You (?:can't|cannot|don't|do not|need|must|should)|I (?:can't|cannot) reach|Your inventory|Nothing interesting happens|You are (?:unable|too)|You have to)/i.test(text))return text;}return null;}
+ private rejectionSince(sequence:number){return actionRefusalSince(this.sdk.getState(),sequence);}
+ private waitForEffect(sequence:number,effect:(w:World)=>boolean,timeout=15000){return this.sdk.session.waitFor(w=>{const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);return effect(w);},timeout);}
+
  private timeout(value:number){if(!Number.isFinite(value)||value<=0)throw new Error('Action timeout must be positive');}
  private requireItem(item:Item,container='93:0'){const current=this.sdk.getState().containers.get(container)?.find(i=>i.slot===item.slot);if(!current||current.id!==item.id||current.amount<1)throw new Error('Item slot changed; query the current container before acting');}
 
@@ -366,7 +369,11 @@ export class BotActions {
   const d=await this.sdk.getDialog();if(!d)throw new Error('No dialogue is open');if(expected&&expected.token!==d.token)throw new Error('Dialogue changed; read the current options before choosing');
   const button=selection===null?d.continueButton:this.sdk.dialogue.select(d,selection,true);
   if(!button)throw new Error('This dialogue requires a choice; select a published option');
-  this.sdk.dialogue.press(d,button);return this.sdk.dialogue.changed(d,timeout);
+  const sequence=this.sdk.getState().messageSequence,abort=new AbortController();let refused:string|null=null;
+  const unsubscribe=this.sdk.session.subscribe(()=>{refused=this.rejectionSince(sequence);if(refused)abort.abort();});
+  try{this.sdk.dialogue.press(d,button);return await this.sdk.dialogue.changed(d,timeout,abort.signal);}
+  catch(error){if(refused)throw new Error(refused);throw error;}finally{unsubscribe();}
+
  }
  async continueDialog(options:{expected?:Dialog;timeout?:number}={}){return this.exclusive(()=>this.advanceDialog(null,options.expected,options.timeout));}
  async chooseDialogOption(selection:DialogPattern|number,options:{expected?:Dialog;timeout?:number}={}){return this.exclusive(()=>this.advanceDialog(selection,options.expected,options.timeout));}
@@ -411,7 +418,7 @@ export class BotActions {
  async dismissDialog(){return this.exclusive(()=>this.dismissCurrentDialog());}
  private async dismissCurrentDialog(){const d=await this.sdk.getDialog();if(!d?.continueButton)return false;await this.advanceDialog(null,d,5000);return true;}
  async interactObject(target:MapObject,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissCurrentDialog();const index=target.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('Object has no matching action');const sequence=this.sdk.getState().messageSequence;this.sdk.sendObjectOption(target,index);await this.sdk.session.waitFor(w=>{const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);return effect(w);},timeout);});}
- async interactNpc(target:Entity,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissCurrentDialog();const def=await this.sdk.npcDefinition(target.type!);if(!def)throw new Error('NPC is hidden in its current form');const index=def.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('NPC has no matching action');this.sdk.session.interactNpc(target.index,index);await this.sdk.session.waitFor(effect,timeout);});}
+ async interactNpc(target:Entity,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissCurrentDialog();const def=await this.sdk.npcDefinition(target.type!);if(!def)throw new Error('NPC is hidden in its current form');const index=def.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('NPC has no matching action');const sequence=this.sdk.getState().messageSequence;this.sdk.session.interactNpc(target.index,index);await this.waitForEffect(sequence,effect,timeout);});}
  async chopTree(target:MapObject,timeout=30_000){const logIds:Record<string,number>={Tree:1511,'Dead tree':1511,Oak:1521,Willow:1519,'Maple tree':1517,'Yew tree':1515,'Magic tree':1513,Teak:6333,Mahogany:6332};const logId=logIds[target.name];if(logId===undefined)throw new Error('Log type is not mapped for this tree; use interactObject with an explicit effect');const before=this.sdk.count(logId),xp=this.sdk.getState().skills.get(8)?.xp??0;await this.interactObject(target,/^chop/i,()=>this.sdk.count(logId)>before,timeout);return {logs:this.sdk.count(logId)-before,xp:Math.max(0,(this.sdk.getState().skills.get(8)?.xp??0)-xp)};}
  /** Open a usable nearby bank, including booths whose Use action opens the banker menu. */
  async openBank(target?:MapObject|Entity,timeout=20000){return this.exclusive(async()=>{
@@ -502,13 +509,13 @@ export class BotActions {
   },timeout);return {xp:Math.max(0,(this.sdk.getState().skills.get(11)?.xp??0)-xp)};
  });}
  async dropItem(item:Item,timeout=10_000){return this.exclusive(async()=>{
-  this.timeout(timeout);this.requireItem(item);const before=this.sdk.count(item.id);this.sdk.sendDropItem(item);
-  try{await this.sdk.session.waitFor(()=>this.sdk.count(item.id)<before,timeout);}catch(e){if(this.sdk.session.status!=='playing')throw e;throw new Error('Drop was not observed. Check game messages; the server may block dropping this item here.');}
+  this.timeout(timeout);this.requireItem(item);const before=this.sdk.count(item.id),sequence=this.sdk.getState().messageSequence;this.sdk.sendDropItem(item);
+  try{await this.waitForEffect(sequence,()=>this.sdk.count(item.id)<before,timeout);}catch(e){if(this.sdk.session.status!=='playing'||this.sdk.session.actionSignal?.aborted||this.rejectionSince(sequence))throw e;throw new Error('Drop was not observed. Check game messages; the server may block dropping this item here.');}
   return {amount:before-this.sdk.count(item.id)};
  });}
  async pickupItem(item:GroundItem,timeout=20_000){return this.exclusive(async()=>{
-  this.timeout(timeout);const before=this.sdk.count(item.id);this.sdk.sendTakeGroundItem(item);await this.sdk.session.waitFor(()=>this.sdk.count(item.id)>before&&!this.sdk.getState().groundItems.has(item.key),timeout);return {amount:this.sdk.count(item.id)-before};
+  this.timeout(timeout);const before=this.sdk.count(item.id),sequence=this.sdk.getState().messageSequence;this.sdk.sendTakeGroundItem(item);await this.waitForEffect(sequence,()=>this.sdk.count(item.id)>before&&!this.sdk.getState().groundItems.has(item.key),timeout);return {amount:this.sdk.count(item.id)-before};
  });}
- async equipItem(item:Item){return this.exclusive(async()=>{this.requireItem(item);const before=this.sdk.count(item.id,'94:0');this.sdk.sendItemOption(item,1);await this.sdk.session.waitFor(()=>this.sdk.count(item.id,'94:0')>before);});}
- async unequipItem(item:Item){return this.exclusive(async()=>{this.requireItem(item,'94:0');const component=equipmentComponents[item.slot];if(component===undefined)throw new Error('Unknown equipment slot');const before=this.sdk.count(item.id,'94:0');this.sdk.session.clickInterface(387,component,0,item.id,item.slot);await this.sdk.session.waitFor(()=>this.sdk.count(item.id,'94:0')<before);});}
+ async equipItem(item:Item){return this.exclusive(async()=>{this.requireItem(item);const before=this.sdk.count(item.id,'94:0'),sequence=this.sdk.getState().messageSequence;this.sdk.sendItemOption(item,1);await this.waitForEffect(sequence,()=>this.sdk.count(item.id,'94:0')>before);});}
+ async unequipItem(item:Item){return this.exclusive(async()=>{this.requireItem(item,'94:0');const component=equipmentComponents[item.slot];if(component===undefined)throw new Error('Unknown equipment slot');const before=this.sdk.count(item.id,'94:0'),sequence=this.sdk.getState().messageSequence;this.sdk.session.clickInterface(387,component,0,item.id,item.slot);await this.waitForEffect(sequence,()=>this.sdk.count(item.id,'94:0')<before);});}
 }

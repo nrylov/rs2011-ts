@@ -1,6 +1,6 @@
+import {actionRefusalSince} from './action-feedback.ts';
 import type {BotSDK} from './sdk.ts';
 import type {Entity} from './world.ts';
-import {plainText} from './dialogue.ts';
 export interface CombatSpell {id:string;name:string;aliases:string[];interfaceId:number;component:number;level:number;}
 // Void 634 spellbook.ifaces.toml: modern_spellbook:wind_strike, cast_id 3.
 const SPELLS:CombatSpell[]=[{id:'wind_strike',name:'Wind Strike',aliases:['Air Strike','air_strike'],interfaceId:192,component:25,level:1}];
@@ -24,7 +24,7 @@ export class MagicService {
    validate();if(!this.sdk.isOpen(spell.interfaceId))throw new Error('Spellbook changed before casting');
    const sequence=w.messageSequence,xp=skill.xp,mindRunes=this.sdk.count(558);this.sdk.session.castSpellOnNpc(spell.interfaceId,spell.component,index);
    await this.sdk.session.waitFor(state=>{
-    if(state.messageSequence>sequence)for(const m of state.messages.slice(-Math.min(state.messageSequence-sequence,state.messages.length)))if([0,4,109].includes(m.type)&&/^(?:You (?:can't|cannot|need|must|don't|do not|haven't|have (?:to|not|no|run out|insufficient))|This spell|I (?:can't|cannot) reach)/i.test(plainText(m.text)))throw new Error(plainText(m.text));
+    const refusal=actionRefusalSince(state,sequence,/^This spell/i);if(refusal)throw new Error(refusal);
     return(state.skills.get(6)?.xp??xp)>xp||this.sdk.count(558)<mindRunes;
    },timeout);
    return{spell:{...spell,aliases:[...spell.aliases]},target:{index,type,name:definition.name},effect:((this.sdk.getState().skills.get(6)?.xp??xp)>xp?'magic-xp':'runes-consumed') as 'magic-xp'|'runes-consumed',xp:(this.sdk.getState().skills.get(6)?.xp??xp)-xp};

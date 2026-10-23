@@ -1,3 +1,4 @@
+import {actionRefusalSince} from './action-feedback.ts';
 import type {BotSDK} from './sdk.ts';
 import type {Component} from '../cache/definitions.ts';
 import {plainText,matchesDialog} from './dialogue.ts';
@@ -85,11 +86,11 @@ export class CreationService {
   const matches=menu.products.filter(p=>matchesDialog(p.name,pattern));if(matches.length!==1)throw new Error(`${matches.length?'Ambiguous':'No matching'} product. Available: ${menu.products.map(p=>p.name).join(', ')}`);
   const product=matches[0];if(!product.available)throw new Error(`Product is not available: ${product.requirements.join(', ')}`);
   const action=product.actions.find(a=>a.amount===amount)??(typeof amount==='number'?product.actions.find(a=>a.amount==='x'):undefined);if(!action)throw new Error('This product does not offer that quantity');
-  this.assertCurrent(menu);const inputSequence=this.sdk.getState().scriptSequence;
+  this.assertCurrent(menu);const inputSequence=this.sdk.getState().scriptSequence,sequence=this.sdk.getState().messageSequence;
   if(menu.id===905){await this.sdk.selectRecipeQuantity(amount as 1|5|10|'all');this.assertCurrent(menu);this.sdk.session.continueDialogue(905,action.component);}
   else this.sdk.session.clickInterface(menu.id,action.component,action.option,action.itemId,action.slot);
   if(action.amount==='x'&&typeof amount==='number'){
-   await this.sdk.session.waitFor(w=>!!w.numberInput&&w.numberInput.sequence>inputSequence,5000);
+   await this.sdk.session.waitFor(w=>{const refusal=actionRefusalSince(w,sequence);if(refusal)throw new Error(refusal);return !!w.numberInput&&w.numberInput.sequence>inputSequence;},5000);
    this.sdk.submitNumber(amount,this.sdk.getNumberInput()!.sequence);
   }
   return {dispatched:true as const,menu,product,amount,needsAmount:amount==='x'};

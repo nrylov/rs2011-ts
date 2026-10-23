@@ -13,3 +13,9 @@ test('a spell consuming its mind rune is observed even when a miss awards no XP'
 test('a fresh reachability refusal aborts the named cast instead of holding its lock for twenty seconds',async()=>{
  const t=setup();try{const pending=t.sdk.castSpellOnNpc('Air Strike',t.chicken,20000),caught=pending.catch(e=>e);await Bun.sleep(10);const started=Date.now();t.w.messages.push({type:0,text:"I can't reach that."});t.w.messageSequence++;t.notify();expect(String(await caught)).toContain("I can't reach");expect(Date.now()-started).toBeLessThan(500);await expect(t.sdk.castSpellOnNpc('Air Strike',t.chicken,20)).rejects.toThrow('timed out');}finally{t.s.close();}
 });
+
+test('a spell with no-interest feedback returns the exact refusal before its observation timeout',async()=>{
+ const t=setup();try{const pending=t.sdk.castSpellOnNpc('Air Strike',t.chicken,20000).catch(e=>e as Error);await Bun.sleep(10);
+ t.w.messages.push({type:109,text:'Nothing interesting happens.'});t.w.messageSequence++;t.notify();expect((await pending as Error).message).toBe('Nothing interesting happens.');
+ }finally{t.s.close();}
+});

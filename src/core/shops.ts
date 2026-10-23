@@ -1,3 +1,4 @@
+import {actionRefusalSince} from './action-feedback.ts';
 import type {BotSDK} from './sdk.ts';
 import type {Entity,Item} from './world.ts';
 import type {ItemSelector} from './banking.ts';
@@ -16,7 +17,7 @@ export class ShopService {
  }
  private synchronized(id:number|null){if(id===null)return false;const w=this.sdk.getState(),key=`${id}:0`,mount=this.identity().mountVersion;return w.containerSync.get(key)==='complete'&&(mount===undefined||(w.containerPacketVersions.get(key)??-1)>mount);}
  private assert(token:string){this.sdk.session.checkAction();if(this.sdk.session.status!=='playing')throw new Error(this.sdk.session.error??'Game connection closed');if(!this.identity().open||this.identity().token!==token)throw new Error('Shop changed or closed; inspect its current stock before retrying');}
- private refusal(sequence:number){const w=this.sdk.getState();return w.messages.slice(-Math.min(Math.max(0,w.messageSequence-sequence),w.messages.length)).filter(()=>w.messageSequence>sequence).filter(m=>[0,4,109].includes(m.type)).map(m=>plainText(m.text)).find(text=>/^(?:You (?:can't|cannot|don't|do not|need|must|have (?:no|not))|Your inventory|(?:The )?[Ss]hop (?:has|is)|I (?:can't|cannot) reach|Not enough)/i.test(text))??null;}
+ private refusal(sequence:number){return actionRefusalSince(this.sdk.getState(),sequence,/^(?:(?:The )?Shop (?:has|is)|Not enough)/i);}
  private observe<T>(read:()=>T|undefined,timeout:number):Promise<T>{
   if(!Number.isFinite(timeout)||timeout<=0)return Promise.reject(new Error('Shop action timed out'));
   return new Promise((resolve,reject)=>{let done=false;const signal=this.sdk.session.actionSignal;let poll:ReturnType<typeof setInterval>|undefined,timer:ReturnType<typeof setTimeout>|undefined;let unsubscribe=()=>{};
@@ -80,10 +81,10 @@ export class ShopService {
  async inspect(selection:ItemSelector,options:{sample?:boolean;timeout?:number}={}){
   const sample=options.sample??false,timeout=options.timeout??5000;if(typeof sample!=='boolean'||!Number.isFinite(timeout)||timeout<=0)throw new Error('Pass a boolean sample flag and positive timeout');
   const end=Date.now()+timeout,item=await this.find(selection,sample);if(!item)throw new Error('No matching shop item');await this.side(item.shopToken,end-Date.now());this.assert(item.shopToken);
-  let signature='',since=Date.now();// Stock buttons are generated script components: their wire item ID is -1.
+  const sequence=this.sdk.getState().messageSequence;let signature='',since=Date.now();// Stock buttons are generated script components: their wire item ID is -1.
   // Sending the definition ID invokes ordinary inventory validation and rejects shared shops.
   this.sdk.session.clickInterface(620,sample?26:25,0,-1,item.slot*(sample?4:6));
-  await this.observe(()=>{this.assert(item.shopToken);const w=this.sdk.getState(),next=`${w.uiRevision}:${w.varcs.get(741)}:${w.varcs.get(744)}:${w.varcs.get(743)}`;if(next!==signature){signature=next;since=Date.now();}return this.sdk.isOpen(449)&&w.varcs.get(741)===item.id&&w.varcs.has(744)&&Date.now()-since>=160?true:undefined;},end-Date.now());
+  await this.observe(()=>{const refusal=this.refusal(sequence);if(refusal)throw new Error(refusal);this.assert(item.shopToken);const w=this.sdk.getState(),next=`${w.uiRevision}:${w.varcs.get(741)}:${w.varcs.get(744)}:${w.varcs.get(743)}`;if(next!==signature){signature=next;since=Date.now();}return this.sdk.isOpen(449)&&w.varcs.get(741)===item.id&&w.varcs.has(744)&&Date.now()-since>=160?true:undefined;},end-Date.now());
   const info=await this.info();if(!info)throw new Error('Shop info panel closed');return {...info,sample,unitPrice:sample?0:info.unitPrice};
  }
  async trade(direction:'buy'|'sell'|'take',selection:ItemSelector,amount:ShopAmount=1,timeout=20000){

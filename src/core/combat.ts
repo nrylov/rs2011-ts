@@ -1,3 +1,4 @@
+import {actionRefusalSince} from './action-feedback.ts';
 import type {BotSDK} from './sdk.ts';
 import type {Component} from '../cache/definitions.ts';
 import {matchesDialog,plainText} from './dialogue.ts';
@@ -50,7 +51,7 @@ export class CombatService {
    this.sdk.session.clickInterface(884,chosen.component,0);
    await this.sdk.session.waitFor(w=>{
     if(this.sdk.getEquipment().find(i=>i.slot===3)?.id!==weaponId||!this.sdk.isOpen(884))throw new Error('Weapon or combat interface changed before confirmation');
-    if(w.messageSequence>sequence)for(const message of w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length)))if([0,4,109].includes(message.type)&&/^You (?:can't|cannot|need|must|don't|do not)/i.test(plainText(message.text)))throw new Error(plainText(message.text));
+    const refusal=actionRefusalSince(w,sequence);if(refusal)throw new Error(refusal);
     return w.varps.get(43)===chosen.index;
    },timeout);return this.state();
   }finally{this.changing=false;}
@@ -75,7 +76,7 @@ export class CombatService {
    remaining();const sequence=this.sdk.getState().messageSequence;this.sdk.session.clickInterface(884,15,option);
    await this.sdk.session.waitFor(w=>{
     if(!this.sdk.isOpen(884))throw new Error('Combat Styles closed during Auto Retaliate confirmation');
-    if(w.messageSequence>sequence)for(const m of w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length)))if([0,4,109].includes(m.type)&&/^You (?:cannot|can't|need|must)/i.test(plainText(m.text)))throw new Error(plainText(m.text));
+    const refusal=actionRefusalSince(w,sequence);if(refusal)throw new Error(refusal);
     return w.varps.get(172)===(enabled?0:1);
    },remaining());return this.autoRetaliateState();
   }finally{this.changingRetaliate=false;}

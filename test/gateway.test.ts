@@ -1,4 +1,5 @@
 import {test,expect} from 'bun:test';
+import {Writer} from '../src/core/binary.ts';
 import {startGateway} from '../src/gateway/service.ts';
 import {attachGatewayClient} from '../src/gateway/endpoint.ts';
 import {connectGateway,listGatewayBots} from '../src/gateway/remote.ts';
@@ -312,5 +313,19 @@ test('remote object discovery preserves name/action regex filters, coordinates, 
   expect(await remote.nearbyObjects({name:/^flour bin$/gi,action:/take-flour/i,limit:1})).toMatchObject([{id:36880,x:bin.x,y:bin.y,level:p.level,distance:1,actions:[{index:1,label:'Take-flour'}]}]);
   expect(await remote.findNearbyObject(36880,{action:'Take-flour'})).toMatchObject({id:36880});
   expect(await remote.nearbyObjects({action:'Open'})).toEqual([]);
+ }finally{remote?.close();await t.close();}
+});
+
+
+test('fresh game refusals reach remote pickup errors and release gateway mutation ownership',async()=>{
+ const t=await setup();let remote;try{
+  const p=t.s.world.player!,item={id:1511,key:987,x:p.x+1,y:p.y,level:p.level,amount:1};t.s.world.groundItems.set(item.key,item);
+  remote=await connectGateway(options(t.gateway.url));
+  for(const text of ['Nothing interesting happens.',"I can't reach that."]){
+   const pending=remote.bot.pickupItem(item,20000).catch(e=>e as Error);await Bun.sleep(25);
+   t.peer.emit(52,new Writer().smart(109).i32(0).u8(0).text(text).finish());
+   expect((await pending as Error).message).toBe(text);
+   expect((await listGatewayBots(t.gateway.url,config.monitorToken))[0].busy).toBe(false);
+  }
  }finally{remote?.close();await t.close();}
 });

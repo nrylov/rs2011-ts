@@ -97,3 +97,10 @@ test('quest offers expose explicit Yes/No decisions and details, with stale and 
  await f.sdk.clickDialogByText('Yes',offer);expect(f.sent).toEqual([{id:178,component:73,option:0}]);await f.sdk.clickDialogByText('No',offer);expect(f.sent[1]).toEqual({id:178,component:74,option:0});
  f.close();await expect(f.sdk.clickDialogByText('Yes',offer)).rejects.toThrow('No dialogue is open');f.open(178);f.packet(108,new Writer().add8(1).le32((178<<16)|27).finish());expect((await f.sdk.getDialog())?.options).toEqual([]);
 });
+
+for(const text of ['Nothing interesting happens.',"I can't reach that."])test(`a refused dialogue choice returns '${text}' and cleans up its wait`,async()=>{
+ const f=fixture();f.open(234);const baseline=f.listeners.size;
+ const pending=f.bot.chooseDialogOption(1,{timeout:20000}).catch(e=>e as Error);await Bun.sleep(10);
+ f.packet(52,new Writer().smart(109).i32(0).u8(0).text(text).finish());
+ expect((await pending as Error).message).toBe(text);expect(f.listeners.size).toBe(baseline);
+});

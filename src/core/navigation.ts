@@ -1,10 +1,10 @@
+import {actionRefusalSince} from './action-feedback.ts';
 import type {BotSDK} from './sdk.ts';
 import type {MapObject} from '../cache/terrain.ts';
 import type {VarbitType} from '../cache/definitions.ts';
 import {CollisionMap,type Point} from './routing.ts';
 import {resolvedSceneObjects} from './scene.ts';
 import {objectKey} from './objects.ts';
-import {plainText} from './dialogue.ts';
 
 export interface RouteOptions {
  tolerance?:number;openDoors?:boolean;level?:number;maxVisited?:number;maxRegions?:number;
@@ -119,7 +119,7 @@ export class NavigationService {
     poll=setInterval(()=>{try{check();}catch(e){reject(e);}},100);
    })]);}finally{clearTimeout(timer!);clearInterval(poll!);}
   };
-  const refusal=(sequence:number)=>{const w=this.sdk.getState();for(const m of w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length))){if(w.messageSequence<=sequence)break;if(![0,4,109].includes(m.type))continue;const text=plainText(m.text);if(/^(?:You (?:can't|cannot|don't|do not|need|must|should)|I (?:can't|cannot) reach|This (?:door|gate)|The (?:door|gate).*locked)/i.test(text))return text;}return null;};
+  const refusal=(sequence:number)=>actionRefusalSince(this.sdk.getState(),sequence,/^(?:This (?:door|gate)|The (?:door|gate).*locked)/i);
   if(!this.sdk.getState().playerUpdateAt)await this.sdk.session.waitFor(w=>w.playerUpdateAt>0,Math.max(1,Math.min(5000,end-Date.now())));
   check();if(!this.healthVarbit&&this.sdk.getState().skills.has(3)&&typeof this.sdk.data.varbit==='function')this.healthVarbit=await bounded(Promise.resolve(this.sdk.data.varbit(7198)));
   while(true){check();const p=this.sdk.getState().player!;if(options.interactionSize===undefined&&distance(p,{x,y})<=(options.tolerance??0))return {x:p.x,y:p.y,level,arrived:true as const,steps,doorsOpened};

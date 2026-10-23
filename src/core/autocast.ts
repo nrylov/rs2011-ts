@@ -1,7 +1,7 @@
+import {actionRefusalSince} from './action-feedback.ts';
 import type {BotSDK} from './sdk.ts';
 import type {SpellDefinition} from './spells.ts';
 import {AUTOCAST_PROFILES} from './autocast-profiles.ts';
-import {plainText} from './dialogue.ts';
 
 export interface AutocastSpell extends SpellDefinition {castId:number;}
 export interface AutocastState {
@@ -67,7 +67,7 @@ export class AutocastService {
    this.sdk.session.clickInterface(chosen.interfaceId,chosen.component,wireOption);
    await this.sdk.session.waitFor(w=>{
     valid();
-    if(w.messageSequence>sequence)for(const message of w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length)))if([0,4,109].includes(message.type)&&/^(?:You (?:can't|cannot|need|must|don't|do not|haven't|have (?:to|not|no|run out|insufficient))|This spell|I (?:can't|cannot) reach)/i.test(plainText(message.text)))throw new Error(plainText(message.text));
+    const refusal=actionRefusalSince(w,sequence,/^This spell/i);if(refusal)throw new Error(refusal);
     return w.varps.get(108)===desired;
    },remaining());
    return this.state();

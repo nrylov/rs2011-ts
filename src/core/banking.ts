@@ -1,6 +1,6 @@
+import {actionRefusalSince} from './action-feedback.ts';
 import type {BotSDK} from './sdk.ts';
 import type {Item} from './world.ts';
-import {plainText} from './dialogue.ts';
 export type ItemSelector=Item|number|string|RegExp;
 export type BankAmount=number|'all';
 const match=(value:string,pattern:string|RegExp)=>typeof pattern==='string'?value.toLowerCase()===pattern.toLowerCase():(pattern.lastIndex=0,pattern.test(value));
@@ -37,7 +37,7 @@ export class BankingService {
   const check=()=>{
    this.sdk.session.checkAction();
    if(!this.sdk.isOpen(ordinary?762:11))throw new Error('Bank closed during transfer');
-   const w=this.sdk.getState();if(w.messageSequence>sequence)for(const m of w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length)))if([0,4,109].includes(m.type)&&/^(?:You (?:can't|cannot|need|must|don't|do not|have (?:no|not))|Your bank|Your inventory|Not enough)/i.test(plainText(m.text)))throw new Error(plainText(m.text));
+   const w=this.sdk.getState();const refusal=actionRefusalSince(w,sequence,/^(?:Your bank|Not enough)/i);if(refusal)throw new Error(refusal);
   };
   check();this.sdk.session.clickInterface(id,component,option,item.id,item.slot);
   if(option===4){

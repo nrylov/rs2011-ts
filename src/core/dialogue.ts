@@ -90,7 +90,7 @@ export class DialogueService {
   const after=typeof options.after==='string'?options.after:options.after?.token;
   return this.observe(d=>!!d&&(options.includeInstructions||d.kind!=='instruction')&&(!after||d.token!==after),options,120) as Promise<Dialog>;
  }
- changed(before:Dialog,timeout=15_000):Promise<Dialog|null>{return this.observe(d=>!d||d.token!==before.token,{timeout},120,900);}
+ changed(before:Dialog,timeout=15_000,signal?:AbortSignal):Promise<Dialog|null>{return this.observe(d=>!d||d.token!==before.token,{timeout,signal},120,900);}
  private observe(predicate:(dialog:Dialog|null)=>boolean,options:DialogWaitOptions,settle:number,closedGrace=settle):Promise<Dialog|null>{
   const signals=[options.signal,this.session.actionSignal].filter((s):s is AbortSignal=>!!s);options={...options,signal:signals.length?AbortSignal.any(signals):undefined};
   const timeout=options.timeout??15_000;

@@ -1,8 +1,8 @@
+import {actionRefusalSince} from './action-feedback.ts';
 import type{BotSDK}from'./sdk.ts';
 import type{Entity,Item,GroundItem}from'./world.ts';
 import type{MapObject}from'../cache/terrain.ts';
 import{SPELL_PROFILES}from'./spell-profiles.ts';
-import{plainText}from'./dialogue.ts';
 import{objectKey}from'./objects.ts';
 export type SpellTarget={kind:'npc';target:Entity}|{kind:'player';target:Entity}|{kind:'self'}|{kind:'item';target:Item|number}|{kind:'object';target:MapObject}|{kind:'ground-item';target:GroundItem};
 export interface SpellDefinition{id:string;name:string;book:string;interfaceId:number;component:number;targets:SpellTarget['kind'][];actions:string[];aliases:string[];}
@@ -44,7 +44,7 @@ export class SpellService{
   if(!Number.isFinite(timeout)||timeout<=0)throw new Error('Teleport timeout must be positive');if(this.teleporting)throw new Error('A Home Teleport is already pending');this.teleporting=true;
   try{const current=this.sdk.getState().player,from=current?{...current}:null;if(!from)throw new Error('Player is not in the world');const sequence=this.sdk.getState().messageSequence,started=this.sdk.getState().tick;
    const result=await this.cast('lumbridge_home_teleport');
-   await this.sdk.session.waitFor(w=>{if(w.messageSequence>sequence)for(const m of w.messages.slice(-Math.min(w.messageSequence-sequence,w.messages.length)))if([0,4,109].includes(m.type)&&/^You (?:can't|cannot|need|must|don't|do not|haven't|have (?:to|not|no|run out|insufficient))\b/i.test(plainText(m.text)))throw new Error(plainText(m.text));const p=w.player;const wasHome=from.level===0&&from.x>=3221&&from.x<=3222&&from.y>=3217&&from.y<=3220;return w.tick>started&&(!wasHome||w.playerMotion==='teleport')&&!!p&&p.level===0&&p.x>=3221&&p.x<=3222&&p.y>=3217&&p.y<=3220;},timeout);
+   await this.sdk.session.waitFor(w=>{const refusal=actionRefusalSince(w,sequence);if(refusal)throw new Error(refusal);const p=w.player;const wasHome=from.level===0&&from.x>=3221&&from.x<=3222&&from.y>=3217&&from.y<=3220;return w.tick>started&&(!wasHome||w.playerMotion==='teleport')&&!!p&&p.level===0&&p.x>=3221&&p.x<=3222&&p.y>=3217&&p.y<=3220;},timeout);
    return{...result,effect:'teleported' as const,from:{x:from.x,y:from.y,level:from.level},to:{...this.sdk.getState().player!}};
   }finally{this.teleporting=false;}
  }

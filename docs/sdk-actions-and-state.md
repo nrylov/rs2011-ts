@@ -21,6 +21,31 @@ XP change, not proof of whether the action succeeded. Fresh refusals still
 reject promptly, and old game messages or player chat do not acknowledge a
 new firemaking attempt.
 
+## Game refusals
+
+Observed action helpers reject promptly with fresh server feedback such as
+`Nothing interesting happens.` or `I can't reach that.`. The game wording is
+preserved in the error, including through the gateway/MCP, and the pending
+observation releases its action lock. This applies to item/NPC interactions,
+pickup/drop/equipment actions, dialogue choices, walking and door crossings,
+bank/shop operations, spells, prayers and combat settings. Shop transfers
+retain their partial-result contract and expose refusal text in `reason`.
+
+Only fresh game messages count; old lines, player chat and ordinary progress
+messages do not reject a new command. A refusal is not proof that an accepted
+walk, attack or production task has been undone.
+
+Low-level `send*` methods still confirm dispatch only. They cannot synchronously
+return a later server reply. Capture the message sequence before dispatch and
+read fresh feedback when using them directly:
+
+```ts
+const sequence = sdk.getState().messageSequence;
+await sdk.sendObjectOption(target, 'Search');
+// After the server has processed the click:
+const feedback = await sdk.getMessages({afterSequence: sequence});
+```
+
 ## Cancel a pending action
 
 ```ts
