@@ -380,7 +380,7 @@ export class BotActions {
  private async dismissCurrentDialog(){const d=await this.sdk.getDialog();if(!d?.continueButton)return false;await this.advanceDialog(null,d,5000);return true;}
  async interactObject(target:MapObject,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissCurrentDialog();const index=target.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('Object has no matching action');const sequence=this.sdk.getState().messageSequence;this.sdk.sendObjectOption(target,index);await this.sdk.session.waitFor(w=>{const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);return effect(w);},timeout);});}
  async interactNpc(target:Entity,option:string|RegExp,effect:(w:World)=>boolean,timeout=15_000){return this.exclusive(async()=>{await this.dismissCurrentDialog();const def=await this.sdk.npcDefinition(target.type!);if(!def)throw new Error('NPC is hidden in its current form');const index=def.options.findIndex(s=>!!s&&match(s,option));if(index<0)throw new Error('NPC has no matching action');this.sdk.session.interactNpc(target.index,index);await this.sdk.session.waitFor(effect,timeout);});}
- async chopTree(target:MapObject,timeout=30_000){const logIds:Record<string,number>={Tree:1511,'Dead tree':1511,Oak:1521,Willow:1519,'Maple tree':1517,'Yew tree':1515,'Magic tree':1513,Teak:6333,Mahogany:6332};const logId=logIds[target.name];if(logId===undefined)throw new Error('Log type is not mapped for this tree; use interactObject with an explicit effect');const before=this.sdk.count(logId),xp=this.sdk.getState().skills.get(8)?.xp??0;await this.interactObject(target,/^chop/i,w=>this.sdk.count(logId)>before&&(w.skills.get(8)?.xp??0)>xp,timeout);return {logs:this.sdk.count(logId)-before,xp:(this.sdk.getState().skills.get(8)?.xp??0)-xp};}
+ async chopTree(target:MapObject,timeout=30_000){const logIds:Record<string,number>={Tree:1511,'Dead tree':1511,Oak:1521,Willow:1519,'Maple tree':1517,'Yew tree':1515,'Magic tree':1513,Teak:6333,Mahogany:6332};const logId=logIds[target.name];if(logId===undefined)throw new Error('Log type is not mapped for this tree; use interactObject with an explicit effect');const before=this.sdk.count(logId),xp=this.sdk.getState().skills.get(8)?.xp??0;await this.interactObject(target,/^chop/i,()=>this.sdk.count(logId)>before,timeout);return {logs:this.sdk.count(logId)-before,xp:Math.max(0,(this.sdk.getState().skills.get(8)?.xp??0)-xp)};}
  /** Open a usable nearby bank, including booths whose Use action opens the banker menu. */
  async openBank(target?:MapObject|Entity,timeout=20000){return this.exclusive(async()=>{
   this.timeout(timeout);if(this.sdk.isOpen(762))return;
@@ -461,7 +461,13 @@ export class BotActions {
  });}
  async burnLogs(logs:Item,timeout=45_000){return this.exclusive(async()=>{
   this.timeout(timeout);this.requireItem(logs);const tinderbox=await this.sdk.findInventoryItem(/^tinderbox$/i);if(!tinderbox)throw new Error('No tinderbox in inventory');const count=this.sdk.count(logs.id),xp=this.sdk.getState().skills.get(11)?.xp??0,sequence=this.sdk.getState().messageSequence;
-  this.sdk.sendUseItemOnItem(tinderbox,logs);await this.sdk.session.waitFor(w=>{if(this.sdk.count(logs.id)<count&&(w.skills.get(11)?.xp??0)>xp)return true;const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal+(refusal.includes("light a fire here")?' Move to a clear nearby tile and try again.':''));return false;},timeout);return {xp:(this.sdk.getState().skills.get(11)?.xp??0)-xp};
+  let lit=false;
+  this.sdk.sendUseItemOnItem(tinderbox,logs);await this.sdk.session.waitFor(()=>{const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal+(refusal.includes("light a fire here")?' Move to a clear nearby tile and try again.':''));
+   // Logs leave inventory when placed on the ground, before the lighting attempt succeeds.
+   // A fresh server success message confirms ignition even when Tutorial Island caps XP.
+   lit ||= this.sdk.getMessages({afterSequence:sequence}).some(m=>[0,4,109].includes(m.type)&&/^The fire catches and the logs begin to burn\.$/i.test(plainText(m.text)));
+   return lit&&this.sdk.count(logs.id)<count;
+  },timeout);return {xp:Math.max(0,(this.sdk.getState().skills.get(11)?.xp??0)-xp)};
  });}
  async dropItem(item:Item,timeout=10_000){return this.exclusive(async()=>{
   this.timeout(timeout);this.requireItem(item);const before=this.sdk.count(item.id);this.sdk.sendDropItem(item);

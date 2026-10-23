@@ -6,6 +6,21 @@ search, category/availability filters, deep links and copyable examples.
 
 These APIs work in the local SDK and through the gateway/MCP. Refresh both the gateway and client SDK before using newly added methods; a running publisher keeps its previously loaded code. Reload MCP after updating its tool definitions. The changes do not require a game-server restart. Existing game actions already accepted by the server may finish.
 
+## Woodcutting and firemaking completion
+
+`await bot.chopTree(tree)` confirms the first new log received in inventory;
+it does not wait for the entire tree to deplete. `await bot.burnLogs(logs)`
+confirms both log consumption and a fresh server message that the fire caught.
+Logs leave inventory when they are placed on the ground, before ignition, so
+inventory removal alone is not a completed fire.
+
+Neither action requires XP to increase. Tutorial Island caps XP, and the
+10× development rate can produce repeated identical XP snapshots. A successful
+result may therefore report `xp: 0`; that field is an observed non-negative
+XP change, not proof of whether the action succeeded. Fresh refusals still
+reject promptly, and old game messages or player chat do not acknowledge a
+new firemaking attempt.
+
 ## Cancel a pending action
 
 ```ts

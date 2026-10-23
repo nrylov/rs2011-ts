@@ -12,8 +12,8 @@ test('tutorial instruction refreshes and public chat do not acknowledge an item 
  const t=await setup();try{let token='before',done=false;t.sdk.getDialog=async()=>({token,kind:'instruction'}) as never;
  const action=t.bot.useItemOnItem(t.sdk.getInventory()[0],t.sdk.getInventory()[1],1000).finally(()=>{done=true;});const result=action.catch(e=>e as Error);await Bun.sleep(20);token='refreshed';t.peer.emit(52,new Writer().smart(2).i32(0).u8(0).text('You cannot do that.').finish());await Bun.sleep(80);expect(done).toBe(false);t.peer.emit(52,message("You can't light a fire here."));expect((await result as Error).message).toContain("You can't light a fire here.");}finally{await t.close();}
 });
-test('firemaking waits for XP after log consumption',async()=>{
- const t=await setup();try{let done=false;const action=t.bot.burnLogs(t.sdk.getInventory()[1],1000).then(result=>{done=true;return result;});await Bun.sleep(20);t.peer.emit(20,new Writer().u16(93).u8(0).u16(1).add8(1).add16(591).finish());await Bun.sleep(30);expect(done).toBe(false);t.peer.emit(47,skill(11,1,40));expect(await action).toEqual({xp:40});}finally{await t.close();}
+test('firemaking waits for actual ignition rather than log consumption or XP alone',async()=>{
+ const t=await setup();try{let done=false;const action=t.bot.burnLogs(t.sdk.getInventory()[1],1000).then(result=>{done=true;return result;});await Bun.sleep(20);t.peer.emit(20,new Writer().u16(93).u8(0).u16(1).add8(1).add16(591).finish());await Bun.sleep(30);expect(done).toBe(false);t.peer.emit(47,skill(11,1,40));await Bun.sleep(20);expect(done).toBe(false);t.peer.emit(52,message('The fire catches and the logs begin to burn.'));expect(await action).toEqual({xp:40});}finally{await t.close();}
 });
 test('firemaking promptly explains a blocked tile instead of waiting for its whole timeout',async()=>{
  const t=await setup();try{const action=t.bot.burnLogs(t.sdk.getInventory()[1],1000);const result=action.catch(e=>e as Error);await Bun.sleep(20);t.peer.emit(52,message("You can't light a fire here."));expect((await result as Error).message).toContain('Move to a clear nearby tile');}finally{await t.close();}
@@ -26,5 +26,38 @@ test('engine no-interest feedback rejects item use even when its statement popup
 test('object helpers surface level refusals rather than waiting for their whole timeout',async()=>{
  const t=await setup();try{t.s.world.index=1;t.s.world.players.set(1,{index:1,x:3100,y:3100,level:0});const oak={id:1281,name:'Oak',x:3101,y:3100,level:0,shape:10,rotation:0,width:2,height:2,solid:2,options:['Chop down',null,null,null,null]};
  const action=t.bot.interactObject(oak,'Chop down',()=>false,1000);const caught=action.catch(e=>e as Error);await Bun.sleep(20);t.peer.emit(52,message('You need to have a Woodcutting level of 15.'));expect((await caught as Error).message).toContain('Woodcutting level of 15');
+ }finally{await t.close();}
+});
+
+
+test('woodcutting confirms a new log even when tutorial XP remains unchanged',async()=>{
+ const t=await setup();try{t.s.world.index=1;t.s.world.players.set(1,{index:1,x:3100,y:3100,level:0});t.s.world.skills.set(8,{index:8,level:3,xp:174});
+ const tree={id:1276,name:'Tree',x:3101,y:3100,level:0,shape:10,rotation:0,width:2,height:2,solid:2,options:['Chop down',null,null,null,null]};
+ const action=t.bot.chopTree(tree,1000);await Bun.sleep(20);t.peer.emit(47,skill(8,3,174));t.peer.emit(20,new Writer().u16(93).u8(0).u16(3).add8(1).add16(591).add8(1).add16(1512).add8(1).add16(1512).finish());
+ expect(await action).toEqual({logs:1,xp:0});
+ }finally{await t.close();}
+});
+
+test('firemaking completes at the tutorial XP cap using a fresh game success message',async()=>{
+ const t=await setup();try{t.s.world.skills.set(11,{index:11,level:3,xp:174});let done=false;
+ const action=t.bot.burnLogs(t.sdk.getInventory()[1],1000).then(result=>{done=true;return result;});await Bun.sleep(20);
+ t.peer.emit(20,new Writer().u16(93).u8(0).u16(1).add8(1).add16(591).finish());t.peer.emit(47,skill(11,3,174));await Bun.sleep(20);expect(done).toBe(false);
+ t.peer.emit(52,new Writer().smart(109).i32(0).u8(0).text('The fire catches and the logs begin to burn.').finish());expect(await action).toEqual({xp:0});
+ }finally{await t.close();}
+});
+
+test('old ignition messages and player chat cannot complete a new firemaking attempt',async()=>{
+ const t=await setup();try{t.s.world.apply(52,message('The fire catches and the logs begin to burn.'));let done=false;
+ const action=t.bot.burnLogs(t.sdk.getInventory()[1],1000).then(result=>{done=true;return result;});await Bun.sleep(20);
+ t.peer.emit(20,new Writer().u16(93).u8(0).u16(1).add8(1).add16(591).finish());t.peer.emit(52,new Writer().smart(2).i32(0).u8(0).text('The fire catches and the logs begin to burn.').finish());await Bun.sleep(40);expect(done).toBe(false);
+ t.peer.emit(52,message('The fire catches and the logs begin to burn.'));expect(await action).toEqual({xp:0});
+ }finally{await t.close();}
+});
+
+test('ignition can arrive before inventory confirmation and capped XP never reports a negative gain',async()=>{
+ const t=await setup();try{t.s.world.skills.set(11,{index:11,level:6,xp:574});let done=false;
+ const action=t.bot.burnLogs(t.sdk.getInventory()[1],1000).then(result=>{done=true;return result;});await Bun.sleep(20);
+ t.peer.emit(47,skill(11,3,174));t.peer.emit(52,message('The fire catches and the logs begin to burn.'));await Bun.sleep(20);expect(done).toBe(false);
+ t.peer.emit(20,new Writer().u16(93).u8(0).u16(1).add8(1).add16(591).finish());expect(await action).toEqual({xp:0});
  }finally{await t.close();}
 });

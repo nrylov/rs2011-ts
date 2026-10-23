@@ -36,6 +36,8 @@ const tips:Record<string,string>={
  'bot.depositItem':'Deposit the requested quantity and observe inventory/bank changes; amounts accept positive integers or all.',
  'bot.withdrawItem':'Withdraw by definition ID, name, RegExp or current bank item; numeric selectors are not slot numbers.',
  'bot.create':'Select a supported production product and quantity from the current creation interface.',
+ 'bot.chopTree':'Wait for the first new log in inventory; this does not wait for the tree to deplete. XP gain is optional and may be zero on Tutorial Island.',
+ 'bot.burnLogs':'Wait for log consumption and a fresh game message confirming the fire caught. Inventory removal alone can mean logs were placed on the ground; XP gain is optional.',
  'bot.closeInterface':'Close a supported modal, including shop, bank, equipment stats or production interfaces.',
 };
 const examples:Record<string,string>={
@@ -54,7 +56,9 @@ const examples:Record<string,string>={
  'bot.buyFromShop':"await bot.buyFromShop('Hammer', 1)",'bot.sellToShop':"await bot.sellToShop('Logs', 'all')",
  'bot.takeShopSample':"await bot.takeShopSample('Bronze hatchet', 1)",'bot.closeShop':'await bot.closeShop()',
  'bot.depositItem':"await bot.depositItem('Logs', 'all')",'bot.withdrawItem':'await bot.withdrawItem(590, 5)',
- 'bot.openBank':'await bot.openBank()', 'bot.closeInterface':'await bot.closeInterface()',
+ 'bot.openBank':'await bot.openBank()', 'bot.chopTree':"const tree = await sdk.findNearbyObject(/^tree$/i);\nif (tree) await bot.chopTree(tree)",
+ 'bot.burnLogs':"const logs = await sdk.findInventoryItem('Logs');\nif (logs) await bot.burnLogs(logs)",
+ 'bot.closeInterface':'await bot.closeInterface()',
  'bot.walkTo':'await bot.walkTo(3222, 3218, {tolerance: 2, timeout: 120000})',
  'bot.create':"await bot.create('Ball of wool', 'all')",
 };
