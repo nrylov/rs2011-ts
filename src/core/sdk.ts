@@ -31,6 +31,23 @@ import {objectKey} from './objects.ts';
 import { resolvedSceneObjects } from './scene.ts';
 import {resolveObjectDefinition} from './object-definitions.ts';
 import { CollisionMap } from './routing.ts';
+export interface NearbyObjectOptions {
+ /** Omit to search the entire loaded scene. Distances are measured in tiles. */
+ radius?:number;
+ name?:string|RegExp;
+ action?:string|RegExp;
+ /** Placed object ID, not the selected child definition ID. */
+ id?:number;
+ /** Excludes objects with no ordinary menu actions; item-on-object targets may have none. */
+ actionableOnly?:boolean;
+ /** Nearest-first page size (default 200, maximum 1000). Filters apply before pagination. */
+ limit?:number;
+ offset?:number;
+}
+export interface NearbyObject extends MapObject {
+ distance:number;
+ actions:{index:number;label:string}[];
+}
 export interface GameData {
  enum?(id:number):EnumType|Promise<EnumType>;
  varbit(id:number):VarbitType|Promise<VarbitType>;
@@ -219,12 +236,29 @@ export class BotSDK {
   if(typeof pattern!=='string'&&!(pattern instanceof RegExp))throw new Error('Inventory item selector must be a name, RegExp, or numeric item ID');
   for(const item of this.getInventory())if(match((await this.data.item(item.id)).name,pattern))return item;return null;
  }
- async nearbyObjects(radius=24){
-  const w=this.getState(),p=w.player;if(!p)return [];
+ /** Search current-floor objects across the loaded scene, nearest first, with current personal forms. */
+ async nearbyObjects(options:number|NearbyObjectOptions={}):Promise<NearbyObject[]>{
+  const query=typeof options==='number'?{radius:options}:options;
+  if(!query||typeof query!=='object'||Array.isArray(query))throw new Error('Pass a radius or nearby-object options');
+  const {radius,name,action,id,actionableOnly,limit=200,offset=0}=query;
+  if(radius!==undefined&&(!Number.isInteger(radius)||radius<0||radius>16383))throw new Error('Object radius must be an integer from 0 to 16383');
+  for(const [key,value]of [['name',name],['action',action]] as const)if(value!==undefined&&typeof value!=='string'&&!(value instanceof RegExp))throw new Error(`Object ${key} filter must be text or a RegExp`);
+  if(id!==undefined&&(!Number.isInteger(id)||id<0||id>65535))throw new Error('Object ID must be an integer from 0 to 65535');
+  if(actionableOnly!==undefined&&typeof actionableOnly!=='boolean')throw new Error('actionableOnly must be boolean');
+  if(!Number.isInteger(limit)||limit<1||limit>1000)throw new Error('Object limit must be an integer from 1 to 1000');
+  if(!Number.isInteger(offset)||offset<0||offset>1000000)throw new Error('Object offset must be an integer from 0 to 1000000');
+  const w=this.getState(),player=w.player;if(!player)return [];const p={...player};
+  // Scene bounds are asymmetric around the player and support all four revision-634 scene sizes.
+  // Before region initialization, retain a bounded 52-tile local fallback.
+  const layout=w.region,minX=Math.max(0,layout?.baseX??p.x-52,radius===undefined?0:p.x-radius),minY=Math.max(0,layout?.baseY??p.y-52,radius===undefined?0:p.y-radius),maxX=Math.min(16383,layout?layout.baseX+layout.size-1:p.x+52,radius===undefined?16383:p.x+radius),maxY=Math.min(16383,layout?layout.baseY+layout.size-1:p.y+52,radius===undefined?16383:p.y+radius);
   const regions:MapRegion[]=[];
-  for(let x=Math.max(0,Math.floor((p.x-radius)/64));x<=Math.min(255,Math.floor((p.x+radius)/64));x++)for(let y=Math.max(0,Math.floor((p.y-radius)/64));y<=Math.min(255,Math.floor((p.y+radius)/64));y++){const r=await this.sceneRegions.region(x,y);if(r)regions.push(r);}
-  return (await resolvedSceneObjects(regions,w,this.data)).filter(o=>o.level===p.level&&Math.max(Math.abs(o.x-p.x),Math.abs(o.y-p.y))<=radius).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));
+  for(let x=Math.floor(minX/64);x<=Math.floor(maxX/64);x++)for(let y=Math.floor(minY/64);y<=Math.floor(maxY/64);y++){const r=await this.sceneRegions.region(x,y);if(r)regions.push(r);}
+  if(w.region!==layout||w.player?.level!==p.level)throw new Error('Scene changed while discovering objects; query again');
+  const objects=await resolvedSceneObjects(regions,w,this.data);
+  if(w.region!==layout||w.player?.level!==p.level)throw new Error('Scene changed while discovering objects; query again');
+  return objects.filter(o=>o.level===p.level&&o.x>=minX&&o.x<=maxX&&o.y>=minY&&o.y<=maxY&&(id===undefined||o.id===id)&&(name===undefined||match(o.name,name))&&(!actionableOnly||o.options.some(Boolean))&&(action===undefined||o.options.some(label=>!!label&&match(label,action)))).map(o=>({...o,distance:Math.max(Math.abs(o.x-p.x),Math.abs(o.y-p.y)),actions:o.options.flatMap((label,index)=>label?[{index,label}]:[])})).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y)).slice(offset,offset+limit);
  }
+
  /** Validate a captured object against the current scene before dispatch. */
  private validateObject(target:MapObject){
   const p=this.getState().player;if(!p||target.level!==p.level)throw new Error('Object is not on the current floor');
@@ -270,7 +304,7 @@ export class BotSDK {
   this.session.interactNpc(latest.index,index);
   return {dispatched:true as const,npcIndex:latest.index,option:def?.options[index]??null,...(options.force?{forced:true as const}:{})};
  }
- async findNearbyObject(pattern:string|RegExp,radius=24){return (await this.nearbyObjects(radius)).find(o=>match(o.name,pattern))??null;}
+ async findNearbyObject(pattern:string|RegExp|number,options:number|NearbyObjectOptions={}){const query=typeof options==='number'?{radius:options}:options;if(!query||typeof query!=='object'||Array.isArray(query))throw new Error('Pass a radius or nearby-object options');return (await this.nearbyObjects({...query,...(typeof pattern==='number'?{id:pattern}:{name:pattern})}))[0]??null;}
  async npcDefinition(type:number):Promise<NpcType|null>{
   let def=await this.data.npc(type);const seen=new Set<number>();
   while(def.transforms){if(seen.has(def.id))throw new Error('Recursive NPC morph');seen.add(def.id);let value=-1;const w=this.getState();
@@ -387,7 +421,7 @@ export class BotActions {
   const addNpc=async(n:Entity)=>{const current=this.sdk.getState().npcs.get(n.index);if(!current||current.type!==n.type)return;const def=await this.sdk.npcDefinition(current.type!);if(!def)return;let option=def.options.findIndex(s=>!!s&&/^Bank$/i.test(s)),rank=0;if(option<0&&/^banker$/i.test(def.name)){option=def.options.findIndex(s=>!!s&&/^Talk-to$/i.test(s));rank=2;}if(option>=0)candidates.push({target:current,option,rank});};
   const addObject=(o:MapObject)=>{let option=o.options.findIndex(s=>!!s&&/^(?:Use-quickly|Bank)$/i.test(s)),rank=0;if(option<0&&/^bank (?:booth|chest)$/i.test(o.name)){option=o.options.findIndex(s=>!!s&&/^Use$/i.test(s));rank=1;}if(option>=0)candidates.push({target:o,option,rank});};
   if(target){if('index'in target)await addNpc(target);else addObject(target);}
-  else{const [npcs,objects]=await Promise.all([this.sdk.nearbyNpcs(),this.sdk.nearbyObjects()]);for(const n of npcs)await addNpc(n);for(const o of objects)if(/^bank (?:booth|chest)$/i.test(o.name))addObject(o);}
+  else{const [npcs,objects]=await Promise.all([this.sdk.nearbyNpcs(),this.sdk.nearbyObjects({name:/^bank (?:booth|chest)$/i})]);for(const n of npcs)await addNpc(n);for(const o of objects)if(/^bank (?:booth|chest)$/i.test(o.name))addObject(o);}
   const p=this.sdk.getState().player;if(!p)throw new Error('Player is not in the world');
   candidates.sort((a,b)=>a.rank-b.rank||Math.max(Math.abs(a.target.x-p.x),Math.abs(a.target.y-p.y))-Math.max(Math.abs(b.target.x-p.x),Math.abs(b.target.y-p.y)));
   const selected=candidates[0];if(!selected)throw new Error(target?'This target has no usable banking action':'No nearby bank with a usable Bank, Use-quickly, Use, or banker Talk-to action');

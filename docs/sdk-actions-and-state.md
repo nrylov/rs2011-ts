@@ -58,6 +58,47 @@ Bank amounts accept positive integers up to 2147483647 or `'all'`. Arbitrary amo
 
 `useInventoryItem` confirms dispatch only; observe HP, inventory, XP or messages to confirm its effect. Named actions preserve their original cache menu slots. The existing synchronous local `getGroundItems()` remains available to map/UI consumers; the awaited details query adds names and floor options. Empty names in the actual cache stay empty rather than being guessed.
 
+## Discover nearby objects
+
+`await sdk.nearbyObjects()` searches the entire loaded scene on your current
+floor, rather than a fixed 24-tile radius. The scene has exact bounds and can
+be 104, 120, 136 or 168 tiles wide, so the search is not a circle centered on
+your character. It does not scan beyond the loaded scene. Before scene
+initialization, a bounded 52-tile radius is used instead.
+
+Each result includes `id`, `name`, `x`, `y`, `level`, tile `distance`, the
+original five-slot `options` array, and `actions: [{index, label}]`. Actions
+retain their real packet indices; null option slots are not renumbered.
+Results are sorted nearest first by straight-line distance; `distance` is the
+maximum horizontal/vertical tile difference, not a route length.
+
+```ts
+await sdk.nearbyObjects({name: /flour|hopper/i});
+await sdk.nearbyObjects({action: /take-flour|operate/i});
+await sdk.nearbyObjects({name: /^door$/i, action: 'Open'});
+await sdk.nearbyObjects({actionableOnly: true});
+await sdk.nearbyObjects({radius: 16, action: /climb/i});
+await sdk.nearbyObjects(16); // existing numeric radius remains supported
+const bin = await sdk.findNearbyObject(36880); // placed ID
+const door = await sdk.findNearbyObject(/^door$/i, {action: 'Open'});
+```
+
+Name and action strings match exactly, ignoring case; use a RegExp for
+partial matches. Filters combine with AND and apply before pagination.
+Queries return the nearest 200 matches by default. Set `limit` (1–1000)
+and `offset` to read further pages without flooding gateway responses:
+
+```ts
+await sdk.nearbyObjects({actionableOnly: true, limit: 100, offset: 100});
+```
+
+Objects with no ordinary menu actions remain in unfiltered results: a hopper
+can still accept grain, and a fire can accept raw food. Item-specific recipes
+are server rules and cannot be inferred from the object's menu alone.
+Discovery includes objects behind walls and beyond immediate interaction
+range. Use `sdk.canReach(target)` to inspect an approach and walk closer when
+needed; a result does not guarantee line of sight, permission or success.
+
 ## State-dependent world objects
 
 `await sdk.objectDefinition(id)` and `await sdk.nearbyObjects()` resolve the

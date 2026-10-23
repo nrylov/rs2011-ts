@@ -42,7 +42,7 @@ const examples:[string,string][]=[
  ['Inspect requested amount','sdk.getNumberInput()'],
  ['Inspect dialogue','await sdk.getDialog()'],
  ['Continue dialogue','await bot.continueDialog()'],
- ['List nearby objects','await sdk.nearbyObjects(16)'],
+ ['List nearby actionable objects','await sdk.nearbyObjects({actionableOnly: true})'],
  ['Open nearest door',"const door = await sdk.findNearbyObject(/^door$/i);\nif (!door) throw new Error('No nearby door');\nsdk.sendObjectOption(door, 'Open');\nreturn 'Open sent; check movement, object state and game messages.';"],
  ['List ground items','sdk.getGroundItems()'],
  ['Cook raw shrimps on fire',"const shrimp = await sdk.findInventoryItem(/^raw shrimps$/i);\nconst fire = await sdk.findNearbyObject(/^fire$/i);\nif (!shrimp || !fire) throw new Error('Raw shrimps and a nearby fire required');\nreturn await bot.useItemOnObject(shrimp, fire);"],

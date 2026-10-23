@@ -6,6 +6,8 @@ export interface ApiParameter {name:string;type:string;optional:boolean;defaultV
 export interface ApiMethod {name:string;namespace:'sdk'|'bot';category:string;description:string;parameters:ApiParameter[];returns:string;signature:string;remoteSignature:string|null;availability:'query'|'action'|'local'|'remote';source:string;line:number;example:string|null;}
 export interface ApiReference {methods:ApiMethod[];types:{name:string;declaration:string}[];}
 const tips:Record<string,string>={
+ 'sdk.nearbyObjects':'Search the entire loaded scene on the current floor by default. Filter by name/action text or RegExp, placed ID, radius or actionableOnly. Returns nearest-first pages (200 default, 1000 maximum) with coordinates, distance, original options and explicit action indices. Use offset for further pages; filters apply before pagination.',
+ 'sdk.findNearbyObject':'Find the nearest current-floor object by exact name, RegExp or placed ID; optional discovery filters include action and radius. Searches the loaded scene by default. A listed object is not proof of reachability or quest eligibility.',
  'sdk.objectDefinition':'Resolve the current personal object form, or null when hidden. id stays the placed interaction ID; resolvedId identifies a selected child definition. Nearby object queries use the same current form.',
  'sdk.getState':'Local SDK returns the mutable World. The gateway returns the latest serialized snapshot, or null before receiving one. Prefer getStateSummary for compact diagnostics.',
  'sdk.getStateSummary':'Compact player, inventory, region and recent-message diagnostics.',
@@ -42,6 +44,8 @@ const tips:Record<string,string>={
  'bot.closeInterface':'Close a supported modal, including shop, bank, equipment stats or production interfaces.',
 };
 const examples:Record<string,string>={
+ 'sdk.nearbyObjects':"await sdk.nearbyObjects({name: /flour|hopper/i, action: /take|operate/i})",
+ 'sdk.findNearbyObject':"await sdk.findNearbyObject(/^flour bin$/i, {action: 'Take-flour'})",
  'sdk.getStateSummary':'await sdk.getStateSummary()', 'sdk.getInventory':'sdk.getInventory()',
  'sdk.findInventoryItem':"await sdk.findInventoryItem('Tinderbox')",'sdk.getShopState':'await sdk.getShopState()',
  'sdk.findShopItem':"await sdk.findShopItem('Hammer')",'sdk.getShopItems':'await sdk.getShopItems({sample: true})',

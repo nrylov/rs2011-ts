@@ -99,3 +99,20 @@ parameters/defaults, return types and examples. Gateway/controller/local-only
 badges distinguish dispatch availability. Definitions are generated from the
 current source at startup/build time; run `bun run docs:api` for an offline
 `dist/api/index.html`. Examples require the appropriate game context.
+
+## Object discovery
+
+Use `await sdk.nearbyObjects({name: /flour|hopper/i})` or
+`await sdk.nearbyObjects({action: /take-flour|operate/i})` to search the entire
+loaded scene on your current floor. Combine `name` and `action` filters when
+needed; strings match exactly ignoring case, regexes allow partial matches.
+Results include `id`, `name`, `x`, `y`, `level`, tile `distance`, original
+`options`, and `actions: [{index,label}]` with real menu slots. The default page
+is 200 nearest matches; use `limit` (up to 1000) and `offset` for more, or filter
+first. Numeric radius calls such as `nearbyObjects(16)` still work.
+`await sdk.findNearbyObject(36880)` finds a placed ID, and
+`await sdk.findNearbyObject(/^door$/i, {action:'Open'})` combines selectors.
+Do not discard all objects without options: hoppers and fires may be valid
+item-on-object targets. Current player-dependent forms are resolved, but
+objects can still be unreachable or quest-locked; inspect `sdk.canReach` and
+fresh game feedback. See `docs/sdk-actions-and-state.md`.
