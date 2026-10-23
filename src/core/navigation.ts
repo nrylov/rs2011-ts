@@ -1,9 +1,8 @@
 import type {BotSDK} from './sdk.ts';
 import type {MapObject} from '../cache/terrain.ts';
 import type {VarbitType} from '../cache/definitions.ts';
-import type {ObjectType} from '../cache/format.ts';
 import {CollisionMap,type Point} from './routing.ts';
-import {sceneObjects} from './scene.ts';
+import {resolvedSceneObjects} from './scene.ts';
 import {objectKey} from './objects.ts';
 import {plainText} from './dialogue.ts';
 
@@ -60,9 +59,7 @@ export class NavigationService {
    if(rx<0||ry<0||rx>255||ry>255)return Promise.resolve();const key=`${rx}:${ry}`;const existing=loaded.get(key);if(existing)return existing;
    if(loaded.size>=maxRegions)throw new Error(`Route exceeded its ${maxRegions}-region search budget`);
    const pending=(async()=>{check();const region=await this.sdk.sceneRegions.region(rx,ry);check();if(!region)return;
-    const world=this.sdk.getState(),defs=new Map<number,ObjectType>();for(const o of region.objects)defs.set(o.id,o);
-    await Promise.all([...world.objectChanges.values()].filter(o=>o.id!==null&&(o.x>>>6)===rx&&(o.y>>>6)===ry&&!defs.has(o.id!)).map(async o=>defs.set(o.id!,await this.sdk.data.object(o.id!))));check();
-    const objects=sceneObjects([region],world,id=>defs.get(id));
+    const objects=await resolvedSceneObjects([region],this.sdk.getState(),this.sdk.data);check();
     const solid=objects.filter(o=>{if(o.level===level&&options.openDoors!==false&&isNavigationDoor(o)&&!this.blockedDoors.has(doorKey(o))){remember(o);return false;}return true;});
     collision.add([region],solid);
    })();loaded.set(key,pending);return pending;

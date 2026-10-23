@@ -58,6 +58,31 @@ Bank amounts accept positive integers up to 2147483647 or `'all'`. Arbitrary amo
 
 `useInventoryItem` confirms dispatch only; observe HP, inventory, XP or messages to confirm its effect. Named actions preserve their original cache menu slots. The existing synchronous local `getGroundItems()` remains available to map/UI consumers; the awaited details query adds names and floor options. Empty names in the actual cache stay empty rather than being guessed.
 
+## State-dependent world objects
+
+`await sdk.objectDefinition(id)` and `await sdk.nearbyObjects()` resolve the
+current object form from your character's varps/varbits. Names, action slots
+and dimensions come from that form. `id` remains the placed object ID used by
+the server; `resolvedId` identifies the selected child definition when different.
+A hidden form returns `null` from `objectDefinition` and is omitted from nearby
+objects. Personal forms are resolved on each query, without changing shared
+cache definitions. Routing uses the same resolved scene.
+
+For example, the mill's placed object `36880` has no name or actions of its own.
+When your flour count is positive it selects `36878`, named `Flour bin`, with
+`Take-flour` in action slot 0. When empty it selects `36879`, named `Mill`,
+without that action. Query again after operating the hopper or emptying the bin:
+
+```ts
+const bin = await sdk.findNearbyObject(/^flour bin$/i);
+if (bin) await sdk.sendObjectOption(bin, 'Take-flour');
+// Dispatch only: confirm the pot changed or read the fresh server refusal.
+```
+
+Using an empty pot on the bin is also a supported game interaction. Neither
+interaction requires bypassing the object's menu validation. Truly unnamed
+cache objects remain unnamed; the SDK does not guess labels from ID ranges.
+
 ## Reachability
 
 ```ts

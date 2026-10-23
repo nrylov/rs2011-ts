@@ -28,7 +28,8 @@ import type { MapRegion, MapObject } from '../cache/terrain.ts';
 import type { ObjectType } from '../cache/format.ts';
 import type { ItemType, NpcType, Component, VarbitType } from '../cache/definitions.ts';
 import {objectKey} from './objects.ts';
-import { sceneObjects } from './scene.ts';
+import { resolvedSceneObjects } from './scene.ts';
+import {resolveObjectDefinition} from './object-definitions.ts';
 import { CollisionMap } from './routing.ts';
 export interface GameData {
  enum?(id:number):EnumType|Promise<EnumType>;
@@ -200,7 +201,8 @@ export class BotSDK {
  private inventoryItem(item:Item|number){const current=this.getInventory().find(i=>i.slot===(typeof item==='number'?item:item.slot));if(!current||typeof item!=='number'&&current.id!==item.id)throw new Error('Item slot changed; query inventory again');return current;}
  sendUseItemOnItem(source:Item|number,target:Item|number){const error=this.inventoryActionError();if(error)throw new Error(error);const from=this.inventoryItem(source),to=this.inventoryItem(target);if(from.slot===to.slot)throw new Error('Select two different inventory slots');this.session.useItemOnItem(from,to);}
  async getGroundItemDetails(radius=24){return Promise.all(this.getGroundItems(radius).map(async item=>{const def=await this.itemDefinition(item.id);return {...item,name:def.name,options:def.floorOptions};}));}
- objectDefinition(id:number){if(!Number.isInteger(id)||id<0||id>65535)throw new Error('Object ID must be an integer from 0 to 65535');return Promise.resolve(this.data.object(id));}
+ /** Current personal object form, or null when hidden; id remains the placed interaction ID. */
+ objectDefinition(id:number){if(!Number.isInteger(id)||id<0||id>65535)throw new Error('Object ID must be an integer from 0 to 65535');return resolveObjectDefinition(id,this.getState(),this.data);}
  async getInventoryDetails(){return Promise.all(this.getInventory().map(async item=>{const def=await this.itemDefinition(item.id);return {...item,name:def.name,options:def.options.map((label,slot)=>({slot,option:inventoryOption(slot),label})).filter(o=>!!o.label)};}));}
  async useInventoryItem(selection:ItemSelector,option:string|RegExp){
   if(typeof option!=='string'&&!(option instanceof RegExp))throw new Error('Pass an item action name or RegExp');
@@ -221,9 +223,7 @@ export class BotSDK {
   const w=this.getState(),p=w.player;if(!p)return [];
   const regions:MapRegion[]=[];
   for(let x=Math.max(0,Math.floor((p.x-radius)/64));x<=Math.min(255,Math.floor((p.x+radius)/64));x++)for(let y=Math.max(0,Math.floor((p.y-radius)/64));y<=Math.min(255,Math.floor((p.y+radius)/64));y++){const r=await this.sceneRegions.region(x,y);if(r)regions.push(r);}
-  const defs=new Map<number,ObjectType>();for(const r of regions)for(const o of r.objects)defs.set(o.id,o);
-  for(const o of w.objectChanges.values())if(o.id!==null&&!defs.has(o.id))defs.set(o.id,await this.data.object(o.id));
-  return sceneObjects(regions,w,id=>defs.get(id)).filter(o=>o.level===p.level&&Math.max(Math.abs(o.x-p.x),Math.abs(o.y-p.y))<=radius).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));
+  return (await resolvedSceneObjects(regions,w,this.data)).filter(o=>o.level===p.level&&Math.max(Math.abs(o.x-p.x),Math.abs(o.y-p.y))<=radius).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));
  }
  /** Validate a captured object against the current scene before dispatch. */
  private validateObject(target:MapObject){
@@ -285,9 +285,7 @@ export class BotSDK {
   const w=this.getState(),p=w.player;if(!p)throw new Error('No player state');
   const regions:MapRegion[]=[];const radius=52;
   for(let rx=Math.floor((p.x-radius)/64);rx<=Math.floor((p.x+radius)/64);rx++)for(let ry=Math.floor((p.y-radius)/64);ry<=Math.floor((p.y+radius)/64);ry++){const r=await this.sceneRegions.region(rx,ry);if(r)regions.push(r);}
-  const defs=new Map<number,ObjectType>();for(const r of regions)for(const o of r.objects)defs.set(o.id,o);
-  for(const o of w.objectChanges.values())if(o.id!==null&&!defs.has(o.id))defs.set(o.id,await this.data.object(o.id));
-  return new CollisionMap(regions,sceneObjects(regions,w,id=>defs.get(id)),p.level);
+  return new CollisionMap(regions,await resolvedSceneObjects(regions,w,this.data),p.level);
  }
  canReach(target:ReachabilityTarget,options:Omit<RouteOptions,'openDoors'|'interactionSize'|'tolerance'>={}){return canReach(this,target,options);}
  planRoute(x:number,y:number,options:RouteOptions={}){return this.navigation.plan(x,y,options);}

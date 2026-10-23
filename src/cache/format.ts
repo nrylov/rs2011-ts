@@ -83,7 +83,7 @@ export function decodeFloor(data: Uint8Array, overlay: boolean): Floor {
   }
 }
 
-export interface ObjectType { id: number; name: string; width: number; height: number; solid: number; interactive?:number; routeBlocked?:boolean; options: (string | null)[]; }
+export interface ObjectType { id: number; name: string; width: number; height: number; solid: number; interactive?:number; routeBlocked?:boolean; varbit?:number; varp?:number; transforms?:number[]; resolvedId?:number; options: (string | null)[]; }
 export function decodeObject(id: number, data: Uint8Array): ObjectType {
   const r = new Reader(data), def: ObjectType = {id, name: '', width: 1, height: 1, solid: 2, interactive:-1, routeBlocked:true, options: Array(5).fill(null)};
   const models = () => { const n = r.u8(); for (let i = 0; i < n; i++) { r.u8(); r.take(r.u8() * 2); } };
@@ -104,7 +104,7 @@ export function decodeObject(id: number, data: Uint8Array): ObjectType {
     else if ([19,28,29,39,69,75,81,101,104,178].includes(op)) r.u8();
     else if ([40,41].includes(op)) r.take(r.u8() * 4);
     else if (op === 42) r.take(r.u8());
-    else if ([77,92].includes(op)) { r.take(4); if (op === 92) r.take(2); r.take((r.u8() + 1) * 2); }
+    else if (op === 77 || op === 92) { const short=()=>{const value=r.u16();return value===65535?-1:value;};def.varbit=short();def.varp=short();const fallback=op===92?short():-1;def.transforms=Array.from({length:r.u8()+1},short);def.transforms.push(fallback); }
     else if ([78,99,100].includes(op)) r.take(3);
     else if (op === 79) { r.take(5); r.take(r.u8() * 2); }
     else if (op === 106) r.take(r.u8() * 3);

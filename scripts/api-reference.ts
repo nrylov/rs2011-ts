@@ -6,6 +6,7 @@ export interface ApiParameter {name:string;type:string;optional:boolean;defaultV
 export interface ApiMethod {name:string;namespace:'sdk'|'bot';category:string;description:string;parameters:ApiParameter[];returns:string;signature:string;remoteSignature:string|null;availability:'query'|'action'|'local'|'remote';source:string;line:number;example:string|null;}
 export interface ApiReference {methods:ApiMethod[];types:{name:string;declaration:string}[];}
 const tips:Record<string,string>={
+ 'sdk.objectDefinition':'Resolve the current personal object form, or null when hidden. id stays the placed interaction ID; resolvedId identifies a selected child definition. Nearby object queries use the same current form.',
  'sdk.getState':'Local SDK returns the mutable World. The gateway returns the latest serialized snapshot, or null before receiving one. Prefer getStateSummary for compact diagnostics.',
  'sdk.getStateSummary':'Compact player, inventory, region and recent-message diagnostics.',
  'sdk.getInventory':'Current inventory slots. This query does not open the inventory tab.',
