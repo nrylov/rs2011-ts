@@ -42,3 +42,6 @@ test('Blood Pact accepted stage uses the visible surface Xenia cache value',asyn
 
 
 test('Vampire Slayer reads revision-634 stages and the three-point reward',async()=>{const t=setup();try{t.sdk.data.varbit=id=>({id,index:178,start:0,end:1});for(const [value,stage,status]of [[0,'unstarted','unstarted'],[1,'started','started'],[2,'armed','started'],[3,'completed','completed']] as const){t.w.varps.set(178,value);expect(await t.sdk.getQuestState('Vampire Slayer')).toMatchObject({value,stage,status,points:3});}}finally{t.s.close();}});
+
+
+test('Ernest the Chicken reads the search, machine-parts and completed stages from varp 32',async()=>{const t=setup();try{for(const [value,stage,status]of [[0,'unstarted','unstarted'],[1,'started','started'],[2,'parts','started'],[3,'completed','completed']] as const){t.w.varps.set(32,value);expect(await t.sdk.getQuestState('Ernest the Chicken')).toMatchObject({value,stage,status,points:4});}}finally{t.s.close();}});
