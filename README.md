@@ -1,5 +1,7 @@
 # rs2011-ts
 
+Contributor handoff: [project context](PROJECT_CONTEXT.md) · [backlog](TODO.md) · [agent guide](AGENTS.md).
+
 A native TypeScript client and developing automation SDK for Void’s RuneScape revision 634 server. Browser and lightweight headless clients share the same encrypted protocol, state, cache decoders, queries and actions. The browser currently renders a schematic 2D map from real cache terrain and placements.
 
 ## Run locally

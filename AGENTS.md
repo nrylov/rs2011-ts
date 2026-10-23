@@ -4,6 +4,24 @@ This repository contains the revision 634 SDK, lightweight client and bot gatewa
 For gameplay, keep each persistent character's scripts and notes in `bots/{username}/`.
 For SDK/client development, work on the repository directly; do not create or control a gameplay account unless the task needs it.
 
+## Shared development context
+
+For SDK/client work, first read [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) and
+[TODO.md](TODO.md), then inspect Git status and relevant source/tests. Claude
+uses the same files through [CLAUDE.md](CLAUDE.md). Update durable context and
+remaining work after meaningful changes; keep account observations in bot notes.
+Coordinate file ownership with other agents and do not stage or revert their work.
+
+Keep ordinary server fixes in the sibling rs2011-server source; keep SDK-specific
+integration here. Verify revision-634 IDs and respect reference licenses. Do not
+interrupt a live run for deployment or a browser refresh without coordination.
+
+Use a descriptive commit title and readable paragraphs explaining the concrete
+problem, resulting behavior, relevant implementation and validation. Give human
+reviewers enough context without dumping every internal detail. Keep independent
+fixes separate. Preserve author/signing configuration; coordinate authorized
+history rewrites, back up first and use force-with-lease.
+
 ## Start or continue an account
 
 For “start a bot” or “continue an existing account”, first check whether `bots/{name}/bot.env` exists. Reuse it; never recreate credentials for a configured account. If only the game account exists, obtain its password and configure it once with `create_bot({name,password})`. Omit the password only for a genuinely new game account.
