@@ -257,3 +257,30 @@ Context: during Blood Pact the defeated cultist Kayle (type 9628, Attack only) i
 - `sendNpcOption(npc, slot, {force:true})` is an explicit escape hatch that sends a numeric slot without the definition check; the result carries `forced:true`.
 - Unit coverage: `test/npc-masks.test.ts` (idle/moving/added NPCs in one packet, every field width, fail-soft on unknown bits and trailing bytes, definition refresh and stale-target rejection, force validation). Full suite and strict typecheck pass.
 - Live validation against the running server is still pending: reload the hosted client, then compare `nearbyNpcs()` for Kayle (expect 9629 with Talk-to) and for a sheared type-8876 sheep.
+
+
+## Fleet monitor and Ernest playtest — 2026-10-23
+
+The complete SDK suite passes 333 tests with two optional live-login tests
+skipped. Scoped TypeScript (excluding unchanged untracked test4/test6/test7 bot
+scripts), browser builds and whitespace checks pass. The unscoped typecheck
+still reports the existing private scripts' errors; they were not edited.
+
+The new fleet monitor was exercised against a private live QA publisher at
+1440px and 390px. Search, floors, selection, offline last-known positions and
+responsive layout worked without browser errors or a game connection from the
+viewer. Gateway regressions verify action lifecycle and rotated instance source
+coordinates; proxy tests verify local authorization and credential isolation.
+
+Ernest was completed through the actual rendered client's SDK. The native
+completion screen, inventory, four quest points and fresh-login/stopped-save
+state agree. Repeat talking does not duplicate rewards. See the
+[base-server playtest report](https://github.com/nrylov/rs2011-server/blob/main/docs/ernest-playtest.md)
+for the full puzzle, recovery, evidence and limits.
+
+A separately observed manor refusal, "The doors won't open.", now triggers
+navigation's normal blocked-door reroute immediately. Three regressions cover
+singular/plural and apostrophe variants without consuming the simulated opening
+timeout. Main gateway/web activation and an existing game-page refresh remain
+coordinated with the active agent; no main session was interrupted by these
+source/test changes. Only the disposable QA services were stopped.

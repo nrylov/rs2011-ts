@@ -6,20 +6,17 @@ marked reported need reproduction; they are not established diagnoses.
 
 ## Next session
 
-- [ ] **Activate the remaining Blood Pact weapon lifetime fixes** at a coordinated
-  restart. Staff/sword overlay is staged, not live; verify its deployment manifest
-  and active hash. See project context and the server backlog. Kayle is already live.
-- [ ] **Playtest Ernest the Chicken** through a regular client and SDK. World
-  tests cover logic; verify map forms, routes, presentation, pacing and rewards.
+- [ ] Coordinate the pending gateway/client-web reload after the active agent
+  finishes, then refresh its game page to load the new manor-refusal handling.
+  The fleet map is implemented/tested but its routes/metadata are not live yet.
 - [ ] **Vampire Slayer presentation**: review the user's downloaded video when
   available, then identify opening/final staking animations and periodic garlic
   feedback. The Count's incompatible combat animation definitions are fixed.
 
 ## SDK and monitoring work
 
-- [ ] Build a standalone map/fleet dashboard usable without a game login.
-  Authenticated gateway fleet status/position metadata already exists; a finished
-  dashboard does not. Never expose monitor credentials in public URLs.
+- [ ] Extend the fleet page to full-world telemetry for unattached characters
+  when server-side monitoring is designed. Current coverage is configured bots.
 - [ ] Extend per-agent monitoring around action history, observations, outcomes
   and script intent; the lightweight and regular companion action logs are a
   starting point. Coordinate scope with the user rather than inventing a large UI.
@@ -60,6 +57,16 @@ Do not add SDK-only changes there merely to work around an unverified client iss
   service boundaries before choosing a separate-server design.
 
 ## Recently completed
+
+- [x] Complete Ernest through the rendered-client SDK, check exact rewards,
+  repeat-payment safety and relog/save persistence; stop only the QA services.
+- [x] Recognize manor door/gate won't-open feedback promptly and reroute without
+  waiting for the opening timeout; three new regressions pass.
+
+- [x] Activate matching no-expiry staff/sword drops, back up saves/overlay and
+  start all four services while preserving the local 10x XP override.
+- [x] Implement the read-only fleet map, controller/action metadata and source
+  instance coordinates, with tests and desktop/mobile browser validation.
 
 - [x] Reword the 58 SDK/client and 19 base-server project commits with readable
   problem/behavior/implementation/validation explanations. Preserved trees,

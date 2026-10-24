@@ -74,8 +74,9 @@ in 2009. Lunar spells do not support autocast; see the linked feedback audit.
 
 ## Deployment checkpoint at end of session
 
-The four development services were shut down at the user's request on 2026-10-23.
-Check actual listeners before starting anything; recorded PIDs can be stale.
+The four development services were restarted on 2026-10-23 after activating
+the remaining Blood Pact weapon fixes. A real account is under agent control;
+coordinate reloads. Check actual listeners; recorded PIDs can be stale.
 
 The private `dev/` directory contains the prepared cache, saves, Java, native
 bundle and Void 2.11.0 runtime. The running release uses a compatibility overlay;
@@ -88,12 +89,29 @@ and the fresh-refusal SDK work. One sling was restored to test7's inventory with
 all other save fields preserved. The local XP multiplier remains **10x** in
 ignored development configuration, not a base-server default.
 
-**Pending deployment:** Caitlin's staff and Reese's sword also have non-expiring
-quest-drop timers in source, but their updated compatibility overlay has only
-been staged. Inspect `dev/staged/blood-pact-weapon-lifetimes/deployment.json` and
-its expected active-overlay hash before activation. Do not blindly copy a source
-build over the old release. Existing dropped weapons are not recreated by this
-change. Normal pickup and instance cleanup still remove these private drops.
+Caitlin's staff and Reese's sword now use the same non-expiring private drop
+lifetime as Kayle's sling in the active runtime. Activation verified old/staged
+overlay hashes, restricted changed entries to the expected actors, backed up
+saves/overlay/configuration and preserved the 10x XP setting. The private record
+is `dev/backups/last-weapon-activation.json`. Normal pickup and instance cleanup
+still remove the drops; already expired weapons are not recreated.
+
+The [fleet monitor](docs/monitoring.md) is implemented and validated on an
+isolated gateway/QA browser. Main-service activation is pending coordination
+with the active agent: gateway and client-web reloads are needed, but the game
+server can stay online. The page covers configured publishers and current
+commands; full-world telemetry and persistent action timelines remain future work. The manor
+won't-open navigation fix is also pending in already loaded game pages: refresh
+them after the coordinated web rebuild/reload window.
+
+The rendered-client/SDK Ernest playtest completed all puzzle steps, verified
+exact noted rewards and repeat-payment safety, and retained completion/rewards
+after relog and in the stopped-server save. It included an idle skeleton death
+and normal item recovery; no quest state or inventory was edited. See the base
+server's `docs/ernest-playtest.md`. Private evidence is under
+`dev/validation/ernest-20261023/`; its browser/server/gateway/preview were stopped,
+with main listener PIDs verified unchanged. Final SDK checks passed 333 tests
+with two live tests skipped, scoped TypeScript and browser builds.
 
 Local deployment/backup records live in `dev/backups/`; these records and saves
 are private and not included in Git. A fresh checkout needs runtime provisioning.
