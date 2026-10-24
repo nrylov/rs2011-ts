@@ -352,3 +352,14 @@ test('fleet positions map instance chunks back to source tiles without publishin
   expect(bot!.instanced).toBe(true);expect(bot!.player).toMatchObject({x:6501,y:1050,level:0});expect(bot!.mapPlayer).toEqual({x:3877,y:5525,level:2});expect(JSON.stringify(bot)).not.toContain('chunks');expect(JSON.stringify(bot)).not.toContain('containers');
  }finally{await t.close();}
 });
+
+
+test('observer discovery finds a named NPC through an empty indexed morph slot',async()=>{
+ const t=await setup();let observer;try{
+  const p=t.s.world.player!;t.s.world.npcs.set(42,{index:42,type:558,x:p.x+1,y:p.y,level:p.level});
+  t.sdk.data.npc=(id:number)=>id===558?{id,name:'',size:1,combat:0,options:[],varbit:7451,varp:-1,transforms:[-1,11699,12261]}:{id,name:'Gerrant',size:1,combat:0,options:['Talk-to',null,'Trade',null,null]};
+  t.sdk.data.varbit=()=>({id:7451,index:1861,start:0,end:5});(t.s as unknown as{notify():void}).notify();
+  observer=await connectGateway(options(t.gateway.url,'observe'));const gerrant=await observer.findNearbyNpc(/^Gerrant$/i);
+  expect(gerrant).toMatchObject({index:42,type:558,id:12261,name:'Gerrant',options:['Talk-to',null,'Trade',null,null]});expect((await observer.nearbyNpcs()).some(n=>n.index===42)).toBe(true);expect(t.s.status).toBe('playing');
+ }finally{observer?.close();await t.close();}
+});

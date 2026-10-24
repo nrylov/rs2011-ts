@@ -12,7 +12,9 @@ export async function resolveObjectDefinition(id:number,world:World,data:{object
    const b=await data.varbit(def.varbit),direct=world.varbits.get(b.id);
    value=direct!==undefined&&(world.variableUpdates.get(`b${b.id}`)??0)>=(world.variableUpdates.get(`p${b.index}`)??0)?direct:((world.varps.get(b.index)??0)>>>b.start)&(2**(b.end-b.start+1)-1);
   }else if(def.varp!==undefined&&def.varp!==-1)value=world.varps.get(def.varp)??0;
-  const next=value>=0&&value<def.transforms.length-1?def.transforms[value]:def.transforms.at(-1)!;
+  const selected=value>=0&&value<def.transforms.length-1?def.transforms[value]:-1;
+  // Match the native ObjectType resolver: empty indexed slots use the fallback.
+  const next=selected===-1?def.transforms.at(-1)!:selected;
   if(next===-1)return null;
   def=await data.object(next);
  }

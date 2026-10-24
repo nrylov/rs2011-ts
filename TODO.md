@@ -7,7 +7,7 @@ marked reported need reproduction; they are not established diagnoses.
 ## Next session
 
 - [ ] Coordinate the pending gateway/client-web reload after the active agent
-  finishes, then refresh its game page to load the new manor-refusal handling.
+  finishes, then refresh its game page to load the manor-refusal and NPC/object fallback fixes.
   The fleet map is implemented/tested but its routes/metadata are not live yet.
 - [ ] **Vampire Slayer presentation**: review the user's downloaded video when
   available, then identify opening/final staking animations and periodic garlic
@@ -57,6 +57,11 @@ Do not add SDK-only changes there merely to work around an unverified client iss
   service boundaries before choosing a separate-server design.
 
 ## Recently completed
+
+- [x] Fix Gerrant and other NPC/object empty-slot fallback forms to match the
+  native revision-634 client; real-cache, hidden/cyclic-form and observer tests pass.
+- [x] Reproduce the castle-stair query issue as first-page scenery crowding;
+  document name/action filtering before pagination and the Staircase cache name.
 
 - [x] Complete Ernest through the rendered-client SDK, check exact rewards,
   repeat-payment safety and relog/save persistence; stop only the QA services.

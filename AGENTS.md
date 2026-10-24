@@ -127,7 +127,13 @@ needed; strings match exactly ignoring case, regexes allow partial matches.
 Results include `id`, `name`, `x`, `y`, `level`, tile `distance`, original
 `options`, and `actions: [{index,label}]` with real menu slots. The default page
 is 200 nearest matches; use `limit` (up to 1000) and `offset` for more, or filter
-first. Numeric radius calls such as `nearbyObjects(16)` still work.
+first. An unfiltered first page is not a complete scene scan: do not fetch
+`nearbyObjects()` and then filter that page in JavaScript when seeking a target.
+At the Lumbridge courtyard, scenery can push both castle staircases out of that
+page even 17 tiles away. Use `nearbyObjects({name:/stair/i})` or
+`findNearbyObject(/stair/i)` so filtering precedes pagination. The cache name is
+"Staircase", so `/stairs/i` does not match it. Numeric radius calls such as
+`nearbyObjects(16)` still work.
 `await sdk.findNearbyObject(36880)` finds a placed ID, and
 `await sdk.findNearbyObject(/^door$/i, {action:'Open'})` combines selectors.
 Do not discard all objects without options: hoppers and fires may be valid

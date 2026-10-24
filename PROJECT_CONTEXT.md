@@ -72,6 +72,23 @@ allowlists before assuming a documented local method is remotely callable.
 Staff-free autocasting is correct for this revision; the requirement was removed
 in 2009. Lunar spells do not support autocast; see the linked feedback audit.
 
+## Discovery findings
+
+Gerrant's apparent missing cache values were an SDK morph-resolution error.
+The native revision-634 NPC/ObjectType resolvers use the explicit fallback when
+an indexed slot is `-1`; the SDK formerly hid that form. The corrected resolvers
+retain true hidden forms, nested/cycle checks and update precedence. Actual
+Gerrant records (558 → fallback 12261; quest form 11699, varbit 7451) and remote
+observer discovery are regression-tested. This is a client/SDK fix, with no
+server or quest-variable changes. Loaded browser bundles still need the queued
+web rebuild/reload and page refresh before they use it.
+
+Castle stair discovery has a separate pagination trap: at `(3221,3221,0)`, an
+unfiltered 200-object page omits both staircases, but filtering inside the query
+finds them 17 tiles away. Prefer `nearbyObjects({name:/stair/i})` or
+`findNearbyObject(/stair/i)`; `/stairs/i` does not match the name Staircase.
+Do not confuse a first page with the entire loaded-scene search range.
+
 ## Deployment checkpoint at end of session
 
 The four development services were restarted on 2026-10-23 after activating

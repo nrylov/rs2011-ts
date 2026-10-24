@@ -311,7 +311,9 @@ export class BotSDK {
   while(def.transforms){if(seen.has(def.id))throw new Error('Recursive NPC morph');seen.add(def.id);let value=-1;const w=this.getState();
    if(def.varbit!==undefined&&def.varbit!==-1){const b=await this.data.varbit(def.varbit);const direct=w.varbits.get(b.id);value=direct!==undefined&&(w.variableUpdates.get(`b${b.id}`)??0)>=(w.variableUpdates.get(`p${b.index}`)??0)?direct:((w.varps.get(b.index)??0)>>>b.start)&(2**(b.end-b.start+1)-1);}
    else if(def.varp!==undefined&&def.varp!==-1)value=w.varps.get(def.varp)??0;
-   const next=value>=0&&value<def.transforms.length-1?def.transforms[value]:def.transforms.at(-1)!;if(next===-1)return null;def=await this.data.npc(next);
+   const selected=value>=0&&value<def.transforms.length-1?def.transforms[value]:-1;
+   // Revision 634 also falls back when the indexed slot itself is empty.
+   const next=selected===-1?def.transforms.at(-1)!:selected;if(next===-1)return null;def=await this.data.npc(next);
   }return def;
  }
  async nearbyNpcs(){const p=this.getState().player;if(!p)return [];const result=await Promise.all([...this.getState().npcs.values()].filter(n=>n.level===p.level).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y)).map(async n=>{const def=await this.npcDefinition(n.type!);return def?{...n,...def}:null;}));return result.filter((n):n is NonNullable<typeof n>=>n!==null);}

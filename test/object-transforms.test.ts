@@ -34,10 +34,10 @@ test('flour bin queries refresh with personal state and retain placed ID and coo
  t.world.varps.set(695,0);expect(await t.sdk.findNearbyObject(/flour bin/i)).toBeNull();expect((await t.sdk.objectDefinition(36880))?.name).toBe('Mill');
  expect(t.region.objects[0].name).toBe('');expect(parent.name).toBe('');
 });
-test('object varbits respect direct updates and later parent-varp updates, with hidden and fallback forms',async()=>{
+test('object varbits respect update order and empty indexed slots use the fallback',async()=>{
  const base={...parent,id:7,varbit:10,varp:-1,transforms:[36879,36878,-1,36879]},t=setup([base,full,empty]);
  t.world.varps.set(100,4);expect(await t.sdk.objectDefinition(7)).toMatchObject({name:'Flour bin',id:7,resolvedId:36878});
- t.world.varbits.set(10,2);t.world.variableUpdates.set('b10',2);expect(await t.sdk.objectDefinition(7)).toBeNull();
+ t.world.varbits.set(10,2);t.world.variableUpdates.set('b10',2);expect(await t.sdk.objectDefinition(7)).toMatchObject({name:'Mill',resolvedId:36879});
  t.world.variableUpdates.set('p100',3);expect(await t.sdk.objectDefinition(7)).toMatchObject({name:'Flour bin'});
  t.world.varps.set(100,12);expect(await t.sdk.objectDefinition(7)).toMatchObject({name:'Mill'});
 });

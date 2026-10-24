@@ -284,3 +284,30 @@ singular/plural and apostrophe variants without consuming the simulated opening
 timeout. Main gateway/web activation and an existing game-page refresh remain
 coordinated with the active agent; no main session was interrupted by these
 source/test changes. Only the disposable QA services were stopped.
+
+
+## Gerrant fallback and castle-stair discovery — 2026-10-23
+
+Read-only observer inspection of test7 reproduced `npcDefinition(558) === null`.
+The installed cache contains all three relevant records; raw 558 has no name,
+uses varbit 7451 and defaults through an empty indexed slot to form 12261.
+The native client's `NpcType.method794` and `ObjectType.method480` explicitly
+fall back for an indexed `-1`. Correct both SDK resolvers instead of changing
+cache definitions or faking quest progress. Gerrant's sparse Trade slot remains
+2, and interaction packets retain the live entity index/original type.
+
+Real-cache fixtures cover Gerrant's default and quest forms, update precedence,
+hidden/nested/cyclic forms and Trade dispatch; an observer-gateway test covers
+name discovery. An existing object test incorrectly expected an indexed hole
+to hide a valid fallback and now checks the native-equivalent Mill result.
+All 338 SDK tests pass with two optional live-login tests skipped. Scoped
+tracked-source TypeScript and browser build checks pass; unrelated private bot
+scripts remain outside the scoped check.
+
+An installed-cache courtyard probe at `(3221,3221,0)` found zero castle stairs
+in the default 200-object page, but a query-level `/stair/i` filter found both
+at 17 tiles. Read-only queries on the attached floor-2 client also found its two
+stairs at 8 and 14 tiles. The search covers the loaded scene; apply name/action
+filters before pagination. Neither investigation moved or took control of test7,
+restarted services or refreshed the active browser. The fallback fix needs the
+coordinated client-web rebuild and page refresh to become active there.

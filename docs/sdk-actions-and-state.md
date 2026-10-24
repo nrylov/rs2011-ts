@@ -110,6 +110,13 @@ const door = await sdk.findNearbyObject(/^door$/i, {action: 'Open'});
 
 Name and action strings match exactly, ignoring case; use a RegExp for
 partial matches. Filters combine with AND and apply before pagination.
+Filter inside the query, rather than fetching an unfiltered page and applying
+JavaScript `.filter()` afterward. From `(3221,3221,0)`, the first 200 scenery
+objects contain neither castle staircase, while `nearbyObjects({name:/stair/i})`
+finds both at 17 tiles. They are named **Staircase**; `/stairs/i` misses that name.
+Use `findNearbyObject(/stair/i)` for the nearest match. This is pagination, not
+a small default search radius. A query only searches the current loaded floor.
+
 Queries return the nearest 200 matches by default. Set `limit` (1–1000)
 and `offset` to read further pages without flooding gateway responses:
 
@@ -272,3 +279,22 @@ observations cannot distinguish simultaneous manual trades or unrelated item
 changes; keep one controller and avoid overlapping manual inventory actions.
 Timeout/cancellation stops later batches; it cannot retract a packet already
 accepted by the server. Re-query inventory before retrying uncertain trades.
+
+
+## NPC and object fallback forms
+
+Revision 634 resolves an empty (`-1`) indexed morph slot through the definition's
+explicit fallback, just as it does an out-of-range selector. An NPC/object is
+hidden only when that resolution also gives `-1`. Both SDK resolvers follow this
+rule without changing the game cache or pretending a quest variable advanced.
+
+Gerrant is a useful example: placed NPC type 558 uses varbit 7451 (varp 1861,
+bits 0–5). At the ordinary default value zero, its empty indexed slot falls back
+to named form 12261; some quest values select form 11699. Both expose Talk-to
+and Trade. `findNearbyNpc(/^Gerrant$/i)` retains the live NPC index and original
+entity type for packets while publishing the current form's name/options.
+Actual visibility still requires Gerrant to be in the client's NPC updates.
+
+The former SDK returned null at zero despite the regular client displaying him.
+The fix also applies to nested defaults, preserves real hidden forms and cycle
+checks, and retains direct-varbit versus newer-parent-varp update precedence.
