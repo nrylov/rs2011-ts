@@ -1,3 +1,4 @@
+import {scriptedPassage} from '../src/core/object-passages.ts';
 import {test,expect} from 'bun:test';
 import {BotSDK,BotActions,type GameData} from '../src/core/sdk.ts';
 import {World} from '../src/core/world.ts';
@@ -156,4 +157,50 @@ test.each(["The doors won't open.","The gates won’t open.","The door will not 
  expect(await t.bot.walkTo(12,5)).toMatchObject({x:12,y:5,arrived:true,doorsOpened:0});expect(t.opens).toEqual([10]);
  expect(t.w.tick).toBe(0); // Explicit feedback must not consume the simulated door-effect timeout.
  expect((await t.sdk.planRoute(8,5))?.path.some(p=>p.y===30)).toBe(true);
+});
+
+
+function cellarFixture(options:{locked?:boolean;misplaced?:boolean;blockedExit?:boolean}={}){
+ const door:MapObject={...gate,id:139,name:'Door',x:3105,y:9760,shape:10,rotation:0,options:options.locked?[]:['Open']};
+ if(options.misplaced)door.x++;
+ const wall={...gate,id:85,name:'',options:[],x:3104,y:9760,rotation:2};
+ const r=region(48,152,(x,y)=>y===9760&&x>=3102&&x<=3108,[door,wall]);
+ r.terrain.flags[tileIndex(3105%64,9760%64,0)]=1;
+ if(options.blockedExit)r.terrain.flags[tileIndex(3106%64,9760%64,0)]=1;
+ return fixture([r],3103,9760);
+}
+test('scripted cellar passage crosses its verified solid doorway without clearing the wall',async()=>{
+ const t=cellarFixture(),plan=await t.sdk.planRoute(3107,9760);
+ expect(plan?.doors).toMatchObject([{object:{id:139},from:{x:3104,y:9760},to:{x:3106,y:9760},scriptedPassage:true}]);
+ expect(plan?.path).not.toContainEqual({x:3105,y:9760});
+ expect(await t.sdk.planRoute(3107,9760,{openDoors:false})).toBeNull();
+ t.w.player!.x=3107;
+ expect((await t.sdk.planRoute(3103,9760))?.doors[0]).toMatchObject({from:{x:3106,y:9760},to:{x:3104,y:9760},scriptedPassage:true});
+ expect(t.moves).toEqual([]);expect(t.opens).toEqual([]);
+});
+test('cellar links do not invent crossings for locked, misplaced or blocked passages',async()=>{
+ for(const options of [{locked:true},{misplaced:true},{blockedExit:true}])expect(await cellarFixture(options).sdk.planRoute(3107,9760)).toBeNull();
+ const base={...gate,id:139,x:3105,y:9760,shape:10};
+ expect(scriptedPassage({...base,level:1})).toBeNull();
+ expect(scriptedPassage({...base,shape:0})).toBeNull();
+ expect(scriptedPassage({...base,id:999})).toBeNull();
+ expect(scriptedPassage({...base,options:['Search']})).toBeNull();
+ expect(scriptedPassage({...base,id:145,x:3102,y:9758})).toEqual([{x:3102,y:9757},{x:3102,y:9759}]);
+});
+test('cellar walker observes the opposite side, not the first tile of movement, and never walks the jump',async()=>{
+ const t=cellarFixture();let intermediate=false;
+ t.setOpen(()=>{t.w.player!.x=3105;});
+ const wait=t.sdk.session.waitFor.bind(t.sdk.session);
+ t.sdk.session.waitFor=async(predicate:any,timeout?:number)=>{
+  if(t.w.player!.x===3105){expect(predicate(t.w)).toBe(false);intermediate=true;t.w.player!.x=3106;}
+  return wait(predicate,timeout);
+ };
+ expect(await t.bot.walkTo(3107,9760)).toMatchObject({arrived:true,x:3107,doorsOpened:1});
+ expect(intermediate).toBe(true);expect(t.opens).toEqual([139]);
+ expect(t.moves).toEqual([{x:3104,y:9760},{x:3107,y:9760}]);
+});
+test('a refused scripted cellar passage stops rather than cycling through the same gate',async()=>{
+ const t=cellarFixture();t.setOpen(()=>{t.w.messages.push({type:0,text:'This door is locked.'});t.w.messageSequence++;});
+ await expect(t.bot.walkTo(3107,9760)).rejects.toThrow('No route after This door is locked.');
+ expect(t.opens).toEqual([139]);expect(t.w.player!.x).toBe(3104);
 });

@@ -88,6 +88,22 @@ allowlists before assuming a documented local method is remotely callable.
 Staff-free autocasting is correct for this revision; the requirement was removed
 in 2009. Lunar spells do not support autocast; see the linked feedback audit.
 
+## Scripted cellar passages
+
+Test7's Ernest cellar loop exposed a separate routing gap after the manor-refusal
+fix was loaded. Puzzle doors have live locked/unlocked forms, but solid terrain
+and a fixed wall remain under the door. Ordinary removal of the door collision
+cannot create a route. `object-passages.ts` now registers the nine verified
+revision-634 placements as side-to-side interaction edges only when the live
+form offers Open. Other walls, locked gates and unknown/blocked endpoints remain
+solid. The walker clicks once and observes the expected opposite-side tile
+before replanning. This does not choose levers or solve the quest.
+
+Raw `sendObjectOption` still confirms dispatch only. Repeated Open clicks can
+cross back and forth; agents should use sequential `bot.walkTo` for available
+passages and observe lever state changes before planning again. Paths containing
+`scriptedPassage` steps are interaction plans, not plain walk-packet waypoints.
+
 ## Discovery findings
 
 Gerrant's apparent missing cache values were an SDK morph-resolution error.

@@ -7,7 +7,8 @@ marked reported need reproduction; they are not established diagnoses.
 ## Next session
 
 - [ ] Coordinate the pending gateway/client-web reload after the active agent
-  finishes, then refresh its game page to load the manor-refusal, NPC/object fallback and character-design guidance fixes.
+  finishes, then refresh its game page to load the manor-refusal, NPC/object fallback and character-design guidance fixes. The regular-client web service has been
+  restarted; verify each browser actually refreshed and loaded the current code.
   The fleet map is implemented/tested but its routes/metadata are not live yet.
 - [ ] **Vampire Slayer presentation**: review the user's downloaded video when
   available, then identify opening/final staking animations and periodic garlic
@@ -57,6 +58,12 @@ Do not add SDK-only changes there merely to work around an unverified client iss
   service boundaries before choosing a separate-server design.
 
 ## Recently completed
+
+- [x] Model Ernest cellar gates as verified scripted crossings; keep underlying
+  walls solid, respect current Open availability and wait for opposite-side
+  arrival. Reproduced old no-route results and verified corrected routes against
+  test7's captured variables and the real cache without controlling the account.
+
 
 - [x] Expose first-login character design in MCP startup/list/execution results,
   add guarded confirmation to new bot scripts, and give actionable tab/action

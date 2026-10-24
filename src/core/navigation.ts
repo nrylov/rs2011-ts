@@ -1,3 +1,4 @@
+import {scriptedPassage} from './object-passages.ts';
 import {CHARACTER_DESIGN_MESSAGE} from './onboarding.ts';
 import {actionRefusalSince} from './action-feedback.ts';
 import type {BotSDK} from './sdk.ts';
@@ -13,7 +14,7 @@ export interface RouteOptions {
  interactionSize?:number;
 }
 export interface WalkOptions extends RouteOptions {timeout?:number;}
-export interface DoorStep {index:number;object:MapObject;from:Point;to:Point;}
+export interface DoorStep {index:number;object:MapObject;from:Point;to:Point;scriptedPassage?:true;}
 export interface RoutePlan {
  path:Point[];doors:DoorStep[];level:number;destination:Point;tolerance:number;visited:number;regions:number;
  interactionSize?:number;
@@ -53,20 +54,21 @@ export class NavigationService {
   if(distance(start,{x,y})>1024)throw new Error('Destination is more than 1024 tiles away; use intermediate destinations or the required transit object');
   const {tolerance,maxVisited,maxRegions}=limits(options),level=start.level,target={x,y};
   const collision=new CollisionMap([],[],level),loaded=new Map<string,Promise<void>>(),neighbourhoods=new Set<string>();
-  const wallDoors=new Map<string,MapObject[]>(),areaDoors:MapObject[]=[];
+  const wallDoors=new Map<string,MapObject[]>(),areaDoors:MapObject[]=[],passages=new Map<string,{object:MapObject;from:Point;to:Point}[]>();
   for(const [key,value]of this.blockedDoors)if(value.until<=Date.now())this.blockedDoors.delete(key);
-  const remember=(o:MapObject)=>{if(o.shape<=3)for(const key of doorEdges(o)){const list=wallDoors.get(key)??[];list.push(o);wallDoors.set(key,list);}else areaDoors.push(o);};
+  const remember=(o:MapObject)=>{const passage=scriptedPassage(o);if(passage){const [a,b]=passage;for(const [from,to]of [[a,b],[b,a]]){const key=`${from.x},${from.y}`,list=passages.get(key)??[];list.push({object:o,from,to});passages.set(key,list);}return;}if(o.shape<=3)for(const key of doorEdges(o)){const list=wallDoors.get(key)??[];list.push(o);wallDoors.set(key,list);}else areaDoors.push(o);};
   const load=(rx:number,ry:number):Promise<void>=>{
    if(rx<0||ry<0||rx>255||ry>255)return Promise.resolve();const key=`${rx}:${ry}`;const existing=loaded.get(key);if(existing)return existing;
    if(loaded.size>=maxRegions)throw new Error(`Route exceeded its ${maxRegions}-region search budget`);
    const pending=(async()=>{check();const region=await this.sdk.sceneRegions.region(rx,ry);check();if(!region)return;
     const objects=await resolvedSceneObjects([region],this.sdk.getState(),this.sdk.data);check();
-    const solid=objects.filter(o=>{if(o.level===level&&options.openDoors!==false&&isNavigationDoor(o)&&!this.blockedDoors.has(doorKey(o))){remember(o);return false;}return true;});
+    const solid=objects.filter(o=>{if(o.level===level&&options.openDoors!==false&&isNavigationDoor(o)&&!this.blockedDoors.has(doorKey(o))){remember(o);return !!scriptedPassage(o);}return true;});
     collision.add([region],solid);
    })();loaded.set(key,pending);return pending;
   };
   // Adjacent chunks contribute walls and object footprints that cross region boundaries.
   const ensure=async(p:Point)=>{const rx=p.x>>>6,ry=p.y>>>6,key=`${rx}:${ry}`;if(neighbourhoods.has(key))return;const jobs:Promise<void>[]=[];for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)jobs.push(Promise.resolve().then(()=>load(rx+dx,ry+dy)));await Promise.all(jobs);neighbourhoods.add(key);};
+  const passageBetween=(a:Point,b:Point)=>passages.get(`${a.x},${a.y}`)?.find(p=>p.to.x===b.x&&p.to.y===b.y);
   const crossing=(a:Point,b:Point)=>[...(wallDoors.get(edge(a,b))??[]),...areaDoors.filter(o=>!inside(a,o)&&inside(b,o))];
   const crossesDoor=(a:Point,b:Point)=>crossing(a,b).length>0||(a.x!==b.x&&a.y!==b.y&&[crossing(a,{x:b.x,y:a.y}),crossing(a,{x:a.x,y:b.y}),crossing({x:b.x,y:a.y},b),crossing({x:a.x,y:b.y},b)].some(v=>v.length));
   const size=options.interactionSize;
@@ -88,12 +90,20 @@ export class NavigationService {
    if(scores.get(node.id)!==node.g)continue;check();const p=point(node.id);
    if(size!==undefined)await ensure(p);
    if(reached(p)){const path:Point[]=[];let id=node.id;while(true){path.push(point(id));if(id===startId)break;id=parents.get(id)!;}path.reverse();const doors:DoorStep[]=[];
-    for(let i=1;i<path.length;i++)for(const object of crossing(path[i-1],path[i]))doors.push({index:i,object,from:path[i-1],to:path[i]});
+    for(let i=1;i<path.length;i++){const passage=passageBetween(path[i-1],path[i]);if(passage)doors.push({index:i,object:passage.object,from:path[i-1],to:path[i],scriptedPassage:true});else for(const object of crossing(path[i-1],path[i]))doors.push({index:i,object,from:path[i-1],to:path[i]});}
     return {path,doors,level,destination:target,tolerance,visited,regions:loaded.size,...(size===undefined?{}:{interactionSize:size})};
    }
    if(++visited>maxVisited)throw new Error(`Route exceeded its ${maxVisited}-tile search budget`);
    if(visited%512===0)await new Promise(resolve=>setTimeout(resolve,0));
    await ensure(p);
+   // Scripted passages are interaction edges. Keep their underlying collision
+   // intact, require known clear endpoints, and never send a walk over this jump.
+   for(const passage of passages.get(`${p.x},${p.y}`)??[]){
+    const q=passage.to,key=`${q.x},${q.y}`;
+    if(!collision.known.has(key)||collision.blocked.has(key))continue;
+    const cost=node.g+50,id=tile(q.x,q.y);if(cost>=(scores.get(id)??Infinity))continue;
+    scores.set(id,cost);parents.set(id,node.id);open.push({id,g:cost,h:heuristic(q),tie:Math.abs(x-q.x)+Math.abs(y-q.y)});
+   }
    for(const [dx,dy]of [[0,1],[1,0],[0,-1],[-1,0],[1,1],[1,-1],[-1,-1],[-1,1]]){
     const q={x:p.x+dx,y:p.y+dy};if(q.x<0||q.y<0||q.x>16383||q.y>16383||q.x<Math.min(start.x,x)-128||q.x>Math.max(start.x,x)+128||q.y<Math.min(start.y,y)-128||q.y>Math.max(start.y,y)+128)continue;
     if(!collision.canStep(p,q))continue;
@@ -143,7 +153,8 @@ export class NavigationService {
      let changedTick:number|undefined;
      try{
       this.sdk.sendObjectOption(live,'Open');
-      await bounded(this.sdk.session.waitFor(w=>{check();const rejected=refusal(sequence);if(rejected)throw new Error(rejected);if(w.player!.x!==before.x||w.player!.y!==before.y)return true;
+      await bounded(this.sdk.session.waitFor(w=>{check();const rejected=refusal(sequence);if(rejected)throw new Error(rejected);if(door.scriptedPassage)return w.player!.x===door.to.x&&w.player!.y===door.to.y;
+       if(w.player!.x!==before.x||w.player!.y!==before.y)return true;
        const change=w.objectChanges.get(key);if(change&&(change.id!==live.id||change.rotation!==live.rotation)){changedTick??=w.tick;return w.tick-changedTick>=2;}return false;
       },Math.max(1,Math.min(6000,end-Date.now()))));
       doorsOpened++;last={...this.sdk.getState().player!};

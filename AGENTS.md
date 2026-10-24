@@ -149,6 +149,14 @@ item-on-object targets. Current player-dependent forms are resolved, but
 objects can still be unreachable or quest-locked; inspect `sdk.canReach` and
 fresh game feedback. See `docs/sdk-actions-and-state.md`.
 
+Scripted puzzle passages can retain solid collision after they are unlocked.
+`bot.walkTo` knows the nine verified Ernest cellar gates and interacts with
+available gates sequentially, waiting to reach the opposite side. It does not
+solve lever combinations. `planRoute` marks these steps `scriptedPassage:true`;
+do not turn their two-tile edges into raw walk commands. Raw `sendObjectOption`
+returns after dispatch, so repeatedly opening the same gate can walk back across
+it. Observe each lever change and crossing before sending the next action.
+
 ## Fleet monitoring
 
 Use `/monitor/` on either client server to watch configured account positions,

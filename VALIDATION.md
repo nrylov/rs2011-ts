@@ -341,3 +341,27 @@ coordinated client-web rebuild and page refresh to become active there.
   original confirmation command immediately. Updated MCP startup guidance needs
   a new MCP process; new browser-hosted diagnostics require the coordinated web
   reload/page refresh already pending with the active agent.
+
+
+## Ernest cellar scripted-door routing — 2026-10-23
+
+Read-only observation of test7 confirmed the manor-refusal fix was now loaded.
+The agent nevertheless cycled raw Open dispatches between puzzle gates, while
+ordinary walkTo planning failed on solid terrain/walls under unlocked gates.
+Captured varp 33 was 22. The old loaded planner returned no route through gate 3
+or back to the ladder. The corrected planner, using captured variables and the
+actual cache, found a route back to `(3117,9753)` through gates 3 and 9. No test7
+movement, lever operation, teleport, inventory edit or controller takeover was
+performed during this investigation. The agent's Home Teleport was independent.
+
+Four new regression tests cover both crossing directions through retained solid
+collision, rejection of locked/misplaced/blocked gates, waiting through an
+intermediate movement tile, and stopping after a fresh locked-door refusal.
+The follower sends ordinary walks only outside the scripted edge and one Open
+interaction for the crossing. Full suite: **346 passed, 2 opt-in live tests
+skipped, 0 failed**; browser build passed. Scoped strict TypeScript checking
+excludes unrelated private test4/test6/test7/test8 scripts. The initial check
+exposed existing nullable-health errors in private test8 scripts; those files
+were left unchanged. Route replay is planning evidence, not a fresh live
+end-to-end cellar playtest; the earlier full quest playtest used manual observed
+crossings. Browser activation requires a page refresh after the web rebuild.
