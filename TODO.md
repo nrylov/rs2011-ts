@@ -6,15 +6,6 @@ marked reported need reproduction; they are not established diagnoses.
 
 ## Next session
 
-- [ ] **Improve existing commit messages.** Review completed for 58 SDK/client
-  commits and 19 base-server project commits after upstream `aa566b0d0`.
-  No history has been rewritten yet. Preserve trees, topology, author/committer
-  identities and dates, co-author trailers and signatures. Back up tips first;
-  validate every tree and parent mapping, update published commit links in a new
-  docs commit, and push with an exact force-with-lease. Do not rewrite upstream
-  server history. User authorized this, but coordinate with any other agents
-  before moving shared branches. The new collaboration-docs commits should also
-  remain intact. Local review metadata: `dev/backups/commit-message-review-20261023/`.
 - [ ] **Activate the remaining Blood Pact weapon lifetime fixes** at a coordinated
   restart. Staff/sword overlay is staged, not live; verify its deployment manifest
   and active hash. See project context and the server backlog. Kayle is already live.
@@ -69,6 +60,11 @@ Do not add SDK-only changes there merely to work around an unverified client iss
   service boundaries before choosing a separate-server design.
 
 ## Recently completed
+
+- [x] Reword the 58 SDK/client and 19 base-server project commits with readable
+  problem/behavior/implementation/validation explanations. Preserved trees,
+  topology, identities, dates and contributor trailers; re-signed replacements.
+  See [history maintenance](docs/history-maintenance.md) for scope and backups.
 
 - [x] Object morph resolution, full loaded-scene discovery, name/action filtering,
   coordinates and actual menu slots, including flour-bin and quest-rock cases.

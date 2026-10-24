@@ -114,3 +114,14 @@ the concrete problem, resulting behavior, relevant implementation and validation
 Scale detail to complexity. Keep independent server fixes independently reviewable.
 Distinguish implemented source, passing tests, deployed code and live validation;
 none of these automatically proves the others.
+
+## Commit history maintenance
+
+The authorized message rewrite is complete: 58 SDK/client and 19 base-server
+project messages now explain the problem, behavior, implementation and checks.
+Original code trees, parent topology, identities, dates and contributor trailers
+were verified unchanged; replacement commits have new verified signatures.
+The shared-context commits retain their messages/content with updated parents.
+Upstream server history is untouched. See [history maintenance](docs/history-maintenance.md)
+for backup locations and collaboration guidance. Historical private deployment
+records retain the hashes actually deployed; do not rewrite those records.
