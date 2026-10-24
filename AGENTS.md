@@ -133,15 +133,26 @@ Use `await sdk.nearbyObjects({name: /flour|hopper/i})` or
 loaded scene on your current floor. Combine `name` and `action` filters when
 needed; strings match exactly ignoring case, regexes allow partial matches.
 Results include `id`, `name`, `x`, `y`, `level`, tile `distance`, original
-`options`, and `actions: [{index,label}]` with real menu slots. The default page
-is 200 nearest matches; use `limit` (up to 1000) and `offset` for more, or filter
-first. An unfiltered first page is not a complete scene scan: do not fetch
-`nearbyObjects()` and then filter that page in JavaScript when seeking a target.
-At the Lumbridge courtyard, scenery can push both castle staircases out of that
-page even 17 tiles away. Use `nearbyObjects({name:/stair/i})` or
-`findNearbyObject(/stair/i)` so filtering precedes pagination. The cache name is
-"Staircase", so `/stairs/i` does not match it. Numeric radius calls such as
-`nearbyObjects(16)` still work.
+`options`, and `actions: [{index,label}]` with real menu slots.
+
+Broad queries (`nearbyObjects()`, radius-only queries) return objects with menu
+actions by default. This keeps non-actionable scenery out of the first page and
+retains unnamed objects with real actions. Name/ID queries search objects with
+or without menu actions, so item-use targets are not hidden. Set
+`actionableOnly:false` explicitly for a scenery-inclusive scan:
+
+```ts
+await sdk.nearbyObjects(); // menu-action objects across the loaded scene
+await sdk.findNearbyObject(/^fountain$/i); // no prior ID required
+await sdk.nearbyObjects({name:/hopper|fire/i}); // includes item-only targets
+await sdk.nearbyObjects({actionableOnly:false, limit:1000}); // include scenery
+```
+
+The default page is 200 nearest matches; use `limit` (up to 1000) and `offset`
+for more, or filter inside the SDK query. A partial page does not establish
+that a target is outside stream range. Use `nearbyObjects({name:/stair/i})` or
+`findNearbyObject(/stair/i)` for the cache name "Staircase" (`/stairs/i` does not
+match). Numeric radius calls such as `nearbyObjects(16)` still work.
 `await sdk.findNearbyObject(36880)` finds a placed ID, and
 `await sdk.findNearbyObject(/^door$/i, {action:'Open'})` combines selectors.
 Do not discard all objects without options: hoppers and fires may be valid

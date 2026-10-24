@@ -115,11 +115,23 @@ observer discovery are regression-tested. This is a client/SDK fix, with no
 server or quest-variable changes. Loaded browser bundles still need the queued
 web rebuild/reload and page refresh before they use it.
 
-Castle stair discovery has a separate pagination trap: at `(3221,3221,0)`, an
+Before broad discovery excluded non-actionable scenery, castle stair discovery had a pagination trap: at `(3221,3221,0)`, an
 unfiltered 200-object page omits both staircases, but filtering inside the query
 finds them 17 tiles away. Prefer `nearbyObjects({name:/stair/i})` or
 `findNearbyObject(/stair/i)`; `/stairs/i` does not match the name Staircase.
 Do not confuse a first page with the entire loaded-scene search range.
+
+Broad nearbyObjects queries now default to menu-action objects; name/ID searches
+retain no-menu targets, and actionableOnly:false explicitly includes scenery.
+Unnamed actionable quest objects remain discoverable. The lightweight map opts
+into the full set so item-on-object targets stay available. This addresses
+scenery crowding without inventing object names, hiding filtered hopper/fire
+searches, or extending beyond the client's loaded scene. Comparison with the
+local rs-sdk source found a 15-tile default scan, unnamed-scenery filtering,
+no collector page cap and separate extended scans; it retains named no-menu
+objects. Our loaded-scene range is already wider. New defaults require the
+browser-hosted SDK bundle to be refreshed; older clients can use the already
+supported actionableOnly:true filter immediately.
 
 ## Deployment checkpoint at end of session
 

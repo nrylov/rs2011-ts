@@ -40,7 +40,7 @@ export interface NearbyObjectOptions {
  action?:string|RegExp;
  /** Placed object ID, not the selected child definition ID. */
  id?:number;
- /** Excludes objects with no ordinary menu actions; item-on-object targets may have none. */
+ /** Broad queries default to true; name/ID searches default to false. Set false to include scenery and item-on-object targets with no menu actions. */
  actionableOnly?:boolean;
  /** Nearest-first page size (default 200, maximum 1000). Filters apply before pagination. */
  limit?:number;
@@ -241,11 +241,11 @@ export class BotSDK {
   if(typeof pattern!=='string'&&!(pattern instanceof RegExp))throw new Error('Inventory item selector must be a name, RegExp, or numeric item ID');
   for(const item of this.getInventory())if(match((await this.data.item(item.id)).name,pattern))return item;return null;
  }
- /** Search current-floor objects across the loaded scene, nearest first, with current personal forms. */
+ /** Search the full loaded scene on the current floor. Broad queries show menu-action objects by default; name/ID searches also include item-on-object targets. */
  async nearbyObjects(options:number|NearbyObjectOptions={}):Promise<NearbyObject[]>{
   const query=typeof options==='number'?{radius:options}:options;
   if(!query||typeof query!=='object'||Array.isArray(query))throw new Error('Pass a radius or nearby-object options');
-  const {radius,name,action,id,actionableOnly,limit=200,offset=0}=query;
+  const {radius,name,action,id,actionableOnly=name===undefined&&id===undefined,limit=200,offset=0}=query;
   if(radius!==undefined&&(!Number.isInteger(radius)||radius<0||radius>16383))throw new Error('Object radius must be an integer from 0 to 16383');
   for(const [key,value]of [['name',name],['action',action]] as const)if(value!==undefined&&typeof value!=='string'&&!(value instanceof RegExp))throw new Error(`Object ${key} filter must be text or a RegExp`);
   if(id!==undefined&&(!Number.isInteger(id)||id<0||id>65535))throw new Error('Object ID must be an integer from 0 to 65535');

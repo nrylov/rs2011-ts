@@ -27,7 +27,12 @@ test('name and action filters accept exact case-insensitive text and regexes, co
  expect((await t.sdk.nearbyObjects({action:/open|take-flour/gi})).map(o=>o.id)).toEqual([1,4,2]);
  expect((await t.sdk.nearbyObjects({name:/door/i,action:'climb-DOWN'})).map(o=>o.id)).toEqual([4]);
  expect((await t.sdk.nearbyObjects({actionableOnly:true})).map(o=>o.id)).toEqual([1,4,2]);
- expect((await t.sdk.nearbyObjects()).some(o=>o.name==='Hopper')).toBe(true);
+ expect((await t.sdk.nearbyObjects()).some(o=>o.name==='Hopper')).toBe(false);
+ expect((await t.sdk.nearbyObjects({actionableOnly:false})).some(o=>o.name==='Hopper')).toBe(true);
+ expect(await t.sdk.findNearbyObject('Hopper')).toMatchObject({id:3,actions:[]});
+ expect((await t.sdk.nearbyObjects({name:'Hopper'})).map(o=>o.id)).toEqual([3]);
+ expect((await t.sdk.nearbyObjects({id:3})).map(o=>o.id)).toEqual([3]);
+ expect(await t.sdk.findNearbyObject('Hopper',{actionableOnly:true})).toBeNull();
  expect(await t.sdk.findNearbyObject(2)).toMatchObject({id:2,name:'Flour bin'});
  expect(await t.sdk.findNearbyObject(/door/i,{action:/climb/i})).toMatchObject({id:4});
  expect(await t.sdk.findNearbyObject('Flour bin',24)).toBeNull();
@@ -46,4 +51,19 @@ test('invalid discovery filters fail before loading any cache regions',async()=>
 test('a scene change while cache requests are pending rejects the obsolete discovery',async()=>{
  const t=setup([object(1,3201)]),read=t.data.region;t.data.region=async(x,y)=>{const r=await read(x,y);t.world.region={...t.world.region!,baseX:4000};return r;};
  await expect(t.sdk.nearbyObjects()).rejects.toThrow('Scene changed');
+});
+
+test('scenery cannot crowd a distant fountain out of broad discovery, and unnamed actionable targets remain discoverable',async()=>{
+ const scenery=Array.from({length:250},(_,n)=>object(n+1000,3200+n%20,3200+Math.floor(n/20),'Flowers',[null,null,null,null,null]));
+ const t=setup([...scenery,object(153,3242,3200,'Fountain',['Search',null,null,null,null]),object(500,3201,3201,'',[null,null,'Search',null,null])]);
+ const broad=await t.sdk.nearbyObjects();
+ expect(broad.map(o=>o.id)).toEqual([500,153]);
+ expect(broad[0]).toMatchObject({name:'',actions:[{index:2,label:'Search'}]});
+ expect(broad[1]).toMatchObject({name:'Fountain',distance:42});
+ expect((await t.sdk.nearbyObjects(52)).map(o=>o.id)).toEqual([500,153]);
+ expect((await t.sdk.nearbyObjects({radius:52})).map(o=>o.id)).toEqual([500,153]);
+ expect((await t.sdk.nearbyObjects({actionableOnly:false})).some(o=>o.id===153)).toBe(false);
+ expect(await t.sdk.findNearbyObject(/^fountain$/i)).toMatchObject({id:153});
+ expect((await t.sdk.nearbyObjects({action:/search/i})).map(o=>o.id)).toEqual([500,153]);
+ expect(await t.sdk.nearbyObjects({name:'Flowers',actionableOnly:true})).toEqual([]);
 });

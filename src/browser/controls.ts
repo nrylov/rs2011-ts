@@ -155,7 +155,7 @@ export class Controls {
   const w=this.sdk.getState(),p=w.player;if(!p)return;
   const filter=(get('object-filter') as HTMLInputElement).value.trim().toLowerCase();
   const key=JSON.stringify([p.x,p.y,p.level,filter,this.selectedItem,[...w.objectChanges.values()]]);if(key===this.objectKey)return;this.objectKey=key;const request=++this.objectRequest;
-  void this.sdk.nearbyObjects(16).then(objects=>{
+  void this.sdk.nearbyObjects({radius:16,actionableOnly:false}).then(objects=>{
    if(request!==this.objectRequest)return;
    const matches=objects.filter(o=>hasObjectMenu(o,!!this.selectedItem)&&(!filter||o.name.toLowerCase().includes(filter))),rows=matches.slice(0,30).map(o=>{
     const row=el('div','');row.className='nearby-npc';row.append(el('span',`${o.name} · ${o.x}, ${o.y}`));const actions=el('button','Actions');actions.setAttribute('aria-label',`Actions for ${o.name} at ${o.x}, ${o.y}`);actions.onclick=e=>this.menu(o.name,[...this.objectUseActions(o),...o.options.flatMap((option,index)=>option?[{label:option,run:()=>{this.sdk.sendObjectOption(o,index);this.report(`${option} ${o.name}: sent to game.`);}}]:[])],e.clientX,e.clientY);row.append(actions);return row;

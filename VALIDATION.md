@@ -365,3 +365,30 @@ exposed existing nullable-health errors in private test8 scripts; those files
 were left unchanged. Route replay is planning evidence, not a fresh live
 end-to-end cellar playtest; the earlier full quest playtest used manual observed
 crossings. Browser activation requires a page refresh after the web rebuild.
+
+## Object discovery without scenery crowding — 2026-10-23
+
+Read-only live queries found the Draynor fountain by name at 42 tiles while it
+was absent from the default 200-object scenery page. This contradicts the
+reported stream-range explanation; no object ID or larger range was needed.
+The local rs-sdk reference collector defaults to 15 tiles, supports explicit
+larger scans, skips unnamed scenery, retains named no-menu objects and returns
+its collected list without a 200-result slice. The 634 SDK already searches
+its entire loaded scene, including asymmetric bounds and larger scene sizes.
+
+Broad 634 SDK discovery now defaults to menu-action objects before pagination.
+Name/ID searches remain inclusive, and explicit actionableOnly:false retains
+all scenery. Unnamed actionable objects are included. The lightweight map opts
+into scenery explicitly to preserve inventory-item targeting. No cache names or
+item-use recipes are invented. The new regression reproduces 250 nearby scenery
+objects obscuring a fountain 42 tiles away, verifies numeric-radius calls and
+unnamed Search targets, and preserves hopper lookup. Gateway tests verify
+remote default lists, inclusive name searches and explicit scenery mode.
+
+Full suite: **347 passed, 2 opt-in live tests skipped, 0 failed**. After adding
+remote coverage, the focused discovery/gateway suite passed 47 tests. Scoped
+strict TypeScript checking, browser build and API generation passed. Private
+bot scripts remain excluded from scoped checking as recorded above. Active
+services and clients were not restarted for this change: the default needs a
+coordinated client-web reload and page refresh. The already-supported explicit
+nearbyObjects({actionableOnly:true}) works in existing clients immediately.

@@ -59,6 +59,11 @@ Do not add SDK-only changes there merely to work around an unverified client iss
 
 ## Recently completed
 
+- [x] Keep non-actionable scenery out of broad object-discovery pages by default;
+  preserve unnamed actionable objects, inclusive name/ID searches and an
+  explicit scenery mode. Preserve item-on-object targets in lightweight menus.
+
+
 - [x] Model Ernest cellar gates as verified scripted crossings; keep underlying
   walls solid, respect current Open availability and wait for opposite-side
   arrival. Reproduced old no-route results and verified corrected routes against

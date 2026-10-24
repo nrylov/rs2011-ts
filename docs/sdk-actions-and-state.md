@@ -111,9 +111,9 @@ const door = await sdk.findNearbyObject(/^door$/i, {action: 'Open'});
 Name and action strings match exactly, ignoring case; use a RegExp for
 partial matches. Filters combine with AND and apply before pagination.
 Filter inside the query, rather than fetching an unfiltered page and applying
-JavaScript `.filter()` afterward. From `(3221,3221,0)`, the first 200 scenery
-objects contain neither castle staircase, while `nearbyObjects({name:/stair/i})`
-finds both at 17 tiles. They are named **Staircase**; `/stairs/i` misses that name.
+JavaScript `.filter()` afterward. A scenery-inclusive query at `(3221,3221,0)`
+can omit both castle staircases from its first 200 results, while
+`nearbyObjects({name:/stair/i})` finds both at 17 tiles. They are named **Staircase**; `/stairs/i` misses that name.
 Use `findNearbyObject(/stair/i)` for the nearest match. This is pagination, not
 a small default search radius. A query only searches the current loaded floor.
 
@@ -124,8 +124,22 @@ and `offset` to read further pages without flooding gateway responses:
 await sdk.nearbyObjects({actionableOnly: true, limit: 100, offset: 100});
 ```
 
-Objects with no ordinary menu actions remain in unfiltered results: a hopper
-can still accept grain, and a fire can accept raw food. Item-specific recipes
+Broad queries default to `actionableOnly:true`, excluding objects without
+ordinary menu actions before pagination. This includes numeric radius calls.
+Unnamed objects with actual actions are retained. Name/ID queries default to
+`actionableOnly:false`: a hopper can still accept grain, and a fire can accept
+raw food. An explicit `actionableOnly` always overrides the default. To explore
+all scenery and unknown item-use targets, use:
+
+```ts
+await sdk.nearbyObjects({actionableOnly:false, limit:1000});
+await sdk.nearbyObjects({name:/hopper|fire/i});
+const fountain = await sdk.findNearbyObject(/^fountain$/i);
+```
+
+Empty results or absence from a page are not evidence of the renderer's stream
+range. Discovery is based on loaded scene bounds and filters, not screen pixels.
+The lightweight map explicitly retains scenery for item-on-object menus. Item-specific recipes
 are server rules and cannot be inferred from the object's menu alone.
 Discovery includes objects behind walls and beyond immediate interaction
 range. Use `sdk.canReach(target)` to inspect an approach and walk closer when

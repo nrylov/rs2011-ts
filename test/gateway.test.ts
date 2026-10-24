@@ -308,11 +308,15 @@ test('shops expose read-only queries to observers and serialized actions to cont
 test('remote object discovery preserves name/action regex filters, coordinates, distances and original menu slots',async()=>{
  const t=await setup();let remote;try{
   const p=t.s.world.player!,bin={id:36880,name:'Flour bin',x:p.x+1,y:p.y,level:p.level,width:2,height:2,solid:2,shape:10,rotation:0,options:[null,'Take-flour',null,null,null]};
-  t.sdk.data.region=(x,y)=>({x,y,objects:x===(bin.x>>>6)&&y===(bin.y>>>6)?[bin]:[],terrain:{flags:Array(16384).fill(0),underlays:[],overlays:[],shapes:[],rotations:[]},underlayColours:{},overlayColours:{}});
+  const hopper={...bin,id:36881,name:'Hopper',x:p.x,options:[null,null,null,null,null]};
+  t.sdk.data.region=(x,y)=>({x,y,objects:x===(bin.x>>>6)&&y===(bin.y>>>6)?[bin,hopper]:[],terrain:{flags:Array(16384).fill(0),underlays:[],overlays:[],shapes:[],rotations:[]},underlayColours:{},overlayColours:{}});
   remote=await connectGateway(options(t.gateway.url,'observe'));
   expect(await remote.nearbyObjects({name:/^flour bin$/gi,action:/take-flour/i,limit:1})).toMatchObject([{id:36880,x:bin.x,y:bin.y,level:p.level,distance:1,actions:[{index:1,label:'Take-flour'}]}]);
   expect(await remote.findNearbyObject(36880,{action:'Take-flour'})).toMatchObject({id:36880});
   expect(await remote.nearbyObjects({action:'Open'})).toEqual([]);
+  expect((await remote.nearbyObjects()).map(o=>o.id)).toEqual([36880]);
+  expect(await remote.findNearbyObject(/^hopper$/i)).toMatchObject({id:36881,actions:[]});
+  expect((await remote.nearbyObjects({actionableOnly:false})).map(o=>o.id)).toEqual([36881,36880]);
  }finally{remote?.close();await t.close();}
 });
 
