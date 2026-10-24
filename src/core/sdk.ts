@@ -1,3 +1,4 @@
+import {onboardingState,CHARACTER_DESIGN_MESSAGE} from './onboarding.ts';
 import {actionRefusalSince} from './action-feedback.ts';
 import {ShopService,type ShopAmount} from './shops.ts';
 export type {ShopAmount,ShopItem,ShopState} from './shops.ts';
@@ -84,7 +85,7 @@ export class BotSDK {
  getRegionLayout(){return this.getState().region;}
  getStateSummary(){
   const w=this.getState(),r=w.region;
-  return {name:w.name,tick:w.tick,player:w.player,sourcePlayer:this.toSourceCoords(),region:r?{zoneX:r.zoneX,zoneY:r.zoneY,size:r.size,baseX:r.baseX,baseY:r.baseY,instanced:!!r.chunks,chunkCount:r.chunks?.length??0,sourceRegionCount:r.chunks?new Set(r.chunks.map(c=>`${c.sourceX>>>6}:${c.sourceY>>>6}`)).size:0}:null,inventory:this.getInventory(),equipment:this.getEquipment(),messageSequence:w.messageSequence,messages:this.getMessages().slice(-10),session:this.getSessionStatus()};
+  return {name:w.name,tick:w.tick,onboarding:onboardingState(w.windowId,w.interfaces.values()),player:w.player,sourcePlayer:this.toSourceCoords(),region:r?{zoneX:r.zoneX,zoneY:r.zoneY,size:r.size,baseX:r.baseX,baseY:r.baseY,instanced:!!r.chunks,chunkCount:r.chunks?.length??0,sourceRegionCount:r.chunks?new Set(r.chunks.map(c=>`${c.sourceX>>>6}:${c.sourceY>>>6}`)).size:0}:null,inventory:this.getInventory(),equipment:this.getEquipment(),messageSequence:w.messageSequence,messages:this.getMessages().slice(-10),session:this.getSessionStatus()};
  }
  getMessages(options:{afterSequence?:number;sinceTick?:number;sinceTime?:number}={}){
   for(const key of ['afterSequence','sinceTick','sinceTime'] as const)if(options[key]!==undefined&&(!Number.isFinite(options[key])||options[key]!<0))throw new Error('Message filters must be non-negative numbers');
@@ -132,7 +133,9 @@ export class BotSDK {
   return components.flatMap(c=>{const option=c.options.findIndex(o=>labels.has(o));if(option<0)return [];let current:Component|undefined=c;const seen=new Set<number>();while(current){if(seen.has(current.id))return [];seen.add(current.id);if(w.hidden.get((w.windowId<<16)|current.id)??current.hidden)return [];current=components.find(p=>p.id===current!.parent);}return [{interfaceId:w.windowId,component:c.id,option,label:c.options[option]}];});
  }
  async getGameTabStatus(){
-  const windowId=this.getState().windowId,tabs=await this.getGameTabs(),dialog=await this.getDialog();
+  const windowId=this.getState().windowId;
+  if(this.isOpen(1028))return {windowId,tabs:[] as Awaited<ReturnType<BotSDK['getGameTabs']>>,reason:CHARACTER_DESIGN_MESSAGE,instruction:[] as string[]};
+  const tabs=await this.getGameTabs(),dialog=await this.getDialog();
   const instruction=dialog?.kind==='instruction'?dialog.lines:[];
   const reason=![548,746].includes(windowId)?`Game tabs are unavailable in window ${windowId}.`:!tabs.length&&instruction.length?`Tutorial tabs are locked. ${instruction.join(' ')}`:!tabs.length?'No game tabs are currently visible.':null;
   return {windowId,tabs,reason,instruction};
@@ -210,6 +213,7 @@ export class BotSDK {
  }
  sendDropItem(item:Item|number){this.sendItemOption(this.inventoryItem(item),7);}
  inventoryActionError(){
+  if(this.isOpen(1028))return CHARACTER_DESIGN_MESSAGE;
   if(this.isOpen(620))return 'Close the shop before using inventory items.';
   if(this.isOpen(667))return 'Close Equipment Stats before using inventory items.';
   if(this.isOpen(762)||this.isOpen(11))return 'Close the bank or deposit box before using inventory items.';
@@ -380,6 +384,7 @@ export class BotActions {
  async continueDialog(options:{expected?:Dialog;timeout?:number}={}){return this.exclusive(()=>this.advanceDialog(null,options.expected,options.timeout));}
  async chooseDialogOption(selection:DialogPattern|number,options:{expected?:Dialog;timeout?:number}={}){return this.exclusive(()=>this.advanceDialog(selection,options.expected,options.timeout));}
  async talkTo(target:Entity|DialogPattern,timeout=20_000){return this.exclusive(async()=>{
+  if(this.sdk.isOpen(1028))throw new Error(CHARACTER_DESIGN_MESSAGE);
   if(!Number.isFinite(timeout)||timeout<=0)throw new Error('Dialogue timeout must be positive');
   const end=Date.now()+timeout;
   const n=typeof target==='string'||target instanceof RegExp?await this.sdk.findNearbyNpc(target):target;if(!n)throw new Error('No matching nearby NPC');
@@ -455,7 +460,13 @@ export class BotActions {
   }
   throw new Error('Bank did not open before the timeout. Check dialogue, PIN requirements, and whether the target can be reached.');
  });}
- async confirmAppearance(){return this.exclusive(async()=>{if(!this.sdk.isOpen(1028))throw new Error('Character creation is not open');this.sdk.session.clickInterface(1028,117);await this.sdk.session.waitFor(()=>!this.sdk.isOpen(1028),5000);});}
+ /** Accept the selected first-login design; repeated calls in the game frame do nothing. */
+ async confirmAppearance(){return this.exclusive(async()=>{
+  const gameFrame=()=>[548,746].includes(this.sdk.getState().windowId);
+  if(!this.sdk.isOpen(1028)){if(gameFrame())return;throw new Error('Character design is not open; wait for login before confirming appearance.');}
+  const sequence=this.sdk.getState().messageSequence;this.sdk.session.clickInterface(1028,117);
+  await this.sdk.session.waitFor(()=>{const refusal=this.rejectionSince(sequence);if(refusal)throw new Error(refusal);return !this.sdk.isOpen(1028)&&gameFrame();},5000);
+ });}
  async closeInterface(){return this.exclusive(async()=>{const creation=await this.sdk.getCreationMenu(),ids=[620,621,449,762,11,667,...(creation?[creation.id,...(creation.id===905?[916]:[])]:[])];const open=ids.filter(id=>this.sdk.isOpen(id));if(!open.length)return;this.sdk.session.closeInterface();await this.sdk.session.waitFor(()=>open.every(id=>!this.sdk.isOpen(id)),5000);});}
  async openShop(target?:Entity|string|RegExp,timeout=20000){return this.exclusive(()=>this.sdk.shops.open(target,timeout));}
  async closeShop(timeout=5000){return this.exclusive(()=>this.sdk.shops.close(timeout));}

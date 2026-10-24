@@ -44,6 +44,22 @@ session rather than logging the account into another client.
 Use `bun run docs:api` for an offline copy. Older validation sections describe
 historical milestones, not necessarily the currently deployed build.
 
+## First-login character design
+
+A fresh regular-client reproduction confirmed that the existing
+`await bot.confirmAppearance()` worked; agents lacked an onboarding signal.
+Character design is fullscreen window 1028, with no normal dialogue or game tabs.
+MCP startup/list/execution results now expose `onboarding` and its next action;
+new starter scripts confirm only when `sdk.isOpen('character creation')` is true.
+Confirmation preserves the selected design, waits for frame 548/746, and is safe
+to repeat after a manual click. Walking, talking and inventory/tab diagnostics
+now identify this prerequisite. No server or native-client changes are needed.
+
+The original confirmation command works in already-open clients. New MCP
+startup guidance needs a new MCP process; browser-hosted hints and the stricter
+confirmation postcondition need a client-web reload and browser refresh. Those
+main-runtime reloads remain pending coordination with the active agent.
+
 ## Important behavior already implemented
 
 - Saved account creation and MCP `start_bot` launch/sign-in for regular,

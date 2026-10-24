@@ -33,7 +33,7 @@ Browser controls:
 - Click an open tile to walk along an observed route with automatic door handling. Click an object/NPC or right-click a tile for actions. Doors and gates have square markers on their actual wall edges: amber when closed, green when open. Click the marker or its Door/Gate label for **Open** or **Close**, including on rotated doors and either half of a double gate. Hover and right-click use the same target. Tutorial progression checks still apply.
 - Drag to pan; scroll or use +/− to zoom; use **Follow character**, floor, grid and collision controls. Player and NPC names appear above their dots.
 - Click named inventory/equipment items for actions. Bank windows expose deposit/withdraw menus and a deposit-inventory button.
-- First-login character creation offers sex selection and confirmation of the current appearance; the full client provides the visual appearance editor. Tutorial instruction text is displayed when open.
+- First-login character creation offers sex selection and confirmation of the current appearance; agents use `if (await sdk.isOpen('character creation')) await bot.confirmAppearance();` before tutorial actions; the full client provides the visual appearance editor. Tutorial instruction text is displayed when open.
 - Dialogue text and choices come from server text updates and IF3 cache components. Click the actual labelled choice or continue button.
 - Action status distinguishes raw dispatches from helpers that observed a game update. The optional amount form submits a number only when the game requests one.
 

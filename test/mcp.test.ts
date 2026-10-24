@@ -18,6 +18,12 @@ test('MCP connects over stdio, executes TypeScript, exposes docs and terminates 
  const parse=(result:any)=>JSON.parse(result.content[0].text);
  let result=parse(await client.callTool({name:'list_bots',arguments:{}}));expect(result.bots[0]).toMatchObject({name:'mcpbot',online:true});
  result=parse(await client.callTool({name:'execute_code',arguments:{bot_name:'mcpbot',code:'const count: number = sdk.getInventory().length; console.log("items", count); return count;'}}));expect(result).toMatchObject({ok:true});expect(result.output).toEqual(['items 2']);expect(result.result).toBe('2');
+ session.world.windowId=1028;(session as unknown as{notify():void}).notify();await Bun.sleep(120);
+ const design=parse(await client.callTool({name:'start_bot',arguments:{bot_name:'mcpbot',client:'regular'}}));expect(design.windowId).toBe(1028);expect(design.onboarding.nextAction).toBe('await bot.confirmAppearance()');expect(session.world.windowId).toBe(1028);
+ const designQuery=parse(await client.callTool({name:'execute_code',arguments:{bot_name:'mcpbot',code:'return await sdk.isOpen("character_creation");'}}));expect(designQuery.result).toBe('true');expect(designQuery.state.onboarding.kind).toBe('character-design');
+ const blocked=parse(await client.callTool({name:'execute_code',arguments:{bot_name:'mcpbot',code:'await bot.walkTo(3223,3218);'}}));expect(blocked.ok).toBe(false);expect(blocked.error).toContain('bot.confirmAppearance()');expect(blocked.state.onboarding.nextAction).toBe('await bot.confirmAppearance()');
+ session.world.windowId=548;(session as unknown as{notify():void}).notify();await Bun.sleep(120);
+ const normal=parse(await client.callTool({name:'list_bots',arguments:{}}));expect(normal.bots[0].onboarding).toBeNull();
  const timed=parse(await client.callTool({name:'execute_code',arguments:{bot_name:'mcpbot',code:'while(true) {}',timeout:1}}));expect(timed.ok).toBe(false);expect(timed.error).toContain('timed out');
  result=parse(await client.callTool({name:'execute_code',arguments:{bot_name:'mcpbot',code:'return sdk.getInventory().length;'}}));expect(result.ok).toBe(true);
  const old=client.callTool({name:'execute_code',arguments:{bot_name:'mcpbot',code:'await new Promise(resolve=>setTimeout(resolve,5000)); return 1;'}});await Bun.sleep(100);const newer=parse(await client.callTool({name:'execute_code',arguments:{bot_name:'mcpbot',code:'return 2;'}}));expect(newer.ok).toBe(true);expect(parse(await old).error).toContain('Replaced');

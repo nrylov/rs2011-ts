@@ -60,6 +60,14 @@ return await sdk.getDialog();
 
 Use `await sdk.findInventoryItem(590)` for a numeric item ID, or pass an exact name/RegExp. `await sdk.npcDefinition(type)` works directly on the remote SDK. To await the next conversation, use `await sdk.waitForDialog({after: previousDialog, timeout:15000})`; instruction panels are excluded unless explicitly requested.
 
+First-login character design is a fullscreen interface, not a dialogue: `getDialog()` can be null and game tabs empty while it is open. `start_bot`, `list_bots` and execution state expose `onboarding` with the required action. Before walking or talking, accept the currently selected design:
+
+```ts
+if (await sdk.isOpen('character creation')) await bot.confirmAppearance();
+```
+
+The regular client can customize appearance visually before confirmation. Confirmation preserves those choices, waits for the normal game frame, and is safe to repeat after a manual confirmation. It does not complete or skip Tutorial Island. Newly generated starter scripts include this guard.
+
 Check state and tutorial instructions before acting. New characters must complete Tutorial Island normally; there is no SDK skip-tutorial shortcut. Begin with short snippets (about 10 seconds) and check observed effects before loops.
 
 `list_bots` reads connection status and positions without taking control. `disconnect_bot` cancels this MCP's execution and stops a lightweight client it started; externally started/browser clients remain running.

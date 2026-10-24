@@ -7,7 +7,7 @@ marked reported need reproduction; they are not established diagnoses.
 ## Next session
 
 - [ ] Coordinate the pending gateway/client-web reload after the active agent
-  finishes, then refresh its game page to load the manor-refusal and NPC/object fallback fixes.
+  finishes, then refresh its game page to load the manor-refusal, NPC/object fallback and character-design guidance fixes.
   The fleet map is implemented/tested but its routes/metadata are not live yet.
 - [ ] **Vampire Slayer presentation**: review the user's downloaded video when
   available, then identify opening/final staking animations and periodic garlic
@@ -57,6 +57,11 @@ Do not add SDK-only changes there merely to work around an unverified client iss
   service boundaries before choosing a separate-server design.
 
 ## Recently completed
+
+- [x] Expose first-login character design in MCP startup/list/execution results,
+  add guarded confirmation to new bot scripts, and give actionable tab/action
+  errors. Confirmation preserves appearance and waits for a real game frame.
+
 
 - [x] Fix Gerrant and other NPC/object empty-slot fallback forms to match the
   native revision-634 client; real-cache, hidden/cyclic-form and observer tests pass.

@@ -311,3 +311,33 @@ stairs at 8 and 14 tiles. The search covers the loaded scene; apply name/action
 filters before pagination. Neither investigation moved or took control of test7,
 restarted services or refreshed the active browser. The fallback fix needs the
 coordinated client-web rebuild and page refresh to become active there.
+
+
+## First-login character-design onboarding — 2026-10-23
+
+- Reproduced with a fresh account through the actual regular-client launcher,
+  BotManager and gateway on isolated ports 43598/8084/7781. The original
+  `bot.confirmAppearance()` already completed design: the missing piece was
+  actionable onboarding, not a broken confirmation packet.
+- A second fresh regular-client account reported window 1028 and the next action
+  in startup and execution results. `getDialog()` was correctly null. Walking
+  failed immediately with the confirmation instruction. Confirmation then closed
+  design, reached game frame 746 and cleared onboarding. No tutorial skip or
+  account-state edits were used.
+- Protocol-fixture tests cover the exact interface click, both fixed (548) and
+  resizable (746) frames, a transient root 0, harmless repeated confirmation,
+  aliases, guarded actions and action-lock release. MCP integration covers status,
+  success and failure metadata; provisioning checks the generated script guard.
+- Full suite: **342 passed, 2 opt-in live tests skipped, 0 failed**. Scoped strict
+  TypeScript checking passed (pre-existing private test4/test6/test7 scripts
+  excluded); browser build and generated API reference passed.
+- An optional third-account generated-script browser run did not reach login:
+  the isolated Java cache file provider raised a LinkedHashMap/ClassCastException
+  during concurrent fresh-browser asset loading. It supplies no additional
+  onboarding evidence; no server fix is included in this change. Generated
+  script content is covered by provisioning tests.
+- Disposable browsers and QA services were stopped afterward. Main game,
+  gateway and client-web services were left untouched. Existing tabs can use the
+  original confirmation command immediately. Updated MCP startup guidance needs
+  a new MCP process; new browser-hosted diagnostics require the coordinated web
+  reload/page refresh already pending with the active agent.

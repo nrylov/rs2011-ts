@@ -62,3 +62,18 @@ The source-generated API reference is available without login at
 badges to distinguish methods exposed through MCP from local-only helpers.
 Timeout arguments in SDK signatures are milliseconds; `execute_code.timeout`
 is seconds.
+
+## First-login character design
+
+A connected client may still be showing character design (window 1028). Startup,
+list and execution results include `onboarding.message` and `onboarding.nextAction`
+until it closes. It is not a dialogue, and game tabs are unavailable there.
+
+```ts
+if (await sdk.isOpen('character creation')) await bot.confirmAppearance();
+```
+
+This accepts the selected appearance and waits for the fixed or resizable game
+frame. Repeating confirmation after a manual click is harmless. Complete Tutorial
+Island normally afterward. New starter scripts include this check; existing
+scripts can add it. Execution failures also include current state when connected.
