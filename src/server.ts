@@ -1,3 +1,4 @@
+import {fleetMonitor} from './gateway/fleet-monitor.ts';
 import {buildApiReference} from '../scripts/api-reference.ts';
 import {createBrowserAccount} from './gateway/browser-account.ts';
 import {browserBootstrap} from './gateway/browser-bootstrap.ts';
@@ -12,6 +13,7 @@ const output=await Bun.build({entrypoints:[resolve(root,'src/browser/main.ts')],
 if(!output.success){console.error(output.logs);process.exit(1);}
 const script=await output.outputs[0].text();
 const regularBuild=await Bun.build({entrypoints:[resolve(root,'src/browser/regular-bridge.ts')],target:'browser',minify:false,sourcemap:'inline'});if(!regularBuild.success)throw new Error('Regular SDK bridge build failed');const regularScript=await regularBuild.outputs[0].text();
+const fleetBuild=await Bun.build({entrypoints:[resolve(root,'src/browser/fleet.ts')],target:'browser',minify:false});if(!fleetBuild.success)throw new Error('Fleet monitor build failed');const fleetScript=await fleetBuild.outputs[0].text();
 const apiReference=buildApiReference(root);
 let mapCache: DiskCache | undefined;
 const cachePath=process.env.VOID_CACHE_PATH;
@@ -23,6 +25,10 @@ const server=Bun.serve<Relay, never>({
     if(new URL(request.url).pathname==='/gateway/create-account')return createBrowserAccount(request,{enabled:process.env.BROWSER_GATEWAY_AUTO_ATTACH==='1',address:server.requestIP(request)?.address??null,root,configPath:process.env.GATEWAY_CONFIG??resolve(root,'gateway.config.json'),host,port:gamePort,cachePath,gatewayUrl:process.env.GATEWAY_URL??'ws://127.0.0.1:7780/gateway'});
     if(new URL(request.url).pathname==='/gateway/bootstrap')return browserBootstrap(request,{enabled:process.env.BROWSER_GATEWAY_AUTO_ATTACH==='1',address:server.requestIP(request)?.address??null,configPath:process.env.GATEWAY_CONFIG??resolve(root,'gateway.config.json'),gatewayUrl:process.env.GATEWAY_URL??'ws://127.0.0.1:7780/gateway'});
     const url=new URL(request.url);
+    if(url.pathname==='/monitor/data')return fleetMonitor(request,{enabled:process.env.BROWSER_GATEWAY_AUTO_ATTACH==='1',address:server.requestIP(request)?.address??null,configPath:process.env.GATEWAY_CONFIG??resolve(root,'gateway.config.json'),gatewayUrl:process.env.GATEWAY_URL??'ws://127.0.0.1:7780/gateway'});
+    if(['/monitor','/monitor/'].includes(url.pathname))return new Response(Bun.file(resolve(root,'fleet.html')),{headers:{'Content-Type':'text/html','Cache-Control':'no-store'}});
+    if(url.pathname==='/fleet.js')return new Response(fleetScript,{headers:{'Content-Type':'text/javascript','Cache-Control':'no-store'}});
+    if(url.pathname==='/fleet.css')return new Response(Bun.file(resolve(root,'fleet.css')),{headers:{'Content-Type':'text/css'}});
     if(['/api','/api/'].includes(url.pathname))return new Response(apiReference,{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
     if(url.pathname==='/game'){
       if(request.headers.get('origin')!==url.origin)return new Response('Invalid origin',{status:403});

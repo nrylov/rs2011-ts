@@ -25,7 +25,7 @@ Start the gateway in a separate process:
 GATEWAY_CONFIG=/absolute/path/gateway.config.json bun run gateway
 ```
 
-It binds to `127.0.0.1:7780` by default. `/health` exposes service health only; `/bots` requires `Authorization: Bearer <monitorToken>`. The listing contains configured bot names, connection status, latest position/floor, freshness and ownership/busy status; it does not contain game credentials or inventory. This is the feed for a future fleet-map dashboard, not a finished dashboard.
+It binds to `127.0.0.1:7780` by default. `/health` exposes service health only; `/bots` requires `Authorization: Bearer <monitorToken>`. The listing contains configured bot names, connection status, latest position/floor, freshness and ownership/busy status; it does not contain game credentials or inventory. The local [fleet map](monitoring.md) uses this feed.
 
 ## 2. Start a persistent game client on that host
 
@@ -157,7 +157,7 @@ This establishes remote session ownership, authenticated control/observation, ac
 | Area | Current gap |
 | --- | --- |
 | Agent tooling | Initial MCP tools and account-directory setup are available; richer agent scheduling, persistent task tracking and automatic game-session recovery remain. |
-| Fleet GUI | A standalone map dashboard that consumes fleet positions; the authenticated listing feed is ready. |
+| Fleet GUI | The read-only [fleet map](monitoring.md) shows configured publishers, presence and current gateway actions. Full-world telemetry and persistent per-agent timelines remain. |
 | Action coverage | Item-on-object/NPC actions, broader skilling/crafting/shop/trade/combat helpers, chat/friends and more interface controls. |
 | State coverage | Combat/targeting/animation evidence, more ClientScript-driven UI and broader quest-specific coverage; instanced chunk mapping and server-sent NPC transforms are supported. |
 | Navigation | Longer journeys, more automatic door/gate handling and fuller dynamic collision behavior. |

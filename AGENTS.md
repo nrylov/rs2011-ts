@@ -134,3 +134,11 @@ Do not discard all objects without options: hoppers and fires may be valid
 item-on-object targets. Current player-dependent forms are resolved, but
 objects can still be unreachable or quest-locked; inspect `sdk.canReach` and
 fresh game feedback. See `docs/sdk-actions-and-state.md`.
+
+## Fleet monitoring
+
+Use `/monitor/` on either client server to watch configured account positions,
+controller presence and current gateway actions without a game login or taking
+control. See [monitoring](docs/monitoring.md) for stale/offline state, instance
+coordinates, local provisioning and activation limits. This is a publisher fleet
+view; full server population telemetry remains separate work.

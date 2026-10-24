@@ -1,6 +1,6 @@
 import{interfaceId}from'../core/interface-names.ts';
 import type {BotSDK,BotActions,Dialog,DialogWaitOptions} from '../core/sdk.ts';
-import {botKey,deadline,encode,botActions,queryMethods,sdkActions,type Mode,type PublishedState,type WorldSnapshot} from './protocol.ts';
+import {botKey,deadline,encode,botActions,queryMethods,sdkActions,type FleetBot,type Mode,type PublishedState,type WorldSnapshot} from './protocol.ts';
 export interface GatewayConnectionOptions {url:string;name:string;token:string;mode?:Mode;takeover?:boolean;timeout?:number;label?:string;}
 export type RemoteBotActions=Pick<BotActions,typeof botActions[number]>;
 type QueryName=typeof queryMethods[number];type ActionName=typeof sdkActions[number];
@@ -160,4 +160,4 @@ export async function connectGateway(options:GatewayConnectionOptions):Promise<G
  });
 }
 export async function runGatewayScript<T>(options:GatewayConnectionOptions,fn:(context:{sdk:GatewaySDK;bot:RemoteBotActions})=>Promise<T>){const sdk=await connectGateway(options);try{return await fn({sdk,bot:sdk.bot});}finally{sdk.close();}}
-export async function listGatewayBots(url:string,monitorToken:string){const base=new URL(url);base.protocol=base.protocol==='wss:'?'https:':base.protocol==='ws:'?'http:':base.protocol;base.pathname='/bots';base.search='';const result=await fetch(base,{headers:{Authorization:`Bearer ${monitorToken}`},signal:AbortSignal.timeout(10000)});if(!result.ok)throw new Error(`Gateway listing failed (${result.status})`);return result.json() as Promise<{name:string;online:boolean;status:string;player:WorldSnapshot['player'];updatedAt:number|null;controlled:boolean;busy:boolean}[]>;}
+export async function listGatewayBots(url:string,monitorToken:string){const base=new URL(url);base.protocol=base.protocol==='wss:'?'https:':base.protocol==='ws:'?'http:':base.protocol;base.pathname='/bots';base.search='';const result=await fetch(base,{headers:{Authorization:`Bearer ${monitorToken}`},signal:AbortSignal.timeout(10000)});if(!result.ok)throw new Error(`Gateway listing failed (${result.status})`);return result.json() as Promise<FleetBot[]>;}

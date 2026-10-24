@@ -14,7 +14,7 @@ export type {Dialog,DialogButton,DialogPattern,DialogWaitOptions} from './core/d
 
 export {connectGateway,runGatewayScript,listGatewayBots,GatewaySDK,type GatewayConnectionOptions,type RemoteBotActions} from './gateway/remote.ts';
 export {attachGatewayClient} from './gateway/endpoint.ts';
-export type {GatewayConfig,WorldSnapshot,PublishedState} from './gateway/protocol.ts';
+export type {GatewayConfig,WorldSnapshot,PublishedState,FleetBot} from './gateway/protocol.ts';
 
 export type {CreationMenu,CreationProduct,CreationAction,CreationAmount} from './core/creation.ts';
 

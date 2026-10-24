@@ -329,3 +329,26 @@ test('fresh game refusals reach remote pickup errors and release gateway mutatio
   }
  }finally{remote?.close();await t.close();}
 });
+
+
+test('fleet metadata observes controller/action lifetime without exposing command arguments',async()=>{
+ const t=await setup();let remote,observer,release:(()=>void)|undefined;try{
+  let begin!:()=>void;const started=new Promise<void>(resolve=>begin=resolve);
+  t.bot.walkTo=async()=>{begin();await new Promise<void>(resolve=>release=resolve);return {x:3224,y:3218,level:0,arrived:true,steps:1,doorsOpened:0};};
+  remote=await connectGateway({...options(t.gateway.url),label:'QA controller'});observer=await connectGateway(options(t.gateway.url,'observe'));
+  const action=remote.bot.walkTo(3224,3218,{timeout:1000});await started;
+  const read=async()=>{const response=await fetch(t.gateway.url.replace('ws:','http:').replace('/gateway','/bots'),{headers:{Authorization:'Bearer '+config.monitorToken}});return (await response.json())[0];};
+  const running=await read();expect(running.controller.label).toBe('QA controller');expect(running.observers).toBe(1);expect(running.action.method).toBe('bot.walkTo');expect(running.action.startedAt).toBeLessThanOrEqual(Date.now());expect(running.busy).toBe(true);expect(running.mapPlayer).toMatchObject({x:t.s.world.player!.x,y:t.s.world.player!.y});expect(running.action.args).toBeUndefined();
+  release!();await action;const ended=await read();expect(ended.action).toBeNull();expect(ended.busy).toBe(false);expect(ended.controlled).toBe(true);
+ }finally{release?.();remote?.close();observer?.close();await t.close();}
+});
+
+
+test('fleet positions map instance chunks back to source tiles without publishing the chunk table',async()=>{
+ const t=await setup();try{
+  const w=t.s.world;w.player!.x=6501;w.player!.y=1050;w.region={zoneX:812,zoneY:131,size:104,baseX:6456,baseY:1000,chunks:[{x:6496,y:1048,level:0,sourceX:3872,sourceY:5520,sourceLevel:2,rotation:1}]};
+  (t.s as unknown as {notify():void}).notify();
+  let bot;for(let attempt=0;attempt<40;attempt++){bot=(await listGatewayBots(t.gateway.url,config.monitorToken))[0];if(bot.player?.x===6501)break;await Bun.sleep(10);}
+  expect(bot!.instanced).toBe(true);expect(bot!.player).toMatchObject({x:6501,y:1050,level:0});expect(bot!.mapPlayer).toEqual({x:3877,y:5525,level:2});expect(JSON.stringify(bot)).not.toContain('chunks');expect(JSON.stringify(bot)).not.toContain('containers');
+ }finally{await t.close();}
+});

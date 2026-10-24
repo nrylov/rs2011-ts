@@ -13,6 +13,8 @@ const hex = (rgb: number) => '#'+(rgb&0xffffff).toString(16).padStart(6,'0');
 export class MapView {
   readonly projection = new MapProjection();
   readonly store: RegionStore;
+  private overview?:{markers:{x:number;y:number;level:number;name:string;selected:boolean;stale:boolean}[];anchor:{x:number;y:number;level:number}};
+  setOverview(markers:NonNullable<MapView["overview"]>["markers"],anchor:{x:number;y:number;level:number}){this.overview={markers,anchor};this.draw();}
   onMenu?: (x:number,y:number,clientX:number,clientY:number)=>void;
   itemSelected=false;
   route:Point[]=[];
@@ -64,7 +66,7 @@ export class MapView {
     });
     canvas.addEventListener('contextmenu',e=>{e.preventDefault();if(!this.current?.player||this.floor!==null&&this.floor!==this.current.player.level)return;const tile=this.menuTile(e.clientX,e.clientY);this.onMenu?.(tile.x,tile.y,e.clientX,e.clientY);});
     canvas.addEventListener('pointercancel',()=>{this.dragging=undefined;});
-    canvas.addEventListener('pointerleave',()=>this.hover('Drag to pan · scroll to zoom · click a tile to walk'));
+    canvas.addEventListener('pointerleave',()=>this.hover(this.overview?'Drag to pan · scroll to zoom':'Drag to pan · scroll to zoom · click a tile to walk'));
   }
   recenter(){this.follow=true;this.draw(this.current);}
   zoom(factor:number){this.projection.zoom(this.projection.scale*factor);this.draw(this.current);}
@@ -205,7 +207,7 @@ export class MapView {
     this.current=world;
     const width=this.canvas.clientWidth,height=this.canvas.clientHeight,dpr=devicePixelRatio||1,c=this.ctx,p=this.projection;
     this.canvas.width=width*dpr;this.canvas.height=height*dpr;c.scale(dpr,dpr);p.width=width;p.height=height;
-    const player=world?.player;
+    const player=world?.player??this.overview?.anchor;
     if(this.follow&&player){p.x=player.x;p.y=player.y;}
     c.fillStyle='#17221e';c.fillRect(0,0,width,height);
     const plane=this.floor??player?.level??0,min=p.world(0,height),max=p.world(width,0);
@@ -243,7 +245,8 @@ export class MapView {
       for(const n of world.npcs.values())if(n.level===plane&&!n.hidden)dot(n.x,n.y,'#a3d1a5',4,n.name);
       for(const other of world.players.values())if(other.index!==world.index&&other.level===plane)dot(other.x,other.y,'#8cbbfa',4,other.name??`Player ${other.index}`);
       if(player.level===plane)dot(player.x,player.y,'#ffdc80',5,world.name);
-    }else{c.fillStyle='#9ab09d';c.font='14px system-ui';c.textAlign='center';c.fillText('Connect to load your surroundings',width/2,height/2);c.textAlign='left';}
+    }else if(!this.overview){c.fillStyle='#9ab09d';c.font='14px system-ui';c.textAlign='center';c.fillText('Connect to load your surroundings',width/2,height/2);c.textAlign='left';}
+    for(const marker of this.overview?.markers??[])if(marker.level===plane)dot(marker.x,marker.y,marker.stale?'#8e9a91':marker.selected?'#ffdc80':'#8cbbfa',marker.selected?6:4,marker.name+(marker.stale?' (last known)':''));
     const placed:{left:number;right:number;top:number;bottom:number}[]=[];
     c.font='11px monospace';c.textAlign='center';c.lineWidth=3;c.strokeStyle='#17221e';
     for(const label of labels.reverse()){

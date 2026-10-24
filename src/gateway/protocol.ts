@@ -32,3 +32,10 @@ export function decode(value:unknown,depth=0):any{
  throw new Error('Invalid arguments');
 }
 export function deadline(value:unknown=70_000){if(typeof value!=='number'||!Number.isFinite(value)||value<100||value>600_000)throw new Error('Timeout must be 100–600000 ms');return value;}
+
+export interface FleetBot {
+ name:string;online:boolean;status:string;player:{x:number;y:number;level:number}|null;
+ mapPlayer:{x:number;y:number;level:number}|null;instanced:boolean;updatedAt:number|null;
+ controlled:boolean;busy:boolean;controller:{id:string;label:string}|null;observers:number;
+ action:{method:string;startedAt:number}|null;
+}

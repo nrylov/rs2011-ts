@@ -1,0 +1,7 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Void · Fleet monitor</title><link rel="stylesheet" href="/fleet.css"></head><body>
+<header><div><strong>VOID <small>634</small></strong><h1>Fleet monitor</h1></div><nav><a href="/">Client</a><a href="/api/">SDK API</a></nav></header>
+<main><p class="intro">Configured bot sessions · read only · no game login required</p><p id="feed-status" role="status">Connecting to the local gateway…</p>
+<div class="layout"><section aria-label="World map"><div class="toolbar"><button id="recenter">Follow selected</button><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-out" aria-label="Zoom out">−</button><label>Floor <select id="floor"><option value="">Auto</option><option>0</option><option>1</option><option>2</option><option>3</option></select></label><span id="map-label">Lumbridge</span></div><canvas id="map" aria-label="Read-only bot position map"></canvas><p id="map-status">Drag to pan · scroll to zoom · select an account to follow</p></section>
+<aside><label class="search">Find account<input id="search" type="search" placeholder="Account name"></label><div id="totals"></div><div id="bot-list"></div></aside></div>
+<section class="details"><h2 id="selected-name">Select an account</h2><p id="selected-state">The map shows configured gateway publishers, not every player on the game server.</p><dl id="selected-details"></dl></section>
+</main><script type="module" src="/fleet.js"></script></body></html>
