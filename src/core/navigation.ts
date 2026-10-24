@@ -119,7 +119,7 @@ export class NavigationService {
     poll=setInterval(()=>{try{check();}catch(e){reject(e);}},100);
    })]);}finally{clearTimeout(timer!);clearInterval(poll!);}
   };
-  const refusal=(sequence:number)=>actionRefusalSince(this.sdk.getState(),sequence,/^(?:This (?:door|gate)|The (?:door|gate).*locked)/i);
+  const refusal=(sequence:number)=>actionRefusalSince(this.sdk.getState(),sequence,/^(?:This (?:door|gate)|The (?:doors?|gates?).*(?:locked|won't open|will not open))/i);
   if(!this.sdk.getState().playerUpdateAt)await this.sdk.session.waitFor(w=>w.playerUpdateAt>0,Math.max(1,Math.min(5000,end-Date.now())));
   check();if(!this.healthVarbit&&this.sdk.getState().skills.has(3)&&typeof this.sdk.data.varbit==='function')this.healthVarbit=await bounded(Promise.resolve(this.sdk.data.varbit(7198)));
   while(true){check();const p=this.sdk.getState().player!;if(options.interactionSize===undefined&&distance(p,{x,y})<=(options.tolerance??0))return {x:p.x,y:p.y,level,arrived:true as const,steps,doorsOpened};

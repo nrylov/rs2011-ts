@@ -147,3 +147,13 @@ test('object reachability does not accept an interaction edge through a separate
  expect(await t.sdk.canReach(object)).toMatchObject({reachable:false,blockingDoor:null});
  expect(t.moves).toHaveLength(0);
 });
+
+
+test.each(["The doors won't open.","The gates won’t open.","The door will not open."])("walker immediately reroutes on explicit passage refusal: %s",async(message)=>{
+ const g={...gate,x:10};const walls=Array.from({length:64},(_,y)=>({...g,id:11,name:'Wall',options:[],x:10,y})).filter(o=>o.y!==5&&o.y!==30);
+ const t=fixture([region(0,0,()=>true,[...walls,g])],8);
+ t.setOpen(()=>{t.w.messages.push({type:0,text:message});t.w.messageSequence++;});
+ expect(await t.bot.walkTo(12,5)).toMatchObject({x:12,y:5,arrived:true,doorsOpened:0});expect(t.opens).toEqual([10]);
+ expect(t.w.tick).toBe(0); // Explicit feedback must not consume the simulated door-effect timeout.
+ expect((await t.sdk.planRoute(8,5))?.path.some(p=>p.y===30)).toBe(true);
+});
